@@ -95,7 +95,7 @@ static void hidd_event_callback(esp_hidd_cb_event_t event,
 			//esp_bd_addr_t rand_addr = {0x04,0x11,0x11,0x11,0x11,0x05};
 
 			esp_ble_gap_set_device_name(GATTS_TAG);
-			esp_ble_gap_config_adv_data(&hidd_adv_data);
+			//esp_ble_gap_config_adv_data(&hidd_adv_data);
 		}
 		break;
 
@@ -110,7 +110,7 @@ static void hidd_event_callback(esp_hidd_cb_event_t event,
 	case ESP_HIDD_EVENT_BLE_DISCONNECT:
 		sec_conn = false;
 		ESP_LOGI(LOG_TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
-		esp_ble_gap_start_advertising(&hidd_adv_params);
+		//esp_ble_gap_start_advertising(&hidd_adv_params);
 		break;
 	case ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT:
 		ESP_LOGI(LOG_TAG, "%s, ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT",
@@ -129,7 +129,7 @@ static void gap_event_handler(esp_gap_ble_cb_event_t event,
 		esp_ble_gap_cb_param_t *param) {
 	switch (event) {
 	case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
-		esp_ble_gap_start_advertising(&hidd_adv_params);
+		//esp_ble_gap_start_advertising(&hidd_adv_params);
 		break;
 	case ESP_GAP_BLE_SEC_REQ_EVT:
 		for (int i = 0; i < ESP_BD_ADDR_LEN; i++) {

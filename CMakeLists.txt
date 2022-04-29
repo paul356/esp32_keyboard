@@ -6,3 +6,4 @@ cmake_minimum_required(VERSION 3.5)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(MK32)
+#idf_build_set_property(COMPILE_OPTIONS "-E" APPEND)

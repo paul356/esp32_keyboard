@@ -38,6 +38,7 @@
 #include "esp_timer.h"
 #include "esp_sleep.h"
 #include "esp_pm.h"
+#include "tinyusb.h"
 
 //HID Ble functions
 //#include "HID_kbdmousejoystick.h"
@@ -296,7 +297,9 @@ extern "C" void deep_sleep(void *pvParameters) {
 #endif
 
 extern "C" void app_main() {
-	//Reset the rtc GPIOS
+    // tinyusb init code
+
+    //Reset the rtc GPIOS
 	rtc_matrix_deinit();
 
 	//Underclocking for better current draw (not really effective)
@@ -335,7 +338,7 @@ extern "C" void app_main() {
 #ifdef MASTER
 	nvs_load_layouts();
 	//activate keyboard BT stack
-	halBLEInit(1, 1, 1, 0);
+	//halBLEInit(1, 1, 1, 0);
 	ESP_LOGI("HIDD", "MAIN finished...");
 #endif
 
@@ -369,7 +372,7 @@ extern "C" void app_main() {
 	// Start the keyboard Tasks
 	// Create the key scanning task on core 1 (otherwise it will crash)
 #ifdef MASTER
-	BLE_EN = 1;
+	BLE_EN = 0;
 	xTaskCreatePinnedToCore(key_reports, "key report task", 8192,
 			xKeyreportTask, configMAX_PRIORITIES, NULL, 1);
 	ESP_LOGI("Keyboard task", "initializezd");
@@ -394,6 +397,17 @@ extern "C" void app_main() {
 			configMAX_PRIORITIES, NULL, 1);
 	ESP_LOGI("Sleep", "initializezd");
 #endif
+
+    tinyusb_config_t tusb_cfg = {
+        .descriptor = NULL,
+        .string_descriptor = NULL,
+        .external_phy = false
+    };
+
+    ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
+
+    uint8_t keycode[6] = {0x4, 0x5, 0, 0, 0, 0};
+    tud_hid_keyboard_report(1, 0, keycode);
 
 //This is for testing
 	//init_layout_server();
