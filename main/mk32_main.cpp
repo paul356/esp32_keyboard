@@ -406,8 +406,8 @@ extern "C" void app_main() {
 
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
 
-    uint8_t keycode[6] = {0x4, 0x5, 0, 0, 0, 0};
-    tud_hid_keyboard_report(1, 0, keycode);
+    //uint8_t keycode[6] = {0x4, 0, 0, 0, 0, 0};
+    //tud_hid_keyboard_report(1, 0, keycode);
 
 //This is for testing
 	//init_layout_server();
