@@ -58,7 +58,7 @@
 #define BATT_PIN ADC1_CHANNEL_7 //gpio pin 35, refer to the esp32 before modifying
 
 //deep sleep parameters, mind that reconnecting after deep sleep might take a minute or two
-#define SLEEP_MINS 45 // undefine if you do not need deep sleep, otherwise define number of minutes for deepsleep
+//#define SLEEP_MINS 45 // undefine if you do not need deep sleep, otherwise define number of minutes for deepsleep
 
 /*
  *---------------------------- Everything below here should not be modified for standard usage----------------------
@@ -71,7 +71,7 @@
 #define MOD_LED_BYTES 2 //bytes for led status and modifiers
 #define MACRO_LEN 3 //keys for macros
 #define KEYMAP_COLS MATRIX_COLS*KEYPADS  // used for a symmetrical split keyboard
-#define REPORT_LEN (MOD_LED_BYTES+MACRO_LEN+MATRIX_ROWS*KEYMAP_COLS) //size of hid reports with NKRO and room for 3 key macro
+#define REPORT_LEN (MOD_LED_BYTES+MATRIX_ROWS*KEYMAP_COLS+MACRO_LEN) //size of hid reports with NKRO and room for 3 key macro
 #define REPORT_COUNT_BYTES (MATRIX_ROWS*KEYMAP_COLS+MACRO_LEN)
 
 #define PLUGIN_BASE_VAL 0x135

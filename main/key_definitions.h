@@ -1,6 +1,7 @@
 #ifndef KEY_DEFINITIONS_H
 #define KEY_DEFINITIONS_H
 
+
 // lifted from TMK and QMK
 
 #define JP_ZHTG KC_GRV  // hankaku/zenkaku|kanzi
