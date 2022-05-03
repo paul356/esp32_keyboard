@@ -62,6 +62,9 @@
 #define SEC_TO_MIN 60
 //plugin functions
 #include "plugins.h"
+#include "protocol_examples_common.h"
+
+extern "C" esp_err_t start_file_server();
 
 static config_data_t config;
 QueueHandle_t espnow_recieve_q;
@@ -252,6 +255,21 @@ extern "C" void espnow_update_matrix(void *pvParameters) {
 //    SLEEP_WAKE=true;
 //}
 
+extern "C" void send_keys(void *pParam)
+{
+    TickType_t xLastWakeTime;
+    const TickType_t xFrequency = configTICK_RATE_HZ * 30;
+
+    xLastWakeTime = xTaskGetTickCount();
+    while (1) {
+        uint8_t keycode[6] = {0x4, 0, 0, 0, 0, 0};
+
+        (void)xTaskDelayUntil(&xLastWakeTime, xFrequency);
+        
+        tud_hid_keyboard_report(1, 0, keycode);
+    }
+}
+
 /*If no key press has been recieved in SLEEP_MINS amount of minutes, put device into deep sleep
  *  wake up on touch on GPIO pin 2
  *  */
@@ -313,9 +331,17 @@ extern "C" void app_main() {
 	// Initialize NVS.
 	ret = nvs_flash_init();
 	if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
-		ESP_ERROR_CHECK (nvs_flash_erase());ret = nvs_flash_init();
+		ESP_ERROR_CHECK (nvs_flash_erase());
+        ret = nvs_flash_init();
 	}
 	ESP_ERROR_CHECK(ret);
+
+    // first init lwIP network stack
+    ESP_ERROR_CHECK(esp_netif_init());
+    // enable default event loop on which wifi event handlers depend
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    ESP_ERROR_CHECK(example_connect());
 
 	// Read config
 	nvs_handle my_handle;
@@ -329,8 +355,9 @@ extern "C" void app_main() {
 	if (ret != ESP_OK) {
 		ESP_LOGE("MAIN", "error reading NVS - bt name, setting to default");
 		strcpy(config.bt_device_name, GATTS_TAG);
-	} else
+	} else {
 		ESP_LOGI("MAIN", "bt device name is: %s", config.bt_device_name);
+    }
 
 	esp_log_level_set("*", ESP_LOG_INFO);
 
@@ -348,17 +375,20 @@ extern "C" void app_main() {
 #ifdef R_ENCODER_SLAVE
 	xTaskCreatePinnedToCore(slave_encoder_report, "Scan encoder changes for slave", 4096, NULL, configMAX_PRIORITIES, NULL,1);
 #endif
-	espnow_send();
+    // disable espnow for now :-P
+	//espnow_send();
 #endif
 
 	//If the device is a master for split board initialize receiving reports from slave
 #ifdef SPLIT_MASTER
-	espnow_receive_q = xQueueCreate(32, REPORT_LEN * sizeof(uint8_t));
+    // disable espnow for now :-P
+    /*
+    espnow_receive_q = xQueueCreate(32, REPORT_LEN * sizeof(uint8_t));
 	espnow_receive();
 	xTaskCreatePinnedToCore(espnow_update_matrix, "ESP-NOW slave matrix state",
 			4096, NULL, configMAX_PRIORITIES, NULL, 1);
 	ESP_LOGI("ESPNOW", "initializezd");
-
+    */
 #endif
 
 	//activate encoder functions
@@ -406,8 +436,9 @@ extern "C" void app_main() {
 
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
 
-    //uint8_t keycode[6] = {0x4, 0, 0, 0, 0, 0};
-    //tud_hid_keyboard_report(1, 0, keycode);
+    xTaskCreatePinnedToCore(send_keys, "period send key", 1024, NULL, configMAX_PRIORITIES, NULL, 1);
+
+    ESP_ERROR_CHECK(start_file_server());
 
 //This is for testing
 	//init_layout_server();
