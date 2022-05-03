@@ -403,8 +403,8 @@ extern "C" void app_main() {
     // Create the key scanning task on core 1 (otherwise it will crash)
 #ifdef MASTER
     BLE_EN = 0;
-    xTaskCreatePinnedToCore(key_reports, "key report task", 8192,
-            xKeyreportTask, configMAX_PRIORITIES, NULL, 1);
+    //xTaskCreatePinnedToCore(key_reports, "key report task", 8192,
+    //        xKeyreportTask, configMAX_PRIORITIES, NULL, 1);
     ESP_LOGI("Keyboard task", "initializezd");
 #endif
     //activate oled
@@ -436,7 +436,7 @@ extern "C" void app_main() {
 
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
 
-    xTaskCreatePinnedToCore(send_keys, "period send key", 1024, NULL, configMAX_PRIORITIES, NULL, 1);
+    //xTaskCreatePinnedToCore(send_keys, "period send key", 1024, NULL, configMAX_PRIORITIES, NULL, 1);
 
     ESP_ERROR_CHECK(start_file_server());
 
