@@ -258,15 +258,17 @@ extern "C" void espnow_update_matrix(void *pvParameters) {
 extern "C" void send_keys(void *pParam)
 {
     TickType_t xLastWakeTime;
-    const TickType_t xFrequency = configTICK_RATE_HZ * 30;
+    const TickType_t xFrequency = configTICK_RATE_HZ * 15;
 
     xLastWakeTime = xTaskGetTickCount();
     while (1) {
         uint8_t keycode[6] = {0x4, 0, 0, 0, 0, 0};
 
         (void)xTaskDelayUntil(&xLastWakeTime, xFrequency);
-        
-        tud_hid_keyboard_report(1, 0, keycode);
+
+        // check interface readiness
+        if (tud_hid_ready())
+            tud_hid_keyboard_report(1, 0, keycode);
     }
 }
 
