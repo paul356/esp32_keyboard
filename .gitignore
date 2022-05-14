@@ -3,3 +3,5 @@ build/
 cmake-*
 .idea/
 sdkconfig.old
+node_modules
+dist/
