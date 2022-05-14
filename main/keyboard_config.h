@@ -30,7 +30,7 @@
 #define MATRIX_ROWS 6
 #define MATRIX_COLS 6 // For split keyboards, define columns for one side only.
 
-#define NKRO // does not work on Android and iOS!,  we can get 18KRO on those
+//#define NKRO // does not work on Android and iOS!,  we can get 18KRO on those
 #define LAYERS 3 // number of layers defined
 
 // Select diode direction

@@ -367,7 +367,7 @@ extern "C" void app_main() {
 #ifdef MASTER
     nvs_load_layouts();
     //activate keyboard BT stack
-    //halBLEInit(1, 1, 1, 0);
+    halBLEInit(1, 1, 1, 0);
     ESP_LOGI("HIDD", "MAIN finished...");
 #endif
 
@@ -404,9 +404,9 @@ extern "C" void app_main() {
     // Start the keyboard Tasks
     // Create the key scanning task on core 1 (otherwise it will crash)
 #ifdef MASTER
-    BLE_EN = 0;
-    //xTaskCreatePinnedToCore(key_reports, "key report task", 8192,
-    //        xKeyreportTask, configMAX_PRIORITIES, NULL, 1);
+    BLE_EN = 1;
+    xTaskCreatePinnedToCore(key_reports, "key report task", 8192,
+            xKeyreportTask, configMAX_PRIORITIES, NULL, 1);
     ESP_LOGI("Keyboard task", "initializezd");
 #endif
     //activate oled
