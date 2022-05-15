@@ -60,6 +60,7 @@ div.dib{*display:inline; *zoom:1;}/* other block level tag(eg. p, li, h1~h6), us
 .lh22{line-height:22px;}
 .lh24{line-height:24px;}
 .lh30{line-height:30px;}
+.lh40{line-height:40px;}
 /* margin */
 .m0{margin:0;}
 .ml1{margin-left:1px;}
@@ -293,4 +294,7 @@ div.dib{*display:inline; *zoom:1;}/* other block level tag(eg. p, li, h1~h6), us
 }
 .align-center {
     align-items: center;
+}
+.justify-center {
+    justify-content: center;
 }
