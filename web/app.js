@@ -280,7 +280,7 @@ row6.innerHTML = elements6
       </div>
     </div>`;
     } else {
-      return `<div class="key" style="width: ${item.width}">
+      return `<div class="key" data-key="${item.name}" style="width: ${item.width}">
       <div class="inner ${item.align === "m" && "justify-center"}">
         <div class="lh40">${item.name}</div>
       </div>
@@ -296,9 +296,17 @@ for (var i = 0; i < keyBtn.length; i++) {
 }
 
 function handleClick(event) {
-  for (var i = 0; i < keyBtn.length; i++) {
-    keyBtn[i].classList.remove("key-active");
+  const dataset = event.currentTarget.classList;
+  let isActive = false;
+  if (dataset) {
+    isActive = !!Object.values(dataset).find(classname => classname.indexOf('key-active') >= 0)
   }
-  event.currentTarget.classList.add("key-active");
-  console.log(event.currentTarget);
+  if (isActive) {
+    event.currentTarget.classList.remove("key-active");
+  } else {
+    for (var i = 0; i < keyBtn.length; i++) {
+      keyBtn[i].classList.remove("key-active");
+    }
+    event.currentTarget.classList.add("key-active");
+  }
 }
