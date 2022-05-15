@@ -17,10 +17,10 @@ static esp_err_t front_page(httpd_req_t* req)
     return ESP_OK;
 }
 
-static esp_err_t layout_json_page(httpd_req_t* req)
+static esp_err_t layouts_json(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr_chunk(req, "{\"layout\":{");
+    httpd_resp_sendstr_chunk(req, "{\"layouts\":{");
     for (int i = 0; i < LAYERS; i ++) {
         httpd_resp_sendstr_chunk(req, "\"");
         httpd_resp_sendstr_chunk(req, default_layout_names[i]);
@@ -53,6 +53,21 @@ static esp_err_t layout_json_page(httpd_req_t* req)
     return ESP_OK;
 }
 
+static esp_err_t keycodes_json(httpd_req_t* req)
+{
+    return ESP_FAIL;
+}
+
+static esp_err_t update_keymap(httpd_req_t* req)
+{
+    return ESP_FAIL;
+}
+
+static esp_err_t reset_keymap(httpd_req_t* req)
+{
+    return ESP_FAIL;
+}
+
 esp_err_t start_file_server()
 {
     httpd_handle_t server = NULL;
@@ -68,16 +83,44 @@ esp_err_t start_file_server()
     }
 
     /* URI handler for getting uploaded files */
-    httpd_uri_t json_uri = {
-        .uri       = "/layouts",  // Match all URIs of type /path/to/file
+    httpd_uri_t layouts_uri = {
+        .uri       = "/api/layouts",  // Match all URIs of type /path/to/file
         .method    = HTTP_GET,
-        .handler   = layout_json_page,
+        .handler   = layouts_json,
         .user_ctx  = NULL    // Pass server data as context
     };
 
-    httpd_register_uri_handler(server, &json_uri);
+    httpd_register_uri_handler(server, &layouts_uri);
 
+    httpd_uri_t keycodes_uri = {
+        .uri       = "/api/keycodes",  // Match all URIs of type /path/to/file
+        .method    = HTTP_GET,
+        .handler   = keycodes_json,
+        .user_ctx  = NULL    // Pass server data as context
+    };
 
+    httpd_register_uri_handler(server, &keycodes_uri);
+
+    /* URI handler for getting uploaded files */
+    httpd_uri_t update_uri = {
+        .uri       = "/api/keymap",  // Match all URIs of type /path/to/file
+        .method    = HTTP_PUT,
+        .handler   = update_keymap,
+        .user_ctx  = NULL    // Pass server data as context
+    };
+
+    httpd_register_uri_handler(server, &update_uri);
+
+    /* URI handler for getting uploaded files */
+    httpd_uri_t reset_uri = {
+        .uri       = "/api/keymap",  // Match all URIs of type /path/to/file
+        .method    = HTTP_POST,
+        .handler   = reset_keymap,
+        .user_ctx  = NULL    // Pass server data as context
+    };
+
+    httpd_register_uri_handler(server, &reset_uri);
+    
     /* URI handler for getting uploaded files */
     httpd_uri_t get_uri = {
         .uri       = "/*",  // Match all URIs of type /path/to/file

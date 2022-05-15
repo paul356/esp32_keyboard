@@ -1,10 +1,10 @@
 #include "key_definitions.h"
 
 const char* key_code_name[256] = {
-	"NO",
-	"ROLL_OVER",
-	"POST_FAIL",
-	"UNDEFINED",
+	"",
+	"",
+	"",
+	"UND",
 	"A",
 	"B",
 	"C",
@@ -41,24 +41,24 @@ const char* key_code_name[256] = {
 	"8",
 	"9",
 	"0",
-	"ENTER",
-	"ESCAPE",
-	"BSPACE",
+	"Ent",
+	"Esc",
+	"Backspace",
 	"TAB",
-	"SPACE",
-	"MINUS",
-	"EQUAL",
-	"LBRACKET",
-	"RBRACKET", /* 0x30 */
-	"BSLASH", /* \ (and |) */
-	"NONUS_HASH", /* Non-US # and ~ (Typically near the Enter key) */
-	"SCOLON", /* ; (and :) */
-	"QUOTE", /* ' and " */
-	"GRAVE", /* Grave accent and tilde */
-	"COMMA", /* ", and < */
-	"DOT", /* . and > */
-	"SLASH", /* / and ? */
-	"CAPSLOCK",
+	"Space",
+	"-",
+	"=",
+	"[",
+	"]", /* 0x30 */
+	"\\", /* \ (and |) */
+	"#(EU)", /* Non-US # and ~ (Typically near the Enter key) */
+	";", /* ; (and :) */
+	"'", /* ' and " */
+	"`", /* Grave accent and tilde */
+	",", /* ", and < */
+	".", /* . and > */
+	"/", /* / and ? */
+	"Caps",
 	"F1",
 	"F2",
 	"F3",
@@ -71,25 +71,25 @@ const char* key_code_name[256] = {
 	"F10",
 	"F11",
 	"F12",
-	"PSCREEN",
-	"SCROLLLOCK",
-	"PAUSE",
-	"INSERT",
-	"HOME",
-	"PGUP",
-	"DELETE",
-	"END",
-	"PGDOWN",
-	"RIGHT",
-	"LEFT", /* 0x50 */
-	"DOWN",
-	"UP",
-	"NUMLOCK",
-	"KP_SLASH",
-	"KP_ASTERISK",
-	"KP_MINUS",
-	"KP_PLUS",
-	"KP_ENTER",
+	"PrtSc",
+	"ScrLk",
+	"Pause",
+	"Ins",
+	"Home",
+	"PgUp",
+	"Del",
+	"End",
+	"PgDn",
+	"<-",
+	"->", /* 0x50 */
+	"Dn",
+	"Up",
+	"Num",
+	"KP_/",
+	"KP_*",
+	"KP_-",
+	"KP_+",
+	"KP_Ent",
 	"KP_1",
 	"KP_2",
 	"KP_3",
@@ -100,82 +100,82 @@ const char* key_code_name[256] = {
 	"KP_8", /* 0x60 */
 	"KP_9",
 	"KP_0",
-	"KP_DOT",
-	"NONUS_BSLASH", /* Non-US \ and | (Typically near the Left-Shift key) */
-	"APPLICATION",
-	"POWER",
-	"KP_EQUAL",
-	"F13",
-	"F14",
-	"F15",
-	"F16",
-	"F17",
-	"F18",
-	"F19",
-	"F20",
-	"F21", /* 0x70 */
-	"F22",
-	"F23",
-	"F24",
-	"EXECUTE",
-	"HELP",
-	"MENU",
-	"SELECT",
-	"STOP",
-	"AGAIN",
-	"UNDO",
-	"CUT",
-	"COPY",
-	"PASTE",
-	"FIND",
-	"MUTE",
-	"VOLUP", /* 0x80 */
-	"VOLDOWN",
-	"LOCKING_CAPS", /* locking Caps Lock */
-	"LOCKING_NUM", /* locking Num Lock */
-	"LOCKING_SCROLL", /* locking Scroll Lock */
-	"KP_COMMA",
-	"KP_EQUAL_AS400", /* equal sign on AS/400 */
-	"INT1",
-	"INT2",
-	"INT3",
-	"INT4",
-	"INT5",
-	"INT6",
-	"INT7",
-	"INT8",
-	"INT9",
-	"LANG1", /* 0x90 */
-	"LANG2",
-	"LANG3",
-	"LANG4",
-	"LANG5",
-	"LANG6",
-	"LANG7",
-	"LANG8",
-	"LANG9",
-	"ALT_ERASE",
-	"SYSREQ",
-	"CANCEL",
-	"CLEAR",
-	"PRIOR",
-	"RETURN",
-	"SEPARATOR",
-	"OUT", /* 0xA0 */
-	"OPER",
-	"CLEAR_AGAIN",
-	"CRSEL",
-	"EXSEL", /* 0xA4 */
+	"KP_.",
+	"\(EU)", /* Non-US \ and | (Typically near the Left-Shift key) */
+	"App",
+	"", /* from Power to EXSEL are not recognized by Windows and Mac*/
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"", /* 0x70 */
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"", /* 0x80 */
+	"",
+	"", /* locking Caps Lock */
+	"", /* locking Num Lock */
+	"", /* locking Scroll Lock */
+	"",
+	"", /* equal sign on AS/400 */
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"", /* 0x90 */
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"",
+	"", /* 0xA0 */
+	"",
+	"",
+	"",
+	"", /* 0xA4 */
     "","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","",
 	/* Modifiers */
-	"LCTRL",
-	"LSHIFT",
-	"LALT",
-	"LGUI",
-	"RCTRL",
-	"RSHIFT",
-	"RALT",
-	"RGUI",
+	"LCtrl",
+	"LShift",
+	"LAlt",
+	"LWin",
+	"RCtrl",
+	"RShift",
+	"RAlt",
+	"RWin",
 
 /* NOTE: 0xE8-FF are used for internal special purpose */
     "","","","","","","","","","","","","","","","","","","","","","","","",

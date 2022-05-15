@@ -2,12 +2,12 @@
 
 1. 查询当前的layouts
 * Method: GET
-* URI: /api/layout
+* URI: /api/layouts
 * Input: none
 * Output(json):
 ```
 {
-    "layout" : {
+    "layouts" : {
                 "QWERTY" : ["ESC", "F1", "F2", ...],
                 "NUM" : [...],
                 "Plugins" : [...]
