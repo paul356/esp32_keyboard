@@ -8,12 +8,7 @@ import { resolve } from 'path';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
-const Plugins = isProduction ? [uglify()] : [serve({
-  contentBase: ['dist'],
-  port: 3000,
-})];
-
-export default {
+const config = {
   input: "web/app.js",
   output: {
     format: "esm",
@@ -34,6 +29,12 @@ export default {
     serve({
       contentBase: ['dist'],
       port: 3000,
-    })
+    }),
   ],
 };
+
+if (isProduction) {
+  config.plugins.push(uglify());
+}
+
+export default config;
