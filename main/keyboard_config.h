@@ -26,7 +26,7 @@
 #define DEBOUNCE 4 //debounce time in ms
 
 //Define matrix
-#define KEYPADS 2 // intended in order to create a Multiple keypad split boards
+#define KEYPADS 1 // intended in order to create a Multiple keypad split boards
 #define MATRIX_ROWS 6
 #define MATRIX_COLS 6 // For split keyboards, define columns for one side only.
 

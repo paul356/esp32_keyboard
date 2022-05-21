@@ -31,6 +31,7 @@ USB HID key code is defined in the range of 0x00 to 0xe7, and even in this regio
 1. __0xC0 to 0xDF__ not used
 1. __0xE0 to 0xE7__ USB HID keyboard modifier codes (standard)
 1. __0xF0 to 0xFF__ Mouse control codes (defined by MK32)
+1. __0x100 to 0x102__ DEFAULT LOWER RAISE move the default layer. DEFAULT is the "QWERTY" layer
 1. __0x103 to 0x122__ MACRO codes
 1. __0x123 to 0x134__ Layer hold codes (defined by MK32)
 1. __0x135 and more__ Plugin codes (defined by MK32)

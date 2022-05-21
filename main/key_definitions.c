@@ -177,6 +177,20 @@ const char* key_code_name[256] = {
 	"RAlt",
 	"RWin",
 
-/* NOTE: 0xE8-FF are used for internal special purpose */
+    /* NOTE: 0xE8-FF are used for internal special purpose */
     "","","","","","","","","","","","","","","","","","","","","","","","",
+
+    /* 0x100 to 0x102, move default layer */
+    "Top",
+    "Lower",
+    "Raise",
+
+    /* 0x103 to 0x122 */
+    "","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","","",
+
+    /* 0x123 to 0x134 */
+    "HQwerty",
+    "HNum",
+    "HPlugin",
+    "","","","","","","","","","","","","","","",
 };
