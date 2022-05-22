@@ -10,7 +10,7 @@
 static esp_err_t front_page(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "text/plain");
-    httpd_resp_sendstr_chunk(req, "M32 main page");
+    httpd_resp_sendstr_chunk(req, "non exist URI");
     httpd_resp_sendstr_chunk(req, NULL);
 
     return ESP_OK;
@@ -58,11 +58,13 @@ static esp_err_t keycodes_json(httpd_req_t* req)
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr_chunk(req, "{\"keycodes\":[");
     uint16_t keyCodeNum = GetKeyCodeNum();
+    bool firstKey = true;
     for (uint16_t kc = 0; kc < keyCodeNum; kc++) {
         const char* keyName = GetKeyCodeName(kc);
         if (keyName != NULL && keyName[0] != '\0') {
-            if (kc == 0) {
+            if (firstKey) {
                 httpd_resp_sendstr_chunk(req, "\"");
+                firstKey = false;
             } else {
                 httpd_resp_sendstr_chunk(req, ",\"");
             }
