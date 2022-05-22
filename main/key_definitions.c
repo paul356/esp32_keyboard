@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <string.h>
 #include "key_definitions.h"
 
 const char* key_code_name[] = {
@@ -207,4 +208,13 @@ const char* GetKeyCodeName(uint16_t keycode)
 
 uint16_t GetKeyCodeNum() {
     return sizeof(key_code_name) / sizeof(key_code_name[0]);
+}
+
+int GetKeyCodeWithName(const char* name){
+	if(name == NULL) return -1;
+
+	for(uint16_t i = 0; i < GetKeyCodeNum(); ++i){
+		if(strcmp(name, key_code_name[i]) == 0) return i;
+	}
+	return -1;
 }
