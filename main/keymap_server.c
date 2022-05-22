@@ -3,6 +3,7 @@
 #include "keyboard_config.h"
 #include "key_definitions.h"
 #include "nvs_keymaps.h"
+#include "nvs_funcs.h"
 #include "cJSON.h"
 
 #define TAG "[HTTPD]"
@@ -80,7 +81,7 @@ static esp_err_t keycodes_json(httpd_req_t* req)
 
 static esp_err_t update_keymap(httpd_req_t* req)
 {
-    #define MAX_BUF_SIZE 4096
+    #define MAX_BUF_SIZE 2048
 
     int total_len = req->content_len;
     if(total_len >= MAX_BUF_SIZE){
@@ -88,7 +89,7 @@ static esp_err_t update_keymap(httpd_req_t* req)
         return ESP_FAIL;
     }
 
-    char recv_buf[MAX_BUF_SIZE]; // TODO: allocate memory size
+    char recv_buf[MAX_BUF_SIZE];
     int received = 0;
     int cur_len  = 0;
     while(cur_len < total_len){
@@ -112,14 +113,12 @@ static esp_err_t update_keymap(httpd_req_t* req)
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'layer' is invalid");
         return ESP_FAIL;
     }
-    const char* layer_name = layer->valuestring;
-    ESP_LOGI(TAG, "layer = %s", layer_name);
-    
+
+    const char* layer_name = layer->valuestring;    
     int layer_index = -1;
     for(uint16_t i = 0; i < LAYERS; ++i){
         if(strcmp(layer_name, default_layout_names[i]) == 0) layer_index = i;
     }
-
     if(layer_index < 0){
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'layer' should be one of ['QWERTY', 'NUM', 'Plugins']");
         return ESP_FAIL;
@@ -142,17 +141,34 @@ static esp_err_t update_keymap(httpd_req_t* req)
         return ESP_FAIL;
     }
 
+    uint16_t temp_layer[MATRIX_ROWS * KEYMAP_COLS];
+    memcpy(temp_layer, layouts[layer_index], sizeof(uint16_t) * MATRIX_ROWS * KEYMAP_COLS);
+    ESP_LOGI(TAG, "pos size = '%d'", cJSON_GetArraySize(positions));
     for(uint16_t i = 0; i < cJSON_GetArraySize(positions); ++i){
         uint16_t pos = (uint16_t)cJSON_GetArrayItem(positions, i)->valueint;
         const char* keyname = cJSON_GetArrayItem(keycodes, i)->valuestring;
         int keycode = GetKeyCodeWithName(keyname);
-        ESP_LOGI(TAG, "PUT: pos = '%d', name = '%s', keycode = '%d'", pos, keyname, keycode);
+        ESP_LOGI(TAG, "PUT: pos = '%d', keycode = '%d'", pos, keycode);
         if(keycode < 0) continue; // ignore invalid keycode
+        ESP_LOGI(TAG, "PUT: keycode = '%d' -> '%d'", temp_layer[pos], keycode);
+        temp_layer[pos] = keycode;
+    }
+    memcpy(layouts[layer_index], temp_layer, sizeof(uint16_t) * MATRIX_ROWS * KEYMAP_COLS);
 
-        // TODO: update keymap with keycodes according position
+    // debug
+    for(uint16_t i = 0; i < cJSON_GetArraySize(positions); ++i){
+        uint16_t pos = (uint16_t)cJSON_GetArrayItem(positions, i)->valueint;
+        ESP_LOGI(TAG, "Update layout: pos = '%d', keycode = '%d'", pos, *(&layouts[layer_index][0][0]+pos));
     }
 
-    cJSON_Delete(root);
+    // corrupt here. Not sure why, still debugging.
+    // save layout
+    //nvs_write_layout(temp_layer, layer_name);
+    
+    ESP_LOGI(TAG, "write layout done!");
+
+    //cJSON_Delete(root);
+    ESP_LOGI(TAG, "delete json done!");
 
     return ESP_OK;
 }
