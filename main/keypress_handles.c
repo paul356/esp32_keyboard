@@ -181,7 +181,7 @@ uint8_t *check_key_state(uint16_t *keymap) {
 				//checking if the keycode is transparent
 				if (keycode == KC_TRNS) {
 					if (current_layout == 0) {
-						keycode = layouts[MAX_LAYER][row][col];
+						keycode = KC_NO;
 					} else {
 						keycode = layouts[current_layout - 1][row][col];
 					}

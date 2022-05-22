@@ -27,31 +27,8 @@
 
 void free_layer_names(char*** layer_names, uint32_t layers);
 
-//convert blob to keymap matrix
-void blob_to_key_mat(uint16_t layout_arr[MATRIX_ROWS*KEYMAP_COLS],uint16_t buffer[MATRIX_ROWS][KEYMAP_COLS]){
-
-	for(uint8_t row=0; row<MATRIX_ROWS;row++){
-		for(uint8_t col=0; col<KEYMAP_COLS;col++){
-			buffer[row][col]=layout_arr[row*KEYMAP_COLS+col];
-		}
-	}
-}
-
-//convert keymap matrix to blob
-void key_mat_to_blob(uint16_t layout[MATRIX_ROWS][KEYMAP_COLS],uint16_t *buffer){
-
-	uint16_t layout_arr[MATRIX_ROWS*KEYMAP_COLS] = {0};
-	for(uint8_t row=0; row<MATRIX_ROWS;row++){
-		for(uint8_t col=0; col<KEYMAP_COLS;col++){
-			layout_arr[row*KEYMAP_COLS+col]=layout[row][col];
-		}
-
-	}
-	memcpy(buffer,layout_arr,sizeof(layout_arr));
-}
-
 //convert string array to a single string
-void str_arr_to_str(char (*layer_names)[MAX_LAYOUT_NAME_LENGTH], uint8_t layers, char **buffer){
+void str_arr_to_str(char **layer_names, uint8_t layers, char **buffer){
 
 	char str[(layers+(layers*MAX_LAYOUT_NAME_LENGTH))*sizeof(char)];
 	memset( str, 0, (layers+(layers*MAX_LAYOUT_NAME_LENGTH))*sizeof(char) );

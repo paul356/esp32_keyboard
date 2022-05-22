@@ -43,7 +43,7 @@ void nvs_read_keymap_cfg(void);
 /*
  * @brief write keyboard configuration to nvs (without keymaps)
  */
-void nvs_write_keymap_cfg(uint8_t layers, char (*layer_names)[MAX_LAYOUT_NAME_LENGTH]);
+void nvs_write_keymap_cfg(uint8_t layers, char **layer_names);
 
 
 

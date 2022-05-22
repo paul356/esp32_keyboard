@@ -19,7 +19,7 @@ static esp_err_t layouts_json(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr_chunk(req, "{\"layouts\":{");
-    for (int i = 0; i < LAYERS; i ++) {
+    for (int i = 0; i < layers_num; i ++) {
         httpd_resp_sendstr_chunk(req, "\"");
         httpd_resp_sendstr_chunk(req, layer_names_arr[i]);
         httpd_resp_sendstr_chunk(req, "\":[");
@@ -42,7 +42,7 @@ static esp_err_t layouts_json(httpd_req_t* req)
         }
         
         httpd_resp_sendstr_chunk(req, "]");
-        if (i != LAYERS - 1) {
+        if (i != layers_num - 1) {
             httpd_resp_sendstr_chunk(req, ",");
         }
     }
