@@ -52,7 +52,7 @@ const char* key_code_name[] = {
 	"=",
 	"[",
 	"]", /* 0x30 */
-	"\\", /* \ (and |) */
+	"\\\\", /* \ (and |) */
 	"#(EU)", /* Non-US # and ~ (Typically near the Enter key) */
 	";", /* ; (and :) */
 	"'", /* ' and " */
