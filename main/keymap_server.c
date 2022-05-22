@@ -159,7 +159,38 @@ static esp_err_t update_keymap(httpd_req_t* req)
 
 static esp_err_t reset_keymap(httpd_req_t* req)
 {
-    return ESP_FAIL;
+    size_t buf_len = req->content_len;
+    char* body = (char*)malloc(buf_len);
+    if (!body) {
+        return ESP_ERR_NO_MEM;
+    }
+    
+    int ret = httpd_req_recv(req, body, buf_len);
+    if (ret <= 0) {
+        free(body);
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    cJSON* root = cJSON_ParseWithLength(body, buf_len);
+    free(body);
+    if (!root) {
+        return ESP_ERR_NO_MEM;
+    }
+    
+    cJSON* pos = cJSON_GetObjectItem(root, "positions");
+    if (!pos || !cJSON_IsArray(pos) || cJSON_GetArraySize(pos) != 0) {
+        cJSON_Delete(root);
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    cJSON* kc  = cJSON_GetObjectItem(root, "keycodes");
+    if (!kc || !cJSON_IsArray(kc) || cJSON_GetArraySize(kc) != 0) {
+        cJSON_Delete(root);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    cJSON_Delete(root);
+    return ESP_OK;
 }
 
 esp_err_t start_file_server()
