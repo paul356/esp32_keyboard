@@ -515,5 +515,6 @@ enum internal_special_keycodes {
 
 const char* GetKeyCodeName(uint16_t keycode);
 uint16_t GetKeyCodeNum();
+int GetKeyCodeWithName(const char* name);
 
 #endif

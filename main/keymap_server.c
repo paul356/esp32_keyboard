@@ -3,6 +3,7 @@
 #include "keyboard_config.h"
 #include "key_definitions.h"
 #include "nvs_keymaps.h"
+#include "cJSON.h"
 
 #define TAG "[HTTPD]"
 
@@ -79,7 +80,81 @@ static esp_err_t keycodes_json(httpd_req_t* req)
 
 static esp_err_t update_keymap(httpd_req_t* req)
 {
-    return ESP_FAIL;
+    #define MAX_BUF_SIZE 4096
+
+    int total_len = req->content_len;
+    if(total_len >= MAX_BUF_SIZE){
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
+        return ESP_FAIL;
+    }
+
+    char recv_buf[MAX_BUF_SIZE]; // TODO: allocate memory size
+    int received = 0;
+    int cur_len  = 0;
+    while(cur_len < total_len){
+        received = httpd_req_recv(req, recv_buf + cur_len, total_len);
+        if(received <= 0){
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
+            return ESP_FAIL;
+        }
+        cur_len += received;
+    }
+    recv_buf[total_len] = '\0';
+
+    cJSON *root = cJSON_Parse(recv_buf);
+    if(root == NULL){
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid json");
+        return ESP_FAIL;
+    }
+
+    cJSON *layer = cJSON_GetObjectItem(root, "layer");
+    if(layer == NULL){
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'layer' is invalid");
+        return ESP_FAIL;
+    }
+    const char* layer_name = layer->valuestring;
+    ESP_LOGI(TAG, "layer = %s", layer_name);
+    
+    int layer_index = -1;
+    for(uint16_t i = 0; i < LAYERS; ++i){
+        if(strcmp(layer_name, default_layout_names[i]) == 0) layer_index = i;
+    }
+
+    if(layer_index < 0){
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'layer' should be one of ['QWERTY', 'NUM', 'Plugins']");
+        return ESP_FAIL;
+    }
+
+    cJSON *positions = cJSON_GetObjectItem(root, "positions");
+    if((positions == NULL) || (cJSON_GetArraySize(positions) == 0)){
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'positions' is invalid");
+        return ESP_FAIL;
+    }
+
+    cJSON *keycodes = cJSON_GetObjectItem(root, "keycodes");
+    if((keycodes == NULL) || (cJSON_GetArraySize(keycodes) == 0)){
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'keycodes' is invalid");
+        return ESP_FAIL;
+    }
+
+    if(cJSON_GetArraySize(positions) != cJSON_GetArraySize(keycodes)){
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "length of 'positions' not match with 'keycodes'");
+        return ESP_FAIL;
+    }
+
+    for(uint16_t i = 0; i < cJSON_GetArraySize(positions); ++i){
+        uint16_t pos = (uint16_t)cJSON_GetArrayItem(positions, i)->valueint;
+        const char* keyname = cJSON_GetArrayItem(keycodes, i)->valuestring;
+        int keycode = GetKeyCodeWithName(keyname);
+        ESP_LOGI(TAG, "PUT: pos = '%d', name = '%s', keycode = '%d'", pos, keyname, keycode);
+        if(keycode < 0) continue; // ignore invalid keycode
+
+        // TODO: update keymap with keycodes according position
+    }
+
+    cJSON_Delete(root);
+
+    return ESP_OK;
 }
 
 static esp_err_t reset_keymap(httpd_req_t* req)
