@@ -143,7 +143,6 @@ static esp_err_t update_keymap(httpd_req_t* req)
 
     uint16_t temp_layer[MATRIX_ROWS * KEYMAP_COLS];
     memcpy(temp_layer, layouts[layer_index], sizeof(uint16_t) * MATRIX_ROWS * KEYMAP_COLS);
-    ESP_LOGI(TAG, "pos size = '%d'", cJSON_GetArraySize(positions));
     for(uint16_t i = 0; i < cJSON_GetArraySize(positions); ++i){
         uint16_t pos = (uint16_t)cJSON_GetArrayItem(positions, i)->valueint;
         const char* keyname = cJSON_GetArrayItem(keycodes, i)->valuestring;
@@ -153,20 +152,12 @@ static esp_err_t update_keymap(httpd_req_t* req)
         ESP_LOGI(TAG, "PUT: keycode = '%d' -> '%d'", temp_layer[pos], keycode);
         temp_layer[pos] = keycode;
     }
-    memcpy(layouts[layer_index], temp_layer, sizeof(uint16_t) * MATRIX_ROWS * KEYMAP_COLS);
-
-    // debug
-    for(uint16_t i = 0; i < cJSON_GetArraySize(positions); ++i){
-        uint16_t pos = (uint16_t)cJSON_GetArrayItem(positions, i)->valueint;
-        ESP_LOGI(TAG, "Update layout: pos = '%d', keycode = '%d'", pos, *(&layouts[layer_index][0][0]+pos));
-    }
 
     // save layout
+    memcpy(layouts[layer_index], temp_layer, sizeof(uint16_t) * MATRIX_ROWS * KEYMAP_COLS);
     nvs_write_layout(temp_layer, layer_name);
-    ESP_LOGI(TAG, "write layout done!");
-    
+
     cJSON_Delete(root);
-    ESP_LOGI(TAG, "delete json done!");
 
     return ESP_OK;
 }
