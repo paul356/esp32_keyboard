@@ -83,6 +83,8 @@ static esp_err_t keycodes_json(httpd_req_t* req)
 char recv_buf[MAX_BUF_SIZE];
 static esp_err_t update_keymap(httpd_req_t* req)
 {
+    httpd_resp_set_type(req, "text/plain");
+
     int total_len = req->content_len;
     if(total_len >= MAX_BUF_SIZE){
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
@@ -159,11 +161,14 @@ static esp_err_t update_keymap(httpd_req_t* req)
 
     cJSON_Delete(root);
 
+    httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
 }
 
 static esp_err_t reset_keymap(httpd_req_t* req)
 {
+    httpd_resp_set_type(req, "text/plain");
+
     size_t buf_len = req->content_len;
     char* body = (char*)malloc(buf_len);
     if (!body) {
@@ -195,6 +200,8 @@ static esp_err_t reset_keymap(httpd_req_t* req)
     }
 
     cJSON_Delete(root);
+
+    httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
 }
 
