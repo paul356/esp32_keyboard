@@ -158,7 +158,7 @@ static esp_err_t update_keymap(httpd_req_t* req)
     nvs_write_layout(temp_layer, layer_name);
 
     cJSON_Delete(root);
-
+    httpd_resp_sendstr(req, "Post control value successfully");
     return ESP_OK;
 }
 
