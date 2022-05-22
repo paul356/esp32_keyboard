@@ -79,17 +79,17 @@ static esp_err_t keycodes_json(httpd_req_t* req)
     return ESP_OK;
 }
 
+#define MAX_BUF_SIZE 1024
+char recv_buf[MAX_BUF_SIZE];
 static esp_err_t update_keymap(httpd_req_t* req)
 {
-    #define MAX_BUF_SIZE 2048
-
     int total_len = req->content_len;
     if(total_len >= MAX_BUF_SIZE){
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
         return ESP_FAIL;
     }
 
-    char recv_buf[MAX_BUF_SIZE];
+    memset(recv_buf, 0, MAX_BUF_SIZE);
     int received = 0;
     int cur_len  = 0;
     while(cur_len < total_len){
@@ -161,13 +161,11 @@ static esp_err_t update_keymap(httpd_req_t* req)
         ESP_LOGI(TAG, "Update layout: pos = '%d', keycode = '%d'", pos, *(&layouts[layer_index][0][0]+pos));
     }
 
-    // corrupt here. Not sure why, still debugging.
     // save layout
-    //nvs_write_layout(temp_layer, layer_name);
-    
+    nvs_write_layout(temp_layer, layer_name);
     ESP_LOGI(TAG, "write layout done!");
-
-    //cJSON_Delete(root);
+    
+    cJSON_Delete(root);
     ESP_LOGI(TAG, "delete json done!");
 
     return ESP_OK;
