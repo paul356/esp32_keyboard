@@ -160,7 +160,7 @@ void layer_adjust(uint16_t keycode) {
 uint8_t matrix_prev_state[KEYPADS][MATRIX_ROWS][MATRIX_COLS] = { 0 };
 
 // checking the state of each key in the matrix
-uint8_t *check_key_state(uint16_t **keymap) {
+uint8_t *check_key_state(uint16_t *keymap) {
 
 	scan_matrix();
 	for (uint8_t pad = 0; pad < KEYPADS; pad++) {
@@ -176,15 +176,14 @@ uint8_t *check_key_state(uint16_t **keymap) {
 					continue;
 
 				uint16_t report_index = (2 + col + row * KEYMAP_COLS);
-				keycode = keymap[row][col];
+				keycode = keymap[row*KEYMAP_COLS + col];
 
 				//checking if the keycode is transparent
 				if (keycode == KC_TRNS) {
 					if (current_layout == 0) {
-						keycode = *default_layouts[MAX_LAYER][row][col];
+						keycode = layouts[MAX_LAYER][row][col];
 					} else {
-						keycode =
-								*default_layouts[current_layout - 1][row][col];
+						keycode = layouts[current_layout - 1][row][col];
 					}
 				}
 
@@ -199,18 +198,18 @@ uint8_t *check_key_state(uint16_t **keymap) {
 					}
 					//checking for layer hold
 					if ((keycode >= LAYER_HOLD_BASE_VAL)
-							&& (keycode <= LAYER_HOLD_MAX_VAL)) {
+                        && (keycode <= LAYER_HOLD_MAX_VAL)) {
 						if (layer_hold_flag == 0) {
 							prev_layout = current_layout;
 							current_layout = (keycode - LAYER_HOLD_BASE_VAL);
 							layer_hold_flag = 1;
 #ifdef OLED_ENABLE
-						xQueueSend(layer_recieve_q, &current_layout,
-								(TickType_t) 0);
+                            xQueueSend(layer_recieve_q, &current_layout,
+                                       (TickType_t) 0);
 #endif
-						ESP_LOGI(KEY_PRESS_TAG,
-								"Layer modified!, Current layer: %d ",
-								current_layout);
+                            ESP_LOGI(KEY_PRESS_TAG,
+                                     "Layer modified!, Current layer: %d ",
+                                     current_layout);
 						}
 
 						continue;
@@ -219,7 +218,7 @@ uint8_t *check_key_state(uint16_t **keymap) {
 
 					// checking for layer adjust keycodes
 					if ((keycode >= LAYERS_BASE_VAL)
-							&& (keycode < MACRO_BASE_VAL)) {
+                        && (keycode < MACRO_BASE_VAL)) {
 						layer_adjust(keycode);
 						continue;
 					}

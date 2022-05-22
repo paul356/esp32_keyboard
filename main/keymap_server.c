@@ -1,12 +1,10 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "keyboard_config.h"
+#include "key_definitions.h"
+#include "nvs_keymaps.h"
 
 #define TAG "[HTTPD]"
-
-extern char default_layout_names[LAYERS][MAX_LAYOUT_NAME_LENGTH];
-extern uint16_t (*default_layouts[])[MATRIX_ROWS][KEYMAP_COLS];
-extern char* key_code_name[];
 
 static esp_err_t front_page(httpd_req_t* req)
 {
@@ -23,17 +21,18 @@ static esp_err_t layouts_json(httpd_req_t* req)
     httpd_resp_sendstr_chunk(req, "{\"layouts\":{");
     for (int i = 0; i < LAYERS; i ++) {
         httpd_resp_sendstr_chunk(req, "\"");
-        httpd_resp_sendstr_chunk(req, default_layout_names[i]);
+        httpd_resp_sendstr_chunk(req, layer_names_arr[i]);
         httpd_resp_sendstr_chunk(req, "\":[");
 
         for (int j = 0; j < MATRIX_ROWS; j++) {
             for (int k = 0; k < KEYMAP_COLS; k++) {
-                uint16_t key_code = (*(default_layouts[i]))[j][k];
+                uint16_t key_code = layouts[i][j][k];
                 httpd_resp_sendstr_chunk(req, "\"");
-                if (key_code > 0xff) {
-                    httpd_resp_sendstr_chunk(req, "EXTENDED");
+                const char* keyName = GetKeyCodeName(key_code);
+                if (keyName != NULL) {
+                    httpd_resp_sendstr_chunk(req, keyName);
                 } else {
-                    httpd_resp_sendstr_chunk(req, key_code_name[key_code]);
+                    httpd_resp_sendstr_chunk(req, GetKeyCodeName(KC_NONE));
                 }
                 httpd_resp_sendstr_chunk(req, "\"");
                 if (j != MATRIX_ROWS - 1 || k != KEYMAP_COLS - 1) {
@@ -55,7 +54,25 @@ static esp_err_t layouts_json(httpd_req_t* req)
 
 static esp_err_t keycodes_json(httpd_req_t* req)
 {
-    return ESP_FAIL;
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr_chunk(req, "{\"keycodes\":[");
+    uint16_t keyCodeNum = GetKeyCodeNum();
+    for (uint16_t kc = 0; kc < keyCodeNum; kc++) {
+        const char* keyName = GetKeyCodeName(kc);
+        if (keyName != NULL && keyName[0] != '\0') {
+            if (kc == 0) {
+                httpd_resp_sendstr_chunk(req, "\"");
+            } else {
+                httpd_resp_sendstr_chunk(req, ",\"");
+            }
+            httpd_resp_sendstr_chunk(req, keyName);
+            httpd_resp_sendstr_chunk(req, "\"");
+        }
+    }
+    httpd_resp_sendstr_chunk(req, "]}");
+    httpd_resp_sendstr_chunk(req, NULL);
+    
+    return ESP_OK;
 }
 
 static esp_err_t update_keymap(httpd_req_t* req)

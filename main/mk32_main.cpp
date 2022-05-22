@@ -141,7 +141,7 @@ extern "C" void key_reports(void *pvParameters) {
 
 
     while (1) {
-        memcpy(report_state, check_key_state(layouts[current_layout]),
+        memcpy(report_state, check_key_state(&layouts[current_layout][0][0]),
                 sizeof report_state);
 
         //Do not send anything if queues are uninitialized

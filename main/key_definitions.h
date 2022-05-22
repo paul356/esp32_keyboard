@@ -1,6 +1,7 @@
 #ifndef KEY_DEFINITIONS_H
 #define KEY_DEFINITIONS_H
 
+#include <stdint.h>
 
 // lifted from TMK and QMK
 
@@ -511,5 +512,8 @@ enum internal_special_keycodes {
 	KC_MS_ACCEL1,
 	KC_MS_ACCEL2 /* 0xFF */
 };
+
+const char* GetKeyCodeName(uint16_t keycode);
+uint16_t GetKeyCodeNum();
 
 #endif

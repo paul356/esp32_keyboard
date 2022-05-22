@@ -28,12 +28,12 @@ void nvs_load_layouts(void);
 /*
  * @read a layout from nvs
  */
-void nvs_read_layout(const char* layout_name,uint16_t buffer[MATRIX_ROWS][KEYMAP_COLS]);
+void nvs_read_layout(const char* layout_name,uint16_t buffer[MATRIX_ROWS*KEYMAP_COLS]);
 
 /*
  * @add a layout to nvs or overwrite existing one
  */
-void nvs_write_layout(uint16_t layout[MATRIX_ROWS][KEYMAP_COLS],const char* layout_name);
+void nvs_write_layout(uint16_t layout[MATRIX_ROWS*KEYMAP_COLS],const char* layout_name);
 
 /*
  * @brief read keyboard configuration from nvs

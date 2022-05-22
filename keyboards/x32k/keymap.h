@@ -10,8 +10,7 @@
 
 #include "keyboard_config.h"
 
-extern uint16_t (*default_layouts[])[MATRIX_ROWS][KEYMAP_COLS];
-
+extern uint16_t _LAYERS[MATRIX_ROWS][KEYMAP_COLS];
 extern uint16_t default_encoder_map[LAYERS][ENCODER_SIZE];
 extern uint16_t default_slave_encoder_map[LAYERS][ENCODER_SIZE];
 

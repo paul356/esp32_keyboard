@@ -1,10 +1,11 @@
+#include <stddef.h>
 #include "key_definitions.h"
 
-const char* key_code_name[256] = {
+const char* key_code_name[] = {
 	"",
 	"",
 	"",
-	"UND",
+	"___",
 	"A",
 	"B",
 	"C",
@@ -194,3 +195,16 @@ const char* key_code_name[256] = {
     "HPlugin",
     "","","","","","","","","","","","","","","",
 };
+
+const char* GetKeyCodeName(uint16_t keycode)
+{
+    if (keycode >= sizeof(key_code_name) / sizeof(key_code_name[0])) {
+        return NULL;
+    } else {
+        return key_code_name[keycode];
+    }
+}
+
+uint16_t GetKeyCodeNum() {
+    return sizeof(key_code_name) / sizeof(key_code_name[0]);
+}

@@ -25,6 +25,8 @@
 #include "keyboard_config.h"
 #include <arr_conv.h>
 
+void free_layer_names(char*** layer_names, uint32_t layers);
+
 //convert blob to keymap matrix
 void blob_to_key_mat(uint16_t layout_arr[MATRIX_ROWS*KEYMAP_COLS],uint16_t buffer[MATRIX_ROWS][KEYMAP_COLS]){
 
@@ -62,27 +64,29 @@ void str_arr_to_str(char (*layer_names)[MAX_LAYOUT_NAME_LENGTH], uint8_t layers,
 }
 
 //convert string to string array
-void str_to_str_arr(char *str, uint8_t layers,char ***buffer){
+void str_to_str_arr(char *str, uint8_t layers, char ***buffer){
+    *buffer = (char**)malloc(layers * sizeof(char*));
+    if (*buffer) {
+        memset(*buffer, 0, layers * sizeof(char*));
+    } else {
+        free_layer_names(buffer, layers);
+        return;
+    }
 
-	char (*layer_names)[MAX_LAYOUT_NAME_LENGTH] =malloc(layers*MAX_LAYOUT_NAME_LENGTH*sizeof(char));
-	char *to= (char*) malloc(MAX_LAYOUT_NAME_LENGTH);
-	strncpy(to, str, MAX_LAYOUT_NAME_LENGTH);
-
-	const char s[2]=",";
-	char *token;
-	//	   get the first token
-	token = strtok(str, s);
-	//	   walk through other tokens and copy them to array
-	uint8_t i=0;
-	while( token != NULL ) {
-		strcpy(layer_names[i],token);
-		token = strtok(NULL, s);
-		i++;
-	}
-	*buffer = malloc(sizeof(layer_names));
-	for(uint8_t i =0; i<layers;i++){
-		(*buffer)[i] = malloc(sizeof(layer_names[i]));
-		strcpy((*buffer)[i],layer_names[i]);
-	}
-
+	const char* token = ",";
+    char *next;
+    uint32_t i = 0;
+    for (char* name = strtok_r(str, token, &next);
+         name && i < layers;
+         name = strtok_r(NULL, token, &next))
+    {
+        (*buffer)[i] = (char*)malloc(strlen(name) + 1);
+        if (!((*buffer)[i])) {
+            free_layer_names(buffer, layers);
+            return;
+        } else {
+            strcpy((*buffer)[i], name);
+        }
+        i++;
+    }
 }
