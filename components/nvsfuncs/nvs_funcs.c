@@ -33,9 +33,9 @@
 
 #define NVS_TAG "NVS Storage"
 
-#define KEYMAP_NAMESPACE "keymap_config"
-#define ENCODER_NAMESPACE "encoder_config"
-#define SLAVE_ENCODER_NAMESPACE "slave_encoder_config"
+#define KEYMAP_NAMESPACE "keymap_conf"
+#define ENCODER_NAMESPACE "encoder_conf"
+#define SLAVE_ENCODER_NAMESPACE "s_encoder_conf"
 
 #define LAYOUT_NAMES "layouts"
 #define LAYOUT_NUM "num_layouts"
