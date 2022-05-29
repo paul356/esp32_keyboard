@@ -172,30 +172,35 @@ static esp_err_t reset_keymap(httpd_req_t* req)
     size_t buf_len = req->content_len;
     char* body = (char*)malloc(buf_len);
     if (!body) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, NULL);
         return ESP_ERR_NO_MEM;
     }
     
     int ret = httpd_req_recv(req, body, buf_len);
     if (ret <= 0) {
         free(body);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, NULL);
         return ESP_ERR_INVALID_ARG;
     }
     
     cJSON* root = cJSON_ParseWithLength(body, buf_len);
     free(body);
     if (!root) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid json");
         return ESP_ERR_NO_MEM;
     }
     
     cJSON* pos = cJSON_GetObjectItem(root, "positions");
     if (!pos || !cJSON_IsArray(pos) || cJSON_GetArraySize(pos) != 0) {
         cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "no positions in json");
         return ESP_ERR_INVALID_ARG;
     }
     
     cJSON* kc  = cJSON_GetObjectItem(root, "keycodes");
     if (!kc || !cJSON_IsArray(kc) || cJSON_GetArraySize(kc) != 0) {
         cJSON_Delete(root);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "no keycodes in json");
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -221,7 +226,7 @@ esp_err_t start_file_server()
 
     /* URI handler for getting uploaded files */
     httpd_uri_t layouts_uri = {
-        .uri       = "/api/layouts",  // Match all URIs of type /path/to/file
+        .uri       = "/api/layouts",  // return keyboard layouts
         .method    = HTTP_GET,
         .handler   = layouts_json,
         .user_ctx  = NULL    // Pass server data as context
@@ -230,7 +235,7 @@ esp_err_t start_file_server()
     httpd_register_uri_handler(server, &layouts_uri);
 
     httpd_uri_t keycodes_uri = {
-        .uri       = "/api/keycodes",  // Match all URIs of type /path/to/file
+        .uri       = "/api/keycodes",  // return valid keycodes
         .method    = HTTP_GET,
         .handler   = keycodes_json,
         .user_ctx  = NULL    // Pass server data as context
@@ -240,7 +245,7 @@ esp_err_t start_file_server()
 
     /* URI handler for getting uploaded files */
     httpd_uri_t update_uri = {
-        .uri       = "/api/keymap",  // Match all URIs of type /path/to/file
+        .uri       = "/api/keymap",  // update keymap of specified keys
         .method    = HTTP_PUT,
         .handler   = update_keymap,
         .user_ctx  = NULL    // Pass server data as context
@@ -250,7 +255,7 @@ esp_err_t start_file_server()
 
     /* URI handler for getting uploaded files */
     httpd_uri_t reset_uri = {
-        .uri       = "/api/keymap",  // Match all URIs of type /path/to/file
+        .uri       = "/api/keymap",  // reset keymap to default value
         .method    = HTTP_POST,
         .handler   = reset_keymap,
         .user_ctx  = NULL    // Pass server data as context
