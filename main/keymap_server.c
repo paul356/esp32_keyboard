@@ -8,11 +8,40 @@
 
 #define TAG "[HTTPD]"
 
-static esp_err_t front_page(httpd_req_t* req)
+static esp_err_t serve_static_files(httpd_req_t* req)
 {
-    httpd_resp_set_type(req, "text/plain");
-    httpd_resp_sendstr_chunk(req, "non exist URI");
-    httpd_resp_sendstr_chunk(req, NULL);
+    extern const unsigned char index_html_start[] asm("_binary_index_html_start");
+    extern const unsigned char index_html_end[] asm("_binary_index_html_end");
+
+    extern const unsigned char app_js_start[] asm("_binary_app_js_start");
+    extern const unsigned char app_js_end[] asm("_binary_app_js_end");
+
+    extern const unsigned char style_css_start[] asm("_binary_style_css_start");
+    extern const unsigned char style_css_end[] asm("_binary_style_css_end");
+    
+    const char* uri = req->uri;
+    
+    if (strcmp(uri, "/index.html") == 0 ||
+        strcmp(uri, "/") == 0) {
+        const size_t chunk_size = index_html_end - index_html_start;
+        httpd_resp_set_type(req, "text/html");
+        httpd_resp_send_chunk(req, (const char*)index_html_start, chunk_size);
+        httpd_resp_sendstr_chunk(req, NULL);
+    } else if (strcmp(uri, "/app.js") == 0) {
+        const size_t chunk_size = app_js_end - app_js_start;
+        httpd_resp_set_type(req, "text/javascript");
+        httpd_resp_send_chunk(req, (const char*)app_js_start, chunk_size);
+        httpd_resp_sendstr_chunk(req, NULL);        
+    } else if (strcmp(uri, "/style.css") == 0) {
+        const size_t chunk_size = style_css_end - style_css_start;
+        httpd_resp_set_type(req, "text/css");
+        httpd_resp_send_chunk(req, (const char*)style_css_start, chunk_size);
+        httpd_resp_sendstr_chunk(req, NULL);
+    } else {
+        httpd_resp_set_type(req, "text/plain");
+        httpd_resp_sendstr_chunk(req, "non exist URI");
+        httpd_resp_sendstr_chunk(req, NULL);
+    }
 
     return ESP_OK;
 }
@@ -267,7 +296,7 @@ esp_err_t start_file_server()
     httpd_uri_t get_uri = {
         .uri       = "/*",  // Match all URIs of type /path/to/file
         .method    = HTTP_GET,
-        .handler   = front_page,
+        .handler   = serve_static_files,
         .user_ctx  = NULL    // Pass server data as context
     };
 
