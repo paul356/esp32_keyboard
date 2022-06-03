@@ -73,29 +73,29 @@ uint16_t default_slave_encoder_map[LAYERS][ENCODER_SIZE] = {
 // Each keymap is represented by an array, with an array that points to all the keymaps  by order
 uint16_t _LAYERS[LAYERS][MATRIX_ROWS][KEYMAP_COLS] = {
     {
-        {KC_GRV,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5   },
-        {KC_ESC,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T   },
-        {KC_TAB,  KC_A,    KC_S,    KC_D,    KC_F,    KC_G   },
-        {KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B   },
-        {KC_LCTRL,KC_LGUI, KC_LALT, KC_SPC,  KC_SPC,  NUM_H  },
-        {DEFAULT, RAISE,   KC_NONE, KC_NONE, KC_NONE, KC_NONE}
+        {KC_GRV,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_GRV,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_NONE, KC_NONE},
+        {KC_ESC,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_ESC,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_NONE, KC_NONE},
+        {KC_TAB,  KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_TAB,  KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_NONE, KC_NONE},
+        {KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_NONE, KC_NONE},
+        {KC_LCTRL,KC_LGUI, KC_LALT, KC_SPC,  KC_SPC,  NUM_H,   KC_LCTRL,KC_LGUI, KC_LALT, KC_SPC,  KC_SPC,  NUM_H,   KC_NONE, KC_NONE},
+        {DEFAULT, RAISE,   KC_NONE, KC_NONE, KC_NONE, KC_NONE, DEFAULT, RAISE,   KC_NONE, KC_NONE, KC_NONE, KC_NONE, KC_NONE, KC_NONE}
 
     },
     {
-        {KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6  },
-        {KC_ESC,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T   }, 
-        {KC_TAB,  KC_A,    KC_S,    KC_D,    KC_F,    KC_G   }, 
-        {KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B   }, 
-        {KC_LCTRL,KC_LGUI, KC_LALT, KC_SPC,  KC_SPC,  NUM_H  }, 
-        {DEFAULT, RAISE,   KC_NONE, KC_NONE, KC_NONE, KC_NONE}
+        {KC_F1,   KC_F2,   KC_F3,   KC_F4,   KC_F5,   KC_F6,   KC_GRV,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_NONE, KC_NONE},
+        {KC_ESC,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_ESC,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_NONE, KC_NONE}, 
+        {KC_TAB,  KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_TAB,  KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_NONE, KC_NONE}, 
+        {KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_NONE, KC_NONE}, 
+        {KC_LCTRL,KC_LGUI, KC_LALT, KC_SPC,  KC_SPC,  NUM_H,   KC_LCTRL,KC_LGUI, KC_LALT, KC_SPC,  KC_SPC,  NUM_H,   KC_NONE, KC_NONE}, 
+        {DEFAULT, RAISE,   KC_NONE, KC_NONE, KC_NONE, KC_NONE, DEFAULT, RAISE,   KC_NONE, KC_NONE, KC_NONE, KC_NONE, KC_NONE, KC_NONE}
     },
     {
-        {KC_GRV,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5   },
-        {KC_ESC,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T   },
-        {KC_TAB,  KC_A,    KC_S,    KC_D,    KC_F,    KC_G   },
-        {KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B   },
-        {KC_LCTRL,KC_LGUI, KC_LALT, KC_SPC,  KC_SPC,  NUM_H  },
-        {DEFAULT, RAISE,   KC_NONE, KC_NONE, KC_NONE, KC_NONE }
+        {KC_GRV,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_GRV,  KC_1,    KC_2,    KC_3,    KC_4,    KC_5,    KC_NONE, KC_NONE},
+        {KC_ESC,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_ESC,  KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,    KC_NONE, KC_NONE},
+        {KC_TAB,  KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_TAB,  KC_A,    KC_S,    KC_D,    KC_F,    KC_G,    KC_NONE, KC_NONE},
+        {KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_LSFT, KC_Z,    KC_X,    KC_C,    KC_V,    KC_B,    KC_NONE, KC_NONE},
+        {KC_LCTRL,KC_LGUI, KC_LALT, KC_SPC,  KC_SPC,  NUM_H,   KC_LCTRL,KC_LGUI, KC_LALT, KC_SPC,  KC_SPC,  NUM_H,   KC_NONE, KC_NONE},
+        {DEFAULT, RAISE,   KC_NONE, KC_NONE, KC_NONE, KC_NONE, DEFAULT, RAISE,   KC_NONE, KC_NONE, KC_NONE, KC_NONE, KC_NONE, KC_NONE }
     }
 };
 
