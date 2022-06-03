@@ -62,9 +62,9 @@
 #define SEC_TO_MIN 60
 //plugin functions
 #include "plugins.h"
-#include "protocol_examples_common.h"
 
-extern "C" esp_err_t start_file_server();
+extern esp_err_t start_file_server();
+extern void wifi_init_softap(void);
 
 static config_data_t config;
 QueueHandle_t espnow_recieve_q;
@@ -338,12 +338,7 @@ extern "C" void app_main() {
     }
     ESP_ERROR_CHECK(ret);
 
-    // first init lwIP network stack
-    ESP_ERROR_CHECK(esp_netif_init());
-    // enable default event loop on which wifi event handlers depend
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-
-    ESP_ERROR_CHECK(example_connect());
+    wifi_init_softap();
 
     // Read config
     nvs_handle my_handle;
