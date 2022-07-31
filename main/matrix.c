@@ -36,10 +36,10 @@
 const gpio_num_t MATRIX_ROWS_PINS[] = { GPIO_NUM_21, GPIO_NUM_47, GPIO_NUM_48,
 		GPIO_NUM_38, GPIO_NUM_2, GPIO_NUM_1 };
 const gpio_num_t MATRIX_COLS_PINS[] = { GPIO_NUM_5, GPIO_NUM_6, GPIO_NUM_7,
-                                        GPIO_NUM_8, GPIO_NUM_9, GPIO_NUM_10,
-                                        GPIO_NUM_11, GPIO_NUM_12, GPIO_NUM_13,
-                                        GPIO_NUM_14, GPIO_NUM_15, GPIO_NUM_16,
-                                        GPIO_NUM_17, GPIO_NUM_18 };
+                                        GPIO_NUM_15, GPIO_NUM_16, GPIO_NUM_17,
+                                        GPIO_NUM_18, GPIO_NUM_8, GPIO_NUM_9,
+                                        GPIO_NUM_10, GPIO_NUM_11, GPIO_NUM_12,
+                                        GPIO_NUM_13, GPIO_NUM_14 };
 
 // matrix states
 uint8_t MATRIX_STATE[MATRIX_ROWS][MATRIX_COLS] = { 0 };
