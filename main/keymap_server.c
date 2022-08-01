@@ -5,6 +5,7 @@
 #include "nvs_keymaps.h"
 #include "nvs_funcs.h"
 #include "cJSON.h"
+#include "keymap.h"
 
 #define TAG "[HTTPD]"
 
@@ -235,6 +236,13 @@ static esp_err_t reset_keymap(httpd_req_t* req)
 
     cJSON_Delete(root);
 
+    for (int i = 0; i < LAYERS; i++) {
+        // save layout
+        memcpy(&layouts[i][0][0], &_LAYERS[i][0][0], sizeof(uint16_t) * MATRIX_ROWS * KEYMAP_COLS);
+        nvs_write_layout(&layouts[i][0][0], default_layout_names[i]);
+    }
+
+    
     httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
 }
