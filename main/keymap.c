@@ -4,7 +4,6 @@
 #include "key_definitions.h"
 #include "keyboard_config.h"
 #include "keymap.h"
-#include "plugins.h"
 
 // A bit different from QMK, default returns you to the first layer, LOWER and raise increase/lower layer by order.
 #define DEFAULT 0x100

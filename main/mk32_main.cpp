@@ -48,20 +48,15 @@
 #include "matrix.h"
 #include "keypress_handles.c"
 #include "keyboard_config.h"
-#include "espnow_receive.h"
-#include "espnow_send.h"
-#include "r_encoder.h"
-#include "battery_monitor.h"
 #include "nvs_funcs.h"
 #include "nvs_keymaps.h"
+#include "keycode_conv.h"
 
 #define KEY_REPORT_TAG "KEY_REPORT"
 #define SYSTEM_REPORT_TAG "KEY_REPORT"
 #define TRUNC_SIZE 20
 #define USEC_TO_SEC 1000000
 #define SEC_TO_MIN 60
-//plugin functions
-#include "plugins.h"
 
 extern esp_err_t start_file_server();
 extern void wifi_init_softap(void);
@@ -76,38 +71,38 @@ TaskHandle_t xOledTask;
 #endif
 TaskHandle_t xKeyreportTask;
 
-//Task for continually updating the OLED
-extern "C" void oled_task(void *pvParameters) {
-#ifdef MASTER
-	ble_connected_oled();
-    bool CON_LOG_FLAG = false; // Just because I don't want it to keep logging the same thing a billion times
-    while (1) {
-        if (halBLEIsConnected() == 0) {
-            if (CON_LOG_FLAG == false) {
-                ESP_LOGI(KEY_REPORT_TAG,
-                        "Not connected, waiting for connection ");
-            }
-            waiting_oled();
-            DEEP_SLEEP = false;
-            CON_LOG_FLAG = true;
-        } else {
-            if (CON_LOG_FLAG == true) {
-                ble_connected_oled();
-            }
-            update_oled();
-            CON_LOG_FLAG = false;
-        }
-    }
-#endif
-#ifdef SLAVE
-    while(1) {
-        ble_slave_oled();
-    }
-#endif
-}
+////Task for continually updating the OLED
+//extern "C" void oled_task(void *pvParameters) {
+//#ifdef MASTER
+//	ble_connected_oled();
+//    bool CON_LOG_FLAG = false; // Just because I don't want it to keep logging the same thing a billion times
+//    while (1) {
+//        if (halBLEIsConnected() == 0) {
+//            if (CON_LOG_FLAG == false) {
+//                ESP_LOGI(KEY_REPORT_TAG,
+//                        "Not connected, waiting for connection ");
+//            }
+//            waiting_oled();
+//            DEEP_SLEEP = false;
+//            CON_LOG_FLAG = true;
+//        } else {
+//            if (CON_LOG_FLAG == true) {
+//                ble_connected_oled();
+//            }
+//            update_oled();
+//            CON_LOG_FLAG = false;
+//        }
+//    }
+//#endif
+//#ifdef SLAVE
+//    while(1) {
+//        ble_slave_oled();
+//    }
+//#endif
+//}
 
 //handle battery reports over BLE
-extern "C" void battery_reports(void *pvParameters) {
+/*extern "C" void battery_reports(void *pvParameters) {
     //uint8_t past_battery_report[1] = { 0 };
 
     while(1){
@@ -129,7 +124,7 @@ extern "C" void battery_reports(void *pvParameters) {
         }
         vTaskDelay(60*1000/ portTICK_PERIOD_MS);
     }
-}
+}*/
 
 
 //How to handle key reports
@@ -189,66 +184,66 @@ extern "C" void key_reports(void *pvParameters) {
 }
 
 //Handling rotary encoder
-extern "C" void encoder_report(void *pvParameters) {
-    uint8_t encoder_state = 0;
-    uint8_t past_encoder_state = 0;
+//extern "C" void encoder_report(void *pvParameters) {
+//    uint8_t encoder_state = 0;
+//    uint8_t past_encoder_state = 0;
+//
+//    while (1) {
+//        encoder_state = r_encoder_state();
+//        if (encoder_state != past_encoder_state) {
+//            DEEP_SLEEP = false;
+//            r_encoder_command(encoder_state, encoder_map[current_layout]);
+//            past_encoder_state = encoder_state;
+//        }
+//
+//    }
+//}
+//
+////Handling rotary encoder for slave pad
+//extern "C" void slave_encoder_report(void *pvParameters) {
+//    uint8_t encoder_state = 0;
+//    uint8_t past_encoder_state = 0;
+//
+//    while (1) {
+//        encoder_state = r_encoder_state();
+//        if (encoder_state != past_encoder_state) {
+//            DEEP_SLEEP = false;
+//            xQueueSend(espnow_encoder_send_q, (void*) &encoder_state,
+//              (TickType_t) 0);
+//            past_encoder_state = encoder_state;
+//        }
+//
+//    }
+//}
+//
+////Function for sending out the modified matrix
+//extern "C" void slave_scan(void *pvParameters) {
+//
+//    uint8_t PAST_MATRIX[MATRIX_ROWS][MATRIX_COLS] = { 0 };
+//
+//    while (1) {
+//        scan_matrix();
+//        if (memcmp(&PAST_MATRIX, &MATRIX_STATE, sizeof MATRIX_STATE) != 0) {
+//            DEEP_SLEEP = false;
+//            memcpy(&PAST_MATRIX, &MATRIX_STATE, sizeof MATRIX_STATE);
+//            xQueueSend(espnow_matrix_send_q, (void*) &MATRIX_STATE,
+//              (TickType_t) 0);
+//
+//        }
+//    }
+//}
 
-    while (1) {
-        encoder_state = r_encoder_state();
-        if (encoder_state != past_encoder_state) {
-            DEEP_SLEEP = false;
-            r_encoder_command(encoder_state, encoder_map[current_layout]);
-            past_encoder_state = encoder_state;
-        }
-
-    }
-}
-
-//Handling rotary encoder for slave pad
-extern "C" void slave_encoder_report(void *pvParameters) {
-    uint8_t encoder_state = 0;
-    uint8_t past_encoder_state = 0;
-
-    while (1) {
-        encoder_state = r_encoder_state();
-        if (encoder_state != past_encoder_state) {
-            DEEP_SLEEP = false;
-            xQueueSend(espnow_encoder_send_q, (void*) &encoder_state,
-                    (TickType_t) 0);
-            past_encoder_state = encoder_state;
-        }
-
-    }
-}
-
-//Function for sending out the modified matrix
-extern "C" void slave_scan(void *pvParameters) {
-
-    uint8_t PAST_MATRIX[MATRIX_ROWS][MATRIX_COLS] = { 0 };
-
-    while (1) {
-        scan_matrix();
-        if (memcmp(&PAST_MATRIX, &MATRIX_STATE, sizeof MATRIX_STATE) != 0) {
-            DEEP_SLEEP = false;
-            memcpy(&PAST_MATRIX, &MATRIX_STATE, sizeof MATRIX_STATE);
-            xQueueSend(espnow_matrix_send_q, (void*) &MATRIX_STATE,
-                    (TickType_t) 0);
-
-        }
-    }
-}
-
-//Update the matrix state via reports recieved by espnow
-extern "C" void espnow_update_matrix(void *pvParameters) {
-
-    uint8_t CURRENT_MATRIX[MATRIX_ROWS][MATRIX_COLS] = { 0 };
-    while (1) {
-        if (xQueueReceive(espnow_receive_q, &CURRENT_MATRIX, 10000)) {
-            DEEP_SLEEP = false;
-            memcpy(&SLAVE_MATRIX_STATE, &CURRENT_MATRIX, sizeof CURRENT_MATRIX);
-        }
-    }
-}
+////Update the matrix state via reports recieved by espnow
+//extern "C" void espnow_update_matrix(void *pvParameters) {
+//
+//    uint8_t CURRENT_MATRIX[MATRIX_ROWS][MATRIX_COLS] = { 0 };
+//    while (1) {
+//        if (xQueueReceive(espnow_receive_q, &CURRENT_MATRIX, 10000)) {
+//            DEEP_SLEEP = false;
+//            memcpy(&SLAVE_MATRIX_STATE, &CURRENT_MATRIX, sizeof CURRENT_MATRIX);
+//        }
+//    }
+//}
 //what to do after waking from deep sleep, doesn't seem to work after updating esp-idf
 //extern "C" void RTC_IRAM_ATTR esp_wake_deep_sleep(void) {
 //    rtc_matrix_deinit();;

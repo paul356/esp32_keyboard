@@ -25,9 +25,7 @@
 #include "keymap.c"
 #include "matrix.h"
 #include "hal_ble.h"
-#include "oled_tasks.h"
 #include "nvs_keymaps.h"
-#include "plugin_manager.h"
 
 #define KEY_PRESS_TAG "KEY_PRESS"
 
@@ -193,7 +191,7 @@ uint8_t *check_key_state(uint16_t *keymap) {
 
 					//checking for function
 					if (keycode >= PLUGIN_BASE_VAL){
-						plugin_launcher(keycode);
+						//plugin_launcher(keycode);
 						continue;
 					}
 					//checking for layer hold

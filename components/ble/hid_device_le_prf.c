@@ -16,7 +16,6 @@
 #include <string.h>
 #include "esp_log.h"
 #include "hid_dev.h"
-#include "battery_monitor.h"
 /// characteristic presentation information
 struct prf_char_pres_fmt {
 	/// Unit (The Unit is a UUID)
