@@ -1,0 +1,4 @@
+#define QMK_VERSION "0.10.48-10-g69c128"
+#define QMK_BUILDDATE "2021-07-14-22:35:05"
+#define CHIBIOS_VERSION "breaking_2020_q1"
+#define CHIBIOS_CONTRIB_VERSION "breaking_2020_q1"
