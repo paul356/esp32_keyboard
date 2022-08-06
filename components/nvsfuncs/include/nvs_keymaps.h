@@ -11,14 +11,10 @@
 #include "config.h"
 
 //array for for holding the keymaps
-extern uint16_t layouts[LAYERS][MATRIX_ROWS][MATRIX_COLS];
+extern uint16_t keymaps[LAYERS][MATRIX_ROWS][MATRIX_COLS];
 
 //array for keymap names
 extern char **layer_names_arr;
-
-extern uint16_t encoder_map[LAYERS][ENCODER_SIZE];
-
-extern uint16_t slave_encoder_map[LAYERS][ENCODER_SIZE];
 
 //amount of arrays
 extern uint8_t layers_num;

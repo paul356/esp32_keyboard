@@ -9,6 +9,9 @@ set(SRC_FILES
     common/host.c
     common/debug.c
     common/magic.c
+    common/esp32s3/timer.c
+    common/esp32s3/miscs.c
+    common/esp32s3/eeconfig.c
     )
 
 idf_component_register(SRCS ${SRC_FILES}

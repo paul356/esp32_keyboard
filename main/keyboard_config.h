@@ -22,11 +22,7 @@
 //#define SPLIT_MASTER	 // undefine if keyboard is not split and master
 //#define SLAVE	 // undefine if keyboard is master
 
-//Define matrix
-#define KEYPADS 1 // intended in order to create a Multiple keypad split boards
-
 //#define NKRO // does not work on Android and iOS!,  we can get 18KRO on those
-#define LAYERS 3 // number of layers defined
 
 //Encoder definitions
 //#define R_ENCODER // undefine if no rotary encoder is used
@@ -58,7 +54,6 @@
 #define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
 #define SET_BIT(var,pos) (var |= 1LLU << pos);
 
-#define MAX_LAYER (LAYERS-1)
 #define MOD_LED_BYTES 2 //bytes for led status and modifiers
 #define MACRO_LEN 3 //keys for macros
 #define REPORT_LEN (MOD_LED_BYTES+16+MACRO_LEN) //size of hid reports with NKRO and room for 3 key macro
@@ -75,15 +70,14 @@
 #define MOUSE_ENCODER 1
 #define KEY_ENCODER 2
 
+#define LAYERS 3
+
 typedef struct config_data {
 	char bt_device_name[MAX_BT_DEVICENAME_LENGTH];
 } config_data_t;
 
 extern uint8_t current_layout;
 extern uint8_t curr_led;
-
-extern uint16_t default_encoder_map[LAYERS][ENCODER_SIZE];
-extern uint16_t default_slave_encoder_map[LAYERS][ENCODER_SIZE];
 
 #define MAX_LAYOUT_NAME_LENGTH 15
 // array to hold names of layouts for oled

@@ -12,7 +12,5 @@
 #include "config.h"
 
 extern uint16_t _LAYERS[LAYERS][MATRIX_ROWS][MATRIX_COLS];
-extern uint16_t default_encoder_map[LAYERS][ENCODER_SIZE];
-extern uint16_t default_slave_encoder_map[LAYERS][ENCODER_SIZE];
 
 #endif /* MAIN_KEYMAP_H_ */
