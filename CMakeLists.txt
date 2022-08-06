@@ -10,3 +10,6 @@ project(MK32)
 target_add_binary_data(MK32.elf "dist/app.js" binary)
 target_add_binary_data(MK32.elf "dist/index.html" binary)
 target_add_binary_data(MK32.elf "dist/style.css" binary)
+
+idf_build_set_property(COMPILE_OPTIONS -D__ESP32S3__ APPEND)
+idf_build_set_property(COMPILE_OPTIONS -DNO_PRINT APPEND)

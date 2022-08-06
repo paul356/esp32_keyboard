@@ -24,6 +24,9 @@
 #    include "hal.h"
 #    include "chibios_config.h"
 #endif
+#if defined(__ESP32S3__)
+#include "driver/gpio.h"
+#endif
 
 #include "wait.h"
 #include "matrix.h"
@@ -218,6 +221,18 @@ typedef ioline_t pin_t;
 #    define readPin(pin) palReadLine(pin)
 
 #    define togglePin(pin) palToggleLine(pin)
+#elif defined(__ESP32S3__)
+    typedef gpio_num_t pin_t;
+#define setPinInput(pin) gpio_set_direction(pin, GPIO_MODE_INPUT)
+#define setPinInputHigh(pin) gpio_set_pull_mode(pin, GPIO_PULLUP_ONLY)
+#define setPinInputLow(pin) gpio_set_pull_mode(pin, GPIO_PULLDOWN_ONLY)
+#define setPinOutput(pin) gpio_set_direction(pin, GPIO_MODE_OUTPUT)
+
+#define writePinHigh(pin) gpio_set_level(pin, 1)
+#define writePinLow(pin) gpio_set_level(pin, 0)
+#define writePin(pin, level) ((level) ? writePinHigh(pin) : writePinLow(pin))
+#define readPin(pin) gpio_get_level(pin)
+#define togglePin(pin) gpio_non_exist(pin)
 #endif
 
 #define SEND_STRING(string) send_string_P(PSTR(string))

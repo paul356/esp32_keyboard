@@ -43,7 +43,7 @@
 char **layer_names_arr;
 uint8_t layers_num=0;
 
-uint16_t layouts[LAYERS][MATRIX_ROWS][KEYMAP_COLS];
+uint16_t layouts[LAYERS][MATRIX_ROWS][MATRIX_COLS];
 uint16_t encoder_map[LAYERS][ENCODER_SIZE];
 uint16_t slave_encoder_map[LAYERS][ENCODER_SIZE];
 
@@ -72,9 +72,9 @@ static esp_err_t nvs_read_blob(const char* namespace, const char* key, void* buf
 }
 
 //read a layout from nvs
-void nvs_read_layout(const char* layout_name, uint16_t buffer[MATRIX_ROWS*KEYMAP_COLS])
+void nvs_read_layout(const char* layout_name, uint16_t buffer[MATRIX_ROWS*MATRIX_COLS])
 {
-    size_t arr_size = sizeof(uint16_t) * MATRIX_ROWS * KEYMAP_COLS;
+    size_t arr_size = sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS;
     esp_err_t err = nvs_read_blob(KEYMAP_NAMESPACE, layout_name, buffer, &arr_size);
     if (err != ESP_OK) {
         ESP_LOGE(NVS_TAG, "read ns:%s key:%s failed", KEYMAP_NAMESPACE, layout_name);
@@ -141,15 +141,15 @@ static void nvs_write_slave_encoder_layout(uint16_t encoder_layout_arr[ENCODER_S
 }
 
 //add or overwrite a keymap to the nvs
-static void nvs_write_layout_matrix(uint16_t layout[MATRIX_ROWS * KEYMAP_COLS], const char* layout_name){
-    esp_err_t err = nvs_write_blob(KEYMAP_NAMESPACE, layout_name, layout, sizeof(uint16_t) * MATRIX_ROWS * KEYMAP_COLS);
+static void nvs_write_layout_matrix(uint16_t layout[MATRIX_ROWS * MATRIX_COLS], const char* layout_name){
+    esp_err_t err = nvs_write_blob(KEYMAP_NAMESPACE, layout_name, layout, sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
     if (err != ESP_OK) {
 		ESP_LOGE(NVS_TAG,"write ns:%s key:%s fail reason(%s)!\n", KEYMAP_NAMESPACE, layout_name, esp_err_to_name(err));
     }
 }
 
 //add or overwrite a keymap to the nvs, also take care of layers_num, layer_names_arr
-void nvs_write_layout(uint16_t layout[MATRIX_ROWS * KEYMAP_COLS], const char* layout_name){
+void nvs_write_layout(uint16_t layout[MATRIX_ROWS * MATRIX_COLS], const char* layout_name){
 
 	ESP_LOGI(NVS_TAG,"Adding/Modifying Layout");
 	uint8_t FOUND_MATCH = 0;
@@ -188,7 +188,7 @@ void nvs_write_layout(uint16_t layout[MATRIX_ROWS * KEYMAP_COLS], const char* la
         layer_names_arr = curr_array;
 
         layers_num = cur_layers_num;
-        memcpy(&layouts[cur_layers_num - 1][0][0], layout, sizeof(uint16_t) * MATRIX_ROWS * KEYMAP_COLS);
+        memcpy(&layouts[cur_layers_num - 1][0][0], layout, sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
 	}
     
 	nvs_write_layout_matrix(layout, layout_name);

@@ -9,8 +9,9 @@
 #define MAIN_KEYMAP_H_
 
 #include "keyboard_config.h"
+#include "config.h"
 
-extern uint16_t _LAYERS[LAYERS][MATRIX_ROWS][KEYMAP_COLS];
+extern uint16_t _LAYERS[LAYERS][MATRIX_ROWS][MATRIX_COLS];
 extern uint16_t default_encoder_map[LAYERS][ENCODER_SIZE];
 extern uint16_t default_slave_encoder_map[LAYERS][ENCODER_SIZE];
 

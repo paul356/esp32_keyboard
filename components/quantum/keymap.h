@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <stdbool.h>
 #include "action.h"
+#include "config.h"
 #if defined(__AVR__)
 #    include <avr/pgmspace.h>
 #elif defined PROTOCOL_CHIBIOS

@@ -57,7 +57,7 @@ static esp_err_t layouts_json(httpd_req_t* req)
         httpd_resp_sendstr_chunk(req, "\":[");
 
         for (int j = 0; j < MATRIX_ROWS; j++) {
-            for (int k = 0; k < KEYMAP_COLS; k++) {
+            for (int k = 0; k < MATRIX_COLS; k++) {
                 uint16_t key_code = layouts[i][j][k];
                 httpd_resp_sendstr_chunk(req, "\"");
                 const char* keyName = GetKeyCodeName(key_code);
@@ -67,7 +67,7 @@ static esp_err_t layouts_json(httpd_req_t* req)
                     httpd_resp_sendstr_chunk(req, GetKeyCodeName(KC_NONE));
                 }
                 httpd_resp_sendstr_chunk(req, "\"");
-                if (j != MATRIX_ROWS - 1 || k != KEYMAP_COLS - 1) {
+                if (j != MATRIX_ROWS - 1 || k != MATRIX_COLS - 1) {
                     httpd_resp_sendstr_chunk(req, ",");
                 }
             }
@@ -173,8 +173,8 @@ static esp_err_t update_keymap(httpd_req_t* req)
         return ESP_FAIL;
     }
 
-    uint16_t temp_layer[MATRIX_ROWS * KEYMAP_COLS];
-    memcpy(temp_layer, layouts[layer_index], sizeof(uint16_t) * MATRIX_ROWS * KEYMAP_COLS);
+    uint16_t temp_layer[MATRIX_ROWS * MATRIX_COLS];
+    memcpy(temp_layer, layouts[layer_index], sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
     for(uint16_t i = 0; i < cJSON_GetArraySize(positions); ++i){
         uint16_t pos = (uint16_t)cJSON_GetArrayItem(positions, i)->valueint;
         const char* keyname = cJSON_GetArrayItem(keycodes, i)->valuestring;
@@ -186,7 +186,7 @@ static esp_err_t update_keymap(httpd_req_t* req)
     }
 
     // save layout
-    memcpy(layouts[layer_index], temp_layer, sizeof(uint16_t) * MATRIX_ROWS * KEYMAP_COLS);
+    memcpy(layouts[layer_index], temp_layer, sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
     nvs_write_layout(temp_layer, layer_name);
 
     cJSON_Delete(root);
@@ -238,7 +238,7 @@ static esp_err_t reset_keymap(httpd_req_t* req)
 
     for (int i = 0; i < LAYERS; i++) {
         // save layout
-        memcpy(&layouts[i][0][0], &_LAYERS[i][0][0], sizeof(uint16_t) * MATRIX_ROWS * KEYMAP_COLS);
+        memcpy(&layouts[i][0][0], &_LAYERS[i][0][0], sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
         nvs_write_layout(&layouts[i][0][0], default_layout_names[i]);
     }
 

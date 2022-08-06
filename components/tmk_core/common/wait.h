@@ -33,6 +33,28 @@ extern "C" {
 #    include "clks.h"
 #    define wait_ms(ms) CLK_delay_ms(ms)
 #    define wait_us(us) CLK_delay_us(us)
+#elif defined __ESP32S3__
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_timer.h"
+#define NOP() asm volatile ("nop")
+static inline void delayMicroseconds(uint32_t us)
+{
+    uint64_t m = (uint64_t)esp_timer_get_time();
+    if(us){
+        uint64_t e = (m + us);
+        if(m > e){ //overflow
+            while((uint64_t)esp_timer_get_time() > e){
+                NOP();
+            }
+        }
+        while((uint64_t)esp_timer_get_time() < e){
+            NOP();
+        }
+    }
+}           
+#define wait_ms(ms) vTaskDelay((ms) / portTICK_PERIOD_MS)
+#define wait_us(us) delayMicroseconds(us)
 #else  // Unit tests
 void wait_ms(uint32_t ms);
 #    define wait_us(us) wait_ms(us / 1000)

@@ -8,9 +8,10 @@
 #ifndef NVS_KEYMAPS_H_
 #define NVS_KEYMAPS_H_
 #include <keyboard_config.h>
+#include "config.h"
 
 //array for for holding the keymaps
-extern uint16_t layouts[LAYERS][MATRIX_ROWS][KEYMAP_COLS];
+extern uint16_t layouts[LAYERS][MATRIX_ROWS][MATRIX_COLS];
 
 //array for keymap names
 extern char **layer_names_arr;

@@ -22,19 +22,11 @@
 //#define SPLIT_MASTER	 // undefine if keyboard is not split and master
 //#define SLAVE	 // undefine if keyboard is master
 
-#define DEBOUNCE 4 //debounce time in ms
-
 //Define matrix
 #define KEYPADS 1 // intended in order to create a Multiple keypad split boards
-#define MATRIX_ROWS 6
-#define MATRIX_COLS 14 // For split keyboards, define columns for one side only.
 
 //#define NKRO // does not work on Android and iOS!,  we can get 18KRO on those
 #define LAYERS 3 // number of layers defined
-
-// Select diode direction
-#define COL2ROW
-//#define ROW2COL
 
 //Encoder definitions
 //#define R_ENCODER // undefine if no rotary encoder is used
@@ -69,9 +61,8 @@
 #define MAX_LAYER (LAYERS-1)
 #define MOD_LED_BYTES 2 //bytes for led status and modifiers
 #define MACRO_LEN 3 //keys for macros
-#define KEYMAP_COLS MATRIX_COLS*KEYPADS  // used for a symmetrical split keyboard
-#define REPORT_LEN (MOD_LED_BYTES+MATRIX_ROWS*KEYMAP_COLS+MACRO_LEN) //size of hid reports with NKRO and room for 3 key macro
-#define REPORT_COUNT_BYTES (MATRIX_ROWS*KEYMAP_COLS+MACRO_LEN)
+#define REPORT_LEN (MOD_LED_BYTES+16+MACRO_LEN) //size of hid reports with NKRO and room for 3 key macro
+#define REPORT_COUNT_BYTES (16+MACRO_LEN)
 
 #define PLUGIN_BASE_VAL 0x135
 #define LAYER_HOLD_MAX_VAL 0x134

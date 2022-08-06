@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include "keyboard.h"
 #include "action.h"
+#include "config.h"
 
 #if defined(LAYER_STATE_8BIT)
 typedef uint8_t layer_state_t;

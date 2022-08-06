@@ -46,7 +46,6 @@
 
 //MK32 functions
 #include "matrix.h"
-#include "keypress_handles.c"
 #include "keyboard_config.h"
 #include "nvs_funcs.h"
 #include "nvs_keymaps.h"
@@ -136,8 +135,8 @@ extern "C" void key_reports(void *pvParameters) {
 
 
     while (1) {
-        memcpy(report_state, check_key_state(&layouts[current_layout][0][0]),
-                sizeof report_state);
+        keyboard_task();
+        memset(report_state, 0, sizeof(report_state));
 
         //Do not send anything if queues are uninitialized
         if (mouse_q == NULL || keyboard_q == NULL || joystick_q == NULL) {
@@ -315,7 +314,7 @@ extern "C" void app_main() {
     // tinyusb init code
 
     //Reset the rtc GPIOS
-    rtc_matrix_deinit();
+    matrix_init();
 
     //Underclocking for better current draw (not really effective)
     //    esp_pm_config_esp32_t pm_config;
