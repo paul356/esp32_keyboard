@@ -236,12 +236,11 @@ static esp_err_t reset_keymap(httpd_req_t* req)
 
     cJSON_Delete(root);
 
-    for (int i = 0; i < LAYERS; i++) {
-        // save layout
-        memcpy(&keymaps[i][0][0], &_LAYERS[i][0][0], sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
-        nvs_write_layout(&keymaps[i][0][0], default_layout_names[i]);
+    esp_err_t err = nvs_reset_layouts();
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "reset fail");
+        return ESP_FAIL;        
     }
-
     
     httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;

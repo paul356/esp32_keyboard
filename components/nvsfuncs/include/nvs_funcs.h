@@ -46,6 +46,7 @@ void nvs_read_keymap_cfg(void);
  */
 void nvs_write_keymap_cfg(uint8_t layers, char **layer_names);
 
+esp_err_t nvs_reset_layouts(void);
 
 void nvs_store_layouts(void);
 

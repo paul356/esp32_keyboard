@@ -159,12 +159,15 @@ void nvs_write_layout(uint16_t layout[MATRIX_ROWS * MATRIX_COLS], const char* la
 void free_layer_names(char*** layer_names, uint32_t layers)
 {
     for (uint32_t i = 0; i < layers; i++) {
-        if (*layer_names) {
+        if (*layer_names && (*layer_names)[i]) {
             free((*layer_names)[i]);
+            (*layer_names)[i] = NULL;
         }
     }
-    free(*layer_names);
-    *layer_names = NULL;
+    if (*layer_names) {
+        free(*layer_names);
+        *layer_names = NULL;
+    }
 }
 
 //read the what layouts are in the nvs
@@ -270,6 +273,30 @@ void nvs_store_layouts(void)
     }
 }
 
+esp_err_t nvs_reset_layouts(void)
+{
+    free_layer_names(&layer_names_arr, layers_num);
+    layer_names_arr = malloc(sizeof(void*) * LAYERS);
+    if (!layer_names_arr) {
+        return ESP_ERR_NO_MEM;
+    }
+    for(uint8_t i = 0;i < LAYERS; i++){
+        layer_names_arr[i] = malloc(sizeof(default_layout_names[i]));
+        if (!layer_names_arr[i]) {
+            free_layer_names(&layer_names_arr, i);
+            return ESP_ERR_NO_MEM;
+        }
+        strcpy(layer_names_arr[i], default_layout_names[i]);
+    }
+    memcpy(&keymaps[0][0][0], &_LAYERS[0][0][0], sizeof(_LAYERS));
+
+    // layout is copy from default, save these configs
+    layers_num = LAYERS;
+    nvs_store_layouts();
+    
+    return ESP_OK;
+}
+
 //load the layouts from nvs
 void nvs_load_layouts(void)
 {
@@ -284,18 +311,6 @@ void nvs_load_layouts(void)
 		}
 	} else {
 		ESP_LOGI(NVS_TAG,"Layouts not found on NVS, loading default layouts");
-		free_layer_names(&layer_names_arr, LAYERS);
-		layer_names_arr = malloc(sizeof(default_layout_names));
-		for(uint8_t i = 0;i < LAYERS; i++){
-			layer_names_arr[i] = malloc(sizeof(default_layout_names[i]));
-			strcpy(layer_names_arr[i],default_layout_names[i]);
-		}
-        memcpy(&keymaps[0][0][0], &_LAYERS[0][0][0], sizeof(_LAYERS));
-	}
-
-    if (layers_num == 0) {
-        // layout is copy from default, save these configs
-        layers_num = LAYERS;
-        nvs_store_layouts();
+        (void)nvs_reset_layouts();
     }
 }

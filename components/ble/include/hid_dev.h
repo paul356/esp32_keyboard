@@ -16,10 +16,6 @@
 #define HID_DEV_H__
 
 #include "hidd_le_prf_int.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 #include "keyboard_config.h"
 
 /* HID Report type */
@@ -256,7 +252,5 @@ void hid_dev_register_reports(uint8_t num_reports, hid_report_map_t *p_report);
 
 void hid_dev_send_report(esp_gatt_if_t gatts_if, uint16_t conn_id, uint8_t id,
 		uint8_t type, uint8_t length, uint8_t *data);
-
-
 #endif /* HID_DEV_H__ */
 
