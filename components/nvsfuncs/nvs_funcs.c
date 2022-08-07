@@ -38,10 +38,16 @@
 #define LAYOUT_NAMES "layouts"
 #define LAYOUT_NUM "num_layouts"
 
+#define MAX_LAYOUT_NAME_LENGTH 15
+// array to hold names of layouts for oled
+
+extern char default_layout_names[LAYERS][MAX_LAYOUT_NAME_LENGTH];
+extern const uint16_t _LAYERS[LAYERS][MATRIX_ROWS][MATRIX_COLS];
+
 char **layer_names_arr;
 uint8_t layers_num=0;
 
-uint16_t keymaps[LAYERS][MATRIX_ROWS][MATRIX_COLS];
+const uint16_t keymaps[LAYERS][MATRIX_ROWS][MATRIX_COLS];
 
 static esp_err_t nvs_read_blob(const char* namespace, const char* key, void* buffer, size_t* buf_size)
 {

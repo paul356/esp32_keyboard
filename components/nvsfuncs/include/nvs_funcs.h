@@ -8,8 +8,8 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include "keyboard_config.h"
 #include "config.h"
+#include "keyboard_config.h"
 
 #ifndef NVS_FUNCS_H_
 #define NVS_FUNCS_H_
@@ -17,9 +17,9 @@
 #define NVS_CONFIG_OK 1
 #define NVS_CONFIG_ERR 0
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+// array to hold names of layouts for oled
+extern char default_layout_names[LAYERS][MAX_LAYOUT_NAME_LENGTH];
+extern const uint16_t _LAYERS[LAYERS][MATRIX_ROWS][MATRIX_COLS];
 
 /*
  * @load the layouts from nvs
@@ -49,11 +49,5 @@ void nvs_write_keymap_cfg(uint8_t layers, char **layer_names);
 esp_err_t nvs_reset_layouts(void);
 
 void nvs_store_layouts(void);
-
-
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* NVS_FUNCS_H_ */

@@ -22,8 +22,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
-#include "keyboard_config.h"
 #include <arr_conv.h>
+#include "nvs_funcs.h"
 
 void free_layer_names(char*** layer_names, uint32_t layers);
 

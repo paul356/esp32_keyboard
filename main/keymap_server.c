@@ -64,7 +64,7 @@ static esp_err_t layouts_json(httpd_req_t* req)
                 if (keyName != NULL) {
                     httpd_resp_sendstr_chunk(req, keyName);
                 } else {
-                    httpd_resp_sendstr_chunk(req, GetKeyCodeName(KC_NONE));
+                    httpd_resp_sendstr_chunk(req, GetKeyCodeName(KC_TRNS));
                 }
                 httpd_resp_sendstr_chunk(req, "\"");
                 if (j != MATRIX_ROWS - 1 || k != MATRIX_COLS - 1) {
@@ -186,7 +186,7 @@ static esp_err_t update_keymap(httpd_req_t* req)
     }
 
     // save layout
-    memcpy(keymaps[layer_index], temp_layer, sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
+    memcpy((void*)(&keymaps[layer_index][0][0]), temp_layer, sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
     nvs_write_layout(temp_layer, layer_name);
 
     cJSON_Delete(root);

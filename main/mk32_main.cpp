@@ -62,7 +62,7 @@ extern void wifi_init_softap(void);
 #define USEC_TO_SEC 1000000
 #define SEC_TO_MIN 60
 
-static config_data_t config;
+//static config_data_t config;
 
 bool DEEP_SLEEP = true; // flag to check if we need to go to deep sleep
 
@@ -170,15 +170,14 @@ extern "C" void app_main()
 {
     esp_err_t ret;
     esp_log_level_set("*", ESP_LOG_INFO);
-
-    //Reset the rtc GPIOS
-    matrix_init();
-
     //Underclocking for better current draw (not really effective)
     //    esp_pm_config_esp32_t pm_config;
     //    pm_config.max_freq_mhz = 10;
     //    pm_config.min_freq_mhz = 10;
     //    esp_pm_configure(&pm_config);
+    
+    //Reset the rtc GPIOS
+    matrix_init();
     matrix_setup();
 
     // Initialize NVS.

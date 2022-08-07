@@ -71,6 +71,7 @@
 #define KEY_ENCODER 2
 
 #define LAYERS 3
+#define MAX_LAYOUT_NAME_LENGTH 15
 
 typedef struct config_data {
 	char bt_device_name[MAX_BT_DEVICENAME_LENGTH];
@@ -78,10 +79,6 @@ typedef struct config_data {
 
 extern uint8_t current_layout;
 extern uint8_t curr_led;
-
-#define MAX_LAYOUT_NAME_LENGTH 15
-// array to hold names of layouts for oled
-extern char default_layout_names[LAYERS][MAX_LAYOUT_NAME_LENGTH];
 
 extern TaskHandle_t xKeyreportTask;
 
