@@ -12,6 +12,7 @@ set(SRC_FILES
     common/esp32s3/timer.c
     common/esp32s3/miscs.c
     common/esp32s3/eeconfig.c
+    common/esp32s3/keyboard_report.c
     )
 
 idf_component_register(SRCS ${SRC_FILES}

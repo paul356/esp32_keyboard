@@ -51,6 +51,7 @@ extern "C" {
 #include "nvs_funcs.h"
 #include "nvs_keymaps.h"
 #include "keycode_conv.h"
+#include "esp32s3/keyboard_report.h"
 
 extern esp_err_t start_file_server();
 extern void wifi_init_softap(void);
@@ -71,27 +72,8 @@ TaskHandle_t xKeyreportTask;
 //How to handle key reports
 static void key_reports(void *pvParameters)
 {
-    uint8_t report_state[REPORT_LEN];
-
     while (1) {
         keyboard_task();
-
-        //Do not send anything if queues are uninitialized
-        if (mouse_q == NULL || keyboard_q == NULL || joystick_q == NULL) {
-            ESP_LOGE(KEY_REPORT_TAG, "queues not initialized");
-            continue;
-        }
-
-        //Check if the report was modified, if so send it
-        report_state[0] = 0;
-        report_state[1] = 0;
-
-        if(BLE_EN == 1){
-            xQueueSend(keyboard_q, report_state, (TickType_t) 0);
-        }
-        if(input_str_q != NULL){
-            xQueueSend(input_str_q, report_state, (TickType_t) 0);
-        }
     }
 }
 
@@ -209,6 +191,7 @@ extern "C" void app_main()
     ESP_LOGI("Sleep", "initialized");
 #endif
 
+    (void)register_keyboard_reporter();
     enable_usb_hid();
     //xTaskCreatePinnedToCore(send_keys, "period send key", 1024, NULL, configMAX_PRIORITIES, NULL, 1);
 
