@@ -16,37 +16,10 @@ enum custom_keycodes {
     PLUGINS,
 };
 
-//Set these for each layer and use when layers are needed in a hold-to use layer
-enum layer_holds {
-	QWERTY_H = LAYER_HOLD_BASE_VAL, NUM_H,FUNCS_H
-};
-
 // array to hold names of layouts for oled
 char default_layout_names[LAYERS][MAX_LAYOUT_NAME_LENGTH] = {
     "QWERTY", "NUM", "Plugins",
 };
-
-/* select a keycode for your macro
- * important - first macro must be initialized as MACRO_BASE_VAL
- * */
-
-#define MACROS_NUM 2
-enum custom_macros {
-	KC_CTRL_ALT_DELETE = MACRO_BASE_VAL, KC_ALT_F4,
-};
-
-/*define what the macros do
- * important- make sure you you put the macros in the same order as the their enumeration
- */
-uint16_t macros[MACROS_NUM][MACRO_LEN] = {
-    // CTRL+ALT+DEL
-    { KC_LCTRL, KC_LALT, KC_DEL },
-    //ALT +F4
-    { KC_RALT, KC_LALT, KC_NO } };
-
-/*Encoder keys for each layer by order, and for each pad
- * First variable states what usage the encoder has
- */
 
 //NOTE: For this keymap due to wiring constraints the the two last rows on the left are wired unconventionally
 // Each keymap is represented by an array, with an array that points to all the keymaps  by order

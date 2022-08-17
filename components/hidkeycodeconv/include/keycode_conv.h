@@ -21,10 +21,6 @@ extern "C" {
 //Flag to enable or disable sending reports via BLE
 int BLE_EN;
 
-/** @brief Queue for receiving keyboard input
- *  */
-QueueHandle_t input_str_q;
-
 /*
  * @pause sending key reports and use keypress to enter char
  */

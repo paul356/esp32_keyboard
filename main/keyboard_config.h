@@ -55,20 +55,8 @@
 #define SET_BIT(var,pos) (var |= 1LLU << pos);
 
 #define MOD_LED_BYTES 2 //bytes for led status and modifiers
-#define MACRO_LEN 3 //keys for macros
-#define REPORT_LEN (MOD_LED_BYTES+16+MACRO_LEN) //size of hid reports with NKRO and room for 3 key macro
-#define REPORT_COUNT_BYTES (16+MACRO_LEN)
-
-#define PLUGIN_BASE_VAL 0x135
-#define LAYER_HOLD_MAX_VAL 0x134
-#define LAYER_HOLD_BASE_VAL 0x123
-#define MACRO_BASE_VAL 0x103
-#define LAYERS_BASE_VAL 0xFF
-
-#define ENCODER_SIZE 4
-#define MEDIA_ENCODER 0
-#define MOUSE_ENCODER 1
-#define KEY_ENCODER 2
+#define REPORT_LEN (MOD_LED_BYTES+16) //size of hid reports with NKRO and room for 3 key macro
+#define REPORT_COUNT_BYTES (16)
 
 #define LAYERS 3
 #define MAX_LAYOUT_NAME_LENGTH 15

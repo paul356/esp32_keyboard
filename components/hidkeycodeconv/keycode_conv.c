@@ -108,38 +108,3 @@ uint8_t char_to_keycode(char ascii_key) {
 
 	return keycode;
 }
-
-/*
- * @convert typing to string, return string on enter key
- */
-char* input_string(void) {
-
-	input_str_q = xQueueCreate(32, REPORT_LEN * sizeof(uint8_t));
-	uint16_t keycode = CHAR_ILLEGAL;
-	char *str_buff = (char *) malloc(sizeof(char) * 1);
-
-	uint8_t report_state[REPORT_LEN];
-	int i = 0;
-	while (keycode != KC_ENT) {
-		if (xQueueReceive(input_str_q, &report_state, portMAX_DELAY)) {
-			for (int key = 2; key < REPORT_LEN; key++) {
-
-				keycode = report_state[key];
-				if (keycode == KC_ENT) {
-					break;
-				}
-				char cur_char = keycode_to_char(keycode, report_state[0]);
-				if (cur_char != CHAR_ILLEGAL) {
-					str_buff[i] = cur_char;
-					i++;
-					str_buff = (char *) realloc(str_buff, sizeof(char) *(i + 1));
-				}
-
-			}
-		}
-	}
-	str_buff[i] = 0; // Null terminate
-	vQueueDelete(input_str_q);
-	return str_buff;
-}
-
