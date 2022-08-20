@@ -5,11 +5,17 @@
 #include "keycode_conv.h"
 
 static void send_keyboard_to_queue(report_keyboard_t*);
-static host_driver_t keyboard_driver = {.send_keyboard = send_keyboard_to_queue};
+static uint8_t keyboard_leds_status(void);
+static host_driver_t keyboard_driver = {.send_keyboard = send_keyboard_to_queue, .keyboard_leds = keyboard_leds_status};
 
 int register_keyboard_reporter(void)
 {
     host_set_driver(&keyboard_driver);
+    return 0;
+}
+
+static uint8_t keyboard_leds_status(void)
+{
     return 0;
 }
 
