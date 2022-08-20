@@ -363,12 +363,9 @@ esp_err_t halBLEInit(uint8_t enableKeyboard, uint8_t enableMedia,
 	joystick_q = xQueueCreate(32, HID_JOYSTICK_IN_RPT_LEN * sizeof(uint8_t));
 	media_q = xQueueCreate(32, HID_CC_IN_RPT_LEN * sizeof(uint8_t));
 
-	// Initialize NVS.
-	esp_err_t ret = nvs_flash_init();
-
 	esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
 	esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-	ret = esp_bt_controller_init(&bt_cfg);
+	esp_err_t ret = esp_bt_controller_init(&bt_cfg);
 	if (ret) {
 		ESP_LOGE(LOG_TAG, "%s initialize controller failed\n", __func__);
 		return ESP_FAIL;

@@ -3,7 +3,7 @@
 #include "esp_log.h"
 #include <string.h>
 
-#define EXAMPLE_ESP_WIFI_SSID      "MK32"
+#define EXAMPLE_ESP_WIFI_SSID      "MK32-1"
 #define EXAMPLE_ESP_WIFI_PASS      "1234567890"
 #define EXAMPLE_ESP_WIFI_CHANNEL   1
 #define EXAMPLE_MAX_STA_CONN       2

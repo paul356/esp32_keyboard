@@ -38,7 +38,6 @@
 #include "esp_bt_main.h"
 #include "esp_bt_device.h"
 #include "hid_dev.h"
-#include "nvs_flash.h"
 
 /** @brief Stack size for BLE task */
 #define TASK_BLE_STACKSIZE 2048
