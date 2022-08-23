@@ -56,7 +56,7 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
     }
 #endif
 
-    if(BLE_EN == 1){
+    if (BLE_EN == 1) {
         xQueueSend(keyboard_q, report_state, (TickType_t) 0);
     }
 }

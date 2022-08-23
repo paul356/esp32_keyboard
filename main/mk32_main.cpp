@@ -52,6 +52,8 @@ extern "C" {
 #include "nvs_keymaps.h"
 #include "keycode_conv.h"
 #include "esp32s3/keyboard_report.h"
+#include "action_layer.h"
+#include "wait.h"
 
 extern esp_err_t start_file_server();
 extern void wifi_init_softap(void);
@@ -74,6 +76,7 @@ static void key_reports(void *pvParameters)
 {
     while (1) {
         keyboard_task();
+        wait_ms(100);
     }
 }
 
@@ -161,6 +164,8 @@ extern "C" void app_main()
     //Reset the rtc GPIOS
     matrix_init();
     matrix_setup();
+
+    default_layer_set(0x1 << 0);
 
     // Initialize NVS.
     ret = nvs_flash_init();
