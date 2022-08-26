@@ -57,6 +57,7 @@ extern "C" {
 
 extern esp_err_t start_file_server();
 extern void wifi_init_softap(void);
+extern void rtc_matrix_deinit(void);
 }
 
 #define KEY_REPORT_TAG "KEY_REPORT"
@@ -162,9 +163,10 @@ extern "C" void app_main()
     //    esp_pm_configure(&pm_config);
     
     //Reset the rtc GPIOS
-    matrix_init();
+    rtc_matrix_deinit();
     matrix_setup();
 
+    matrix_init();
     default_layer_set(0x1 << 0);
 
     // Initialize NVS.

@@ -224,8 +224,8 @@ typedef ioline_t pin_t;
 #elif defined(__ESP32S3__)
     typedef gpio_num_t pin_t;
 #define setPinInput(pin) gpio_set_direction(pin, GPIO_MODE_INPUT)
-#define setPinInputHigh(pin) gpio_set_pull_mode(pin, GPIO_PULLUP_ONLY)
-#define setPinInputLow(pin) gpio_set_pull_mode(pin, GPIO_PULLDOWN_ONLY)
+#define setPinInputHigh(pin) gpio_set_direction(pin, GPIO_MODE_INPUT); gpio_set_pull_mode(pin, GPIO_PULLUP_ONLY)
+#define setPinInputLow(pin) gpio_set_direction(pin, GPIO_MODE_INPUT); gpio_set_pull_mode(pin, GPIO_PULLDOWN_ONLY)
 #define setPinOutput(pin) gpio_set_direction(pin, GPIO_MODE_OUTPUT)
 
 #define writePinHigh(pin) gpio_set_level(pin, 1)
