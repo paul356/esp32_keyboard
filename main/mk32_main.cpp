@@ -77,7 +77,7 @@ static void key_reports(void *pvParameters)
 {
     while (1) {
         keyboard_task();
-        wait_ms(100);
+        wait_ms(5);
     }
 }
 

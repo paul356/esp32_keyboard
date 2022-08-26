@@ -21,7 +21,7 @@ static uint8_t keyboard_leds_status(void)
 
 static void send_keyboard_to_queue(report_keyboard_t *report)
 {
-    uint8_t report_state[REPORT_LEN];
+    uint8_t report_state[REPORT_LEN] = {0};
 
     //Do not send anything if queues are uninitialized
     if (mouse_q == NULL || keyboard_q == NULL || joystick_q == NULL) {
