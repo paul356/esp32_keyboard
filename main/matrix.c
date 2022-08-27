@@ -97,50 +97,15 @@ void rtc_matrix_setup(void) {
 
 // Initializing matrix pins
 void matrix_setup(void) {
-
-#ifdef COL2ROW
 	// Initializing columns
 	for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-
-		gpio_pad_select_gpio(cols[col]);
-		gpio_set_direction(cols[col], GPIO_MODE_INPUT_OUTPUT);
-		gpio_set_level(cols[col], 0);
-
-		ESP_LOGI(GPIO_TAG,"%d is level %d", cols[col],
-				gpio_get_level(cols[col]));
+        gpio_pad_select_gpio(cols[col]);
+        gpio_reset_pin(cols[col]);
 	}
 
 	// Initializing rows
 	for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-
-		gpio_pad_select_gpio(rows[row]);
-		gpio_set_direction(rows[row], GPIO_MODE_INPUT_OUTPUT);
-		gpio_set_drive_capability(rows[row], GPIO_DRIVE_CAP_0);
-		gpio_set_level(rows[row], 0);
-
-		ESP_LOGI(GPIO_TAG,"%d is level %d", rows[row],
-				gpio_get_level(rows[row]));
+        gpio_pad_select_gpio(rows[row]);
+        gpio_reset_pin(rows[row]);
 	}
-#endif
-#ifdef ROW2COL
-	// Initializing rows
-	for(uint8_t row=0; row < MATRIX_ROWS; row++) {
-
-		gpio_pad_select_gpio(rows[row]);
-		gpio_set_direction(rows[row], GPIO_MODE_INPUT_OUTPUT);
-		gpio_set_level(rows[row], 0);
-		ESP_LOGI(GPIO_TAG,"%d is level %d",rows[row],gpio_get_level(rows[row]));
-	}
-
-	// Initializing columns
-	for(uint8_t col=0; col < MATRIX_COLS; col++) {
-
-		gpio_pad_select_gpio(cols[col]);
-		gpio_set_direction(cols[col], GPIO_MODE_INPUT_OUTPUT);
-		gpio_set_drive_capability(cols[col],GPIO_DRIVE_CAP_0);
-		gpio_set_level(cols[col], 0);
-
-		ESP_LOGI(GPIO_TAG,"%d is level %d",cols[col],gpio_get_level(cols[col]));
-	}
-#endif
 }

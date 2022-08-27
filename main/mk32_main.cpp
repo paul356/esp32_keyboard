@@ -162,8 +162,7 @@ extern "C" void app_main()
     //    pm_config.min_freq_mhz = 10;
     //    esp_pm_configure(&pm_config);
     
-    //Reset the rtc GPIOS
-    rtc_matrix_deinit();
+    // set pin to gpio mode in case
     matrix_setup();
 
     matrix_init();

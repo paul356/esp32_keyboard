@@ -30,6 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MATRIX_ROWS 6
 #define MATRIX_COLS 14
 
+#define LAYER_STATE_8BIT
+
 /*
  * Keyboard Matrix Assignments
  *
