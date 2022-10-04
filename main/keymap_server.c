@@ -1,5 +1,6 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
+#include "esp_ota_ops.h"
 #include "keyboard_config.h"
 #include "key_definitions.h"
 #include "nvs_keymaps.h"
@@ -246,6 +247,80 @@ static esp_err_t reset_keymap(httpd_req_t* req)
     return ESP_OK;
 }
 
+static esp_err_t upload_bin_file(httpd_req_t* req)
+{
+    int file_len = req->content_len;
+    int accumu_len = 0;
+    char str_buf[25];
+
+    ESP_LOGI(TAG, "Starting OTA ...");
+
+    esp_partition_t* update_partition = NULL;
+
+    update_partition = esp_ota_get_next_update_partition(NULL);
+    if (!update_partition) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "no available update partition");
+        return ESP_FAIL;
+    }
+
+    esp_ota_handle_t update_handle = 0;
+    esp_err_t err = esp_ota_begin(update_partition, OTA_WITH_SEQUENTIAL_WRITES, &update_handle);
+    if (err != ESP_OK) {
+        esp_ota_abort(update_handle);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "can't begin ota");
+        return ESP_FAIL;
+    }
+    
+    while (accumu_len < file_len) {
+        int recieved = httpd_req_recv(req, recv_buf, MAX_BUF_SIZE);
+        if (recieved <= 0) {
+            if (recieved == HTTPD_SOCK_ERR_TIMEOUT) {
+                continue;
+            }
+            ESP_LOGE("HTTPD", "fail to recieve file");
+            esp_ota_abort(update_handle);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "fail to recieve file");
+            return ESP_FAIL;
+        }
+
+        err = esp_ota_write(update_handle, recv_buf, recieved);
+        if (err != ESP_OK) {
+            esp_ota_abort(update_handle);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "fail to write ota data");
+            return ESP_FAIL;
+        }
+
+        accumu_len += recieved;
+    }
+
+    if (accumu_len != file_len) {
+        esp_ota_abort(update_handle);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "recieve more data than expected");
+        return ESP_FAIL;
+    }
+
+    err = esp_ota_end(update_handle);
+    if (err !=  ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "can't end ota successfully");
+        return ESP_FAIL;
+    }
+
+    err = esp_ota_set_boot_partition(update_partition);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "fail to set boot partition");
+        return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "text/plain");
+    snprintf(str_buf, sizeof(str_buf), "File size is %d.", accumu_len);
+    httpd_resp_sendstr_chunk(req, str_buf);
+    httpd_resp_sendstr_chunk(req, "Please reboot keyboard ...");
+    httpd_resp_sendstr_chunk(req, NULL);
+
+    esp_restart();
+    return ESP_OK;
+}
+
 esp_err_t start_file_server()
 {
     httpd_handle_t server = NULL;
@@ -298,6 +373,15 @@ esp_err_t start_file_server()
     };
 
     httpd_register_uri_handler(server, &reset_uri);
+
+    httpd_uri_t upload_uri = {
+        .uri       = "/upload/bin_file",
+        .method    = HTTP_POST,
+        .handler   = upload_bin_file,
+        .user_ctx  = NULL
+    };
+
+    httpd_register_uri_handler(server, &upload_uri);
     
     /* URI handler for getting uploaded files */
     httpd_uri_t get_uri = {

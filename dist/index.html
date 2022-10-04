@@ -18,6 +18,49 @@
         <button class="btn" id="button_reset">重置</button>
       </div>
     </div>
-  <script  src="app.js"></script>
+    <script  src="app.js"></script>
+    <br />
+    <form action="/upload/bin_file" method="post" enctype="multipart/form-data">
+      <div>
+        <label for="bin_file">Choose upgradable bin file:</label>
+        <input type="file" id="bin_file" name="bin_file" accept=".bin" />
+      </div>
+      <div>
+        <button id="upload" type="button" onclick="_upload()">Submit</button>
+      </div>
+    </form>
+    <script>
+      function _upload() {
+          var upload_path = "/upload/bin_file";
+          var fileInput = document.getElementById("bin_file").files;
+
+          if (fileInput.length == 0) {
+              alert("No file selected!");
+          } else {
+              document.getElementById("bin_file").disabled = true;
+              document.getElementById("upload").disabled = true;
+
+              var file = fileInput[0];
+              var xhttp = new XMLHttpRequest();
+              xhttp.onreadystatechange = function() {
+                  if (xhttp.readyState == 4) {
+                      if (xhttp.status == 200) {
+                          document.open();
+                          document.write(xhttp.responseText);
+                          document.close();
+                      } else if (xhttp.status == 0) {
+                          alert("Server closed the connection abruptly!");
+                          location.reload()
+                      } else {
+                          alert(xhttp.status + " Error!\n" + xhttp.responseText);
+                          location.reload()
+                      }
+                  }
+              };
+              xhttp.open("POST", upload_path, true);
+              xhttp.send(file);
+          }
+      }
+    </script>
 </body>
 </html>
