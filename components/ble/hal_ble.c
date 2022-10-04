@@ -208,6 +208,7 @@ void halBLETask_keyboard(void * params) {
 				//pend on MQ, if timeout triggers, just wait again.
 				if (xQueueReceive(keyboard_q, &key_report, portMAX_DELAY)) {
 					//if we are not connected, discard.
+                    // hardcoded HID interface 0, keyboard id 1
                     if (tud_hid_n_ready(0)) {
                         tud_hid_n_keyboard_report(0, 1, key_report[0], &key_report[2]);
                     }

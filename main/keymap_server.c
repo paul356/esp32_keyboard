@@ -317,6 +317,7 @@ static esp_err_t upload_bin_file(httpd_req_t* req)
     httpd_resp_sendstr_chunk(req, "Please reboot keyboard ...");
     httpd_resp_sendstr_chunk(req, NULL);
 
+    esp_restart();
     return ESP_OK;
 }
 
