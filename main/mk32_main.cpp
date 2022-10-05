@@ -39,6 +39,7 @@
 #include "esp_sleep.h"
 #include "esp_pm.h"
 #include "tinyusb.h"
+#include "tusb_cdc_acm.h"
 
 extern "C" {
 //HID Ble functions
@@ -65,8 +66,7 @@ extern void rtc_matrix_deinit(void);
 #define TRUNC_SIZE 20
 #define USEC_TO_SEC 1000000
 #define SEC_TO_MIN 60
-
-//static config_data_t config;
+#define TAG "main"
 
 bool DEEP_SLEEP = true; // flag to check if we need to go to deep sleep
 
@@ -141,6 +141,50 @@ static void deep_sleep(void *pvParameters) {
 }
 #endif
 
+int tinyusb_cdc_vprintf(const char* fmt, va_list args)
+{
+    char buf[CONFIG_TINYUSB_CDC_RX_BUFSIZE];
+
+    int chars = vsnprintf(buf, sizeof(buf), fmt, args);
+    if (chars + 1 > sizeof(buf)) {
+        chars = sizeof(buf) - 1;
+    }
+
+    tinyusb_cdcacm_itf_t cdc_acm_itf = TINYUSB_CDC_ACM_0;
+    tinyusb_cdcacm_write_queue(cdc_acm_itf, (const uint8_t*)buf, chars);
+    tinyusb_cdcacm_write_flush(cdc_acm_itf, 0);
+
+    return chars;
+}
+
+void tinyusb_cdc_rx_callback(int itf, cdcacm_event_t *event)
+{
+    /* initialization */
+    size_t rx_size = 0;
+    uint8_t buf[65];
+
+    tinyusb_cdcacm_itf_t cdc_acm_itf = TINYUSB_CDC_ACM_0;
+    /* read */
+    esp_err_t ret = tinyusb_cdcacm_read(cdc_acm_itf, buf, CONFIG_TINYUSB_CDC_RX_BUFSIZE, &rx_size);
+    if (ret == ESP_OK) {
+        buf[rx_size] = '\0';
+        ESP_LOGI(TAG, "Got data (%d bytes): %s", rx_size, buf);
+    } else {
+        ESP_LOGE(TAG, "Read error");
+    }
+
+    /* write back */
+    tinyusb_cdcacm_write_queue(cdc_acm_itf, buf, rx_size);
+    tinyusb_cdcacm_write_flush(cdc_acm_itf, 0);
+}
+
+void tinyusb_cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
+{
+    int dtr = event->line_state_changed_data.dtr;
+    int rst = event->line_state_changed_data.rts;
+    ESP_LOGI(TAG, "Line state changed! dtr:%d, rst:%d", dtr, rst);
+}
+
 static void enable_usb_hid(void)
 {
     tinyusb_config_t tusb_cfg = {
@@ -149,7 +193,19 @@ static void enable_usb_hid(void)
         .external_phy = false
     };
 
-    ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));    
+    ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
+
+    tinyusb_config_cdcacm_t amc_cfg = {
+        .usb_dev = TINYUSB_USBDEV_0,
+        .cdc_port = TINYUSB_CDC_ACM_0,
+        .rx_unread_buf_sz = 64,
+        .callback_rx = &tinyusb_cdc_rx_callback, // the first way to register a callback
+        .callback_rx_wanted_char = NULL,
+        .callback_line_state_changed = &tinyusb_cdc_line_state_changed_callback,
+        .callback_line_coding_changed = NULL
+    };
+
+    ESP_ERROR_CHECK(tusb_cdc_acm_init(&amc_cfg));
 }
 
 extern "C" void app_main()
