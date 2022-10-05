@@ -40,6 +40,7 @@
 #include "esp_pm.h"
 #include "tinyusb.h"
 #include "tusb_cdc_acm.h"
+#include "debug.h"
 
 extern "C" {
 //HID Ble functions
@@ -141,22 +142,6 @@ static void deep_sleep(void *pvParameters) {
 }
 #endif
 
-int tinyusb_cdc_vprintf(const char* fmt, va_list args)
-{
-    char buf[CONFIG_TINYUSB_CDC_RX_BUFSIZE];
-
-    int chars = vsnprintf(buf, sizeof(buf), fmt, args);
-    if (chars + 1 > sizeof(buf)) {
-        chars = sizeof(buf) - 1;
-    }
-
-    tinyusb_cdcacm_itf_t cdc_acm_itf = TINYUSB_CDC_ACM_0;
-    tinyusb_cdcacm_write_queue(cdc_acm_itf, (const uint8_t*)buf, chars);
-    tinyusb_cdcacm_write_flush(cdc_acm_itf, 0);
-
-    return chars;
-}
-
 void tinyusb_cdc_rx_callback(int itf, cdcacm_event_t *event)
 {
     /* initialization */
@@ -206,6 +191,10 @@ static void enable_usb_hid(void)
     };
 
     ESP_ERROR_CHECK(tusb_cdc_acm_init(&amc_cfg));
+
+    debug_enable = true;
+    debug_matrix = true;
+    debug_keyboard = true;
 }
 
 extern "C" void app_main()

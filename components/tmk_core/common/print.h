@@ -97,6 +97,26 @@ extern "C"
 
 #        endif /* USER_PRINT / NORMAL PRINT */
 
+#elif defined(__ESP32S3__)
+#include "esp32s3/print.h"
+#ifdef USER_PRINT
+#            define print(s)
+#            define println(s)
+#            define xprintf(fmt, ...)
+
+// Create user print defines
+#            define uprint(s) tinyusb_cdc_print(s)
+#            define uprintln(s) tinyusb_cdc_print(s "\r\n")
+#            define uprintf tinyusb_cdc_vprintf
+#else
+#            define print(s) tinyusb_cdc_print(s)
+#            define println(s) tinyusn_cdc_print(s "\r\n")
+#            define xprintf tinyusb_cdc_vprintf
+#            define uprint(s) tinyusb_cdc_print(s)
+#            define uprintln(s) tinyusb_cdc_print(s "\r\n")
+#            define uprintf tinyusb_cdc_vprintf
+#endif
+
 #    elif defined(PROTOCOL_ARM_ATSAM) /* PROTOCOL_ARM_ATSAM */
 
 #        include "arm_atsam/printf.h"
