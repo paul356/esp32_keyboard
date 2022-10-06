@@ -110,7 +110,7 @@ extern "C"
 #            define uprintf tinyusb_cdc_vprintf
 #else
 #            define print(s) tinyusb_cdc_print(s)
-#            define println(s) tinyusn_cdc_print(s "\r\n")
+#            define println(s) tinyusb_cdc_print(s "\r\n")
 #            define xprintf tinyusb_cdc_vprintf
 #            define uprint(s) tinyusb_cdc_print(s)
 #            define uprintln(s) tinyusb_cdc_print(s "\r\n")
@@ -194,25 +194,25 @@ extern "C"
 #        define print_hex16(i) xprintf("%04X", i)
 #        define print_hex32(i) xprintf("%08lX", i)
 /* binary */
-#        define print_bin4(i) xprintf("%04b", i)
-#        define print_bin8(i) xprintf("%08b", i)
-#        define print_bin16(i) xprintf("%016b", i)
-#        define print_bin32(i) xprintf("%032lb", i)
-#        define print_bin_reverse8(i) xprintf("%08b", bitrev(i))
-#        define print_bin_reverse16(i) xprintf("%016b", bitrev16(i))
-#        define print_bin_reverse32(i) xprintf("%032lb", bitrev32(i))
+#        define print_bin4(i) xprintf("%s", bit4_rep[(i) & BIT4MASK])
+#        define print_bin8(i) xprintf("%s%s", bit4_rep[((i) >> 4) & BIT4MASK], bit4_rep[(i) & BIT4MASK])
+#        define print_bin16(i) xprintf("%s%s%s%s", bit4_rep[((i) >> 12) & BIT4MASK], bit4_rep[((i) >> 8) & BIT4MASK], bit4_rep[((i) >> 4) & BIT4MASK], bit4_rep[(i) & BIT4MASK])
+#        define print_bin32(i) xprintf("%s%s%s%s%s%s%s%s", bit4_rep[((i) >> 28) & BIT4MASK], bit4_rep[((i) >> 24) & BIT4MASK], bit4_rep[((i) >> 20) & BIT4MASK], bit4_rep[((i) >> 16) & BIT4MASK], bit4_rep[((i) >> 12) & BIT4MASK], bit4_rep[((i) >> 8) & BIT4MASK], bit4_rep[((i) >> 4) & BIT4MASK], bit4_rep[(i) & BIT4MASK])
+#        define print_bin_reverse8(i) print_bin8(bitrev(i))
+#        define print_bin_reverse16(i) print_bin16(bitrev16(i))
+#        define print_bin_reverse32(i) print_bin32(bitrev32(i))
 /* print value utility */
 #        define print_val_dec(v) xprintf(#        v ": %u\n", v)
 #        define print_val_decs(v) xprintf(#        v ": %d\n", v)
 #        define print_val_hex8(v) xprintf(#        v ": %X\n", v)
 #        define print_val_hex16(v) xprintf(#        v ": %02X\n", v)
 #        define print_val_hex32(v) xprintf(#        v ": %04lX\n", v)
-#        define print_val_bin8(v) xprintf(#        v ": %08b\n", v)
-#        define print_val_bin16(v) xprintf(#        v ": %016b\n", v)
-#        define print_val_bin32(v) xprintf(#        v ": %032lb\n", v)
-#        define print_val_bin_reverse8(v) xprintf(#        v ": %08b\n", bitrev(v))
-#        define print_val_bin_reverse16(v) xprintf(#        v ": %016b\n", bitrev16(v))
-#        define print_val_bin_reverse32(v) xprintf(#        v ": %032lb\n", bitrev32(v))
+#        define print_val_bin8(v) xprintf(#        v ": %s%s\n", bit4_rep[((v) >> 4) & BIT4MASK], bit4_rep[(v) & BIT4MASK])
+#        define print_val_bin16(i) xprintf(#        i ": %s%s%s%s\n", bit4_rep[((i) >> 12) & BIT4MASK], bit4_rep[((i) >> 8) & BIT4MASK], bit4_rep[((i) >> 4) & BIT4MASK], bit4_rep[(i) & BIT4MASK])
+#        define print_val_bin32(i) xprintf(#        i ": %s%s%s%s%s%s%s%s\n", bit4_rep[((i) >> 28) & BIT4MASK], bit4_rep[((i) >> 24) & BIT4MASK], bit4_rep[((i) >> 20) & BIT4MASK], bit4_rep[((i) >> 16) & BIT4MASK], bit4_rep[((i) >> 12) & BIT4MASK], bit4_rep[((i) >> 8) & BIT4MASK], bit4_rep[((i) >> 4) & BIT4MASK], bit4_rep[(i) & BIT4MASK])
+#        define print_val_bin_reverse8(v) xprintf(#        v ": %s%s\n", bit4_rep[(bitrev(v) >> 4) & BIT4MASK], bit4_rep[bitrev(v) & BIT4MASK])
+#        define print_val_bin_reverse16(v) xprintf(#        v ": %s%s%s%s\n", bit4_rep[(bitrev16(v) >> 12) & BIT4MASK], bit4_rep[(bitrev16(v) >> 8) & BIT4MASK], bit4_rep[(bitrev16(v) >> 4) & BIT4MASK], bit4_rep[bitrev16(v) & BIT4MASK])
+#        define print_val_bin_reverse32(v) xprintf(#        v ": %s%s%s%s%s%s%s%s\n", bit4_rep[(bitrev32(v) >> 28) & BIT4MASK], bit4_rep[(bitrev32(v) >> 24) & BIT4MASK], bit4_rep[(bitrev32(v) >> 20) & BIT4MASK], bit4_rep[(bitrev32(v) >> 16) & BIT4MASK], bit4_rep[(bitrev32(v) >> 12) & BIT4MASK], bit4_rep[(bitrev32(v) >> 8) & BIT4MASK], bit4_rep[(bitrev32(v) >> 4) & BIT4MASK], bit4_rep[bitrev32(v) & BIT4MASK])
 
 #    endif /* USER_PRINT / NORMAL_PRINT */
 

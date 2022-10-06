@@ -192,9 +192,9 @@ static void enable_usb_hid(void)
 
     ESP_ERROR_CHECK(tusb_cdc_acm_init(&amc_cfg));
 
-    debug_enable = true;
-    debug_matrix = true;
-    debug_keyboard = true;
+    debug_enable = false;
+    debug_matrix = false;
+    debug_keyboard = false;
 }
 
 extern "C" void app_main()

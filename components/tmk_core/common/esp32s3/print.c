@@ -1,6 +1,13 @@
 #include <string.h>
 #include "tusb_cdc_acm.h"
 
+const char* bit4_rep[16] = {
+    [ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
+    [ 4] = "0100", [ 5] = "0101", [ 6] = "0110", [ 7] = "0111",
+    [ 8] = "1000", [ 9] = "1001", [10] = "1010", [11] = "1011",
+    [12] = "1100", [13] = "1101", [14] = "1110", [15] = "1111",
+};
+
 int tinyusb_cdc_print(const char* buf)
 {
     int len = strlen(buf);
@@ -12,9 +19,10 @@ int tinyusb_cdc_print(const char* buf)
     return len;
 }
 
+
+static char buf[CONFIG_TINYUSB_CDC_RX_BUFSIZE / 2 + 1];
 int tinyusb_cdc_vprintf(const char* fmt, ...)
 {
-    char buf[CONFIG_TINYUSB_CDC_RX_BUFSIZE / 2];
     va_list valist;
 
     va_start(valist, fmt);
