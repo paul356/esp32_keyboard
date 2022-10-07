@@ -69,7 +69,7 @@ void host_keyboard_send(report_keyboard_t *report) {
         for (uint8_t i = 0; i < KEYBOARD_REPORT_SIZE; i++) {
             dprintf("%02X ", report->raw[i]);
         }
-        dprint("\n");
+        dprint("\r\n");
     }
 }
 

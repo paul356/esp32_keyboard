@@ -1,8 +1,14 @@
 #include "host.h"
 #include "keyboard_report.h"
 #include "keyboard_config.h"
-#include "hal_ble.h"
 #include "keycode_conv.h"
+#include "wait.h"
+#include "tinyusb.h"
+#include "esp_log.h"
+
+extern QueueHandle_t mouse_q;
+extern QueueHandle_t keyboard_q;
+extern QueueHandle_t joystick_q;
 
 static void send_keyboard_to_queue(report_keyboard_t*);
 static uint8_t keyboard_leds_status(void);
@@ -55,6 +61,15 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
         }
     }
 #endif
+
+    // hardcoded HID interface 0, keyboard id 1
+    if (tud_ready()) {
+        // endpoint may be busy
+        while (!tud_hid_n_ready(0)) {
+            wait_ms(1);
+        }
+        tud_hid_n_keyboard_report(0, 1, report_state[0], &report_state[2]);
+    }
 
     if (BLE_EN == 1) {
         xQueueSend(keyboard_q, report_state, (TickType_t) 0);

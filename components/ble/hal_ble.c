@@ -86,9 +86,6 @@ uint8_t mouse_report[HID_MOUSE_IN_RPT_LEN] = { 0 };
 uint8_t media_report[HID_CC_IN_RPT_LEN] = { 0 };
 uint8_t joystick_report[HID_JOYSTICK_IN_RPT_LEN] = { 0 };
 
-extern bool tud_hid_n_ready(uint8_t itf);
-extern bool tud_hid_n_keyboard_report(uint8_t itf, uint8_t report_id, uint8_t modifier, uint8_t keycode[6]);
-
 /** @brief Callback for HID events. */
 static void hidd_event_callback(esp_hidd_cb_event_t event,
 		esp_hidd_cb_param_t *param) {
@@ -208,10 +205,6 @@ void halBLETask_keyboard(void * params) {
 				//pend on MQ, if timeout triggers, just wait again.
 				if (xQueueReceive(keyboard_q, &key_report, portMAX_DELAY)) {
 					//if we are not connected, discard.
-                    // hardcoded HID interface 0, keyboard id 1
-                    if (tud_hid_n_ready(0)) {
-                        tud_hid_n_keyboard_report(0, 1, key_report[0], &key_report[2]);
-                    }
 					if (sec_conn == false)
 						continue;
 					hid_dev_send_report(hidd_le_env.gatt_if, hid_conn_id,
