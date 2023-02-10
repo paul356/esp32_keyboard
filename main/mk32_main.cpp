@@ -39,7 +39,9 @@
 #include "esp_sleep.h"
 #include "esp_pm.h"
 #include "tinyusb.h"
+#if CONFIG_TINYUSB_CDC_ENABLED
 #include "tusb_cdc_acm.h"
+#endif
 #include "debug.h"
 
 extern "C" {
@@ -142,6 +144,7 @@ static void deep_sleep(void *pvParameters) {
 }
 #endif
 
+#if CONFIG_TINYUSB_CDC_ENABLED
 void tinyusb_cdc_rx_callback(int itf, cdcacm_event_t *event)
 {
     /* initialization */
@@ -169,6 +172,7 @@ void tinyusb_cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
     int rst = event->line_state_changed_data.rts;
     ESP_LOGI(TAG, "Line state changed! dtr:%d, rst:%d", dtr, rst);
 }
+#endif
 
 static void enable_usb_hid(void)
 {
@@ -180,6 +184,7 @@ static void enable_usb_hid(void)
 
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
 
+    /*
     tinyusb_config_cdcacm_t amc_cfg = {
         .usb_dev = TINYUSB_USBDEV_0,
         .cdc_port = TINYUSB_CDC_ACM_0,
@@ -191,6 +196,7 @@ static void enable_usb_hid(void)
     };
 
     ESP_ERROR_CHECK(tusb_cdc_acm_init(&amc_cfg));
+    */
 
     debug_enable = false;
     debug_matrix = false;

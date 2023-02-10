@@ -1,12 +1,6 @@
 #include <string.h>
+#if CONFIG_TINYUSB_CDC_ENABLED
 #include "tusb_cdc_acm.h"
-
-const char* bit4_rep[16] = {
-    [ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
-    [ 4] = "0100", [ 5] = "0101", [ 6] = "0110", [ 7] = "0111",
-    [ 8] = "1000", [ 9] = "1001", [10] = "1010", [11] = "1011",
-    [12] = "1100", [13] = "1101", [14] = "1110", [15] = "1111",
-};
 
 int tinyusb_cdc_print(const char* buf)
 {
@@ -44,4 +38,21 @@ int tinyusb_cdc_vprintf(const char* fmt, ...)
 
     return chars;
 }
+#else
+int tinyusb_cdc_print(const char* buf)
+{
+    return 0;
+}
 
+int tinyusb_cdc_vprintf(const char* fmt, ...)
+{
+    return 0;
+}
+#endif
+
+const char* bit4_rep[16] = {
+    [ 0] = "0000", [ 1] = "0001", [ 2] = "0010", [ 3] = "0011",
+    [ 4] = "0100", [ 5] = "0101", [ 6] = "0110", [ 7] = "0111",
+    [ 8] = "1000", [ 9] = "1001", [10] = "1010", [11] = "1011",
+    [12] = "1100", [13] = "1101", [14] = "1110", [15] = "1111",
+};
