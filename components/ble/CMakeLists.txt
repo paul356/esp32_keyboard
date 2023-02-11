@@ -1,3 +1,3 @@
-idf_component_register(SRCS "hal_ble.c" "hid_dev.c" "hid_device_le_prf.c"
+idf_component_register(SRCS "hal_ble.c"
                        INCLUDE_DIRS "include" "${CMAKE_SOURCE_DIR}/main"
-                       REQUIRES bt)
+                       REQUIRES bt esp_hid)

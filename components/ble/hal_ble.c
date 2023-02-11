@@ -22,142 +22,379 @@
  */
 
 #include "hal_ble.h"
+#include "esp_hidd.h"
 
-#define LOG_TAG "hal_ble"
+#define TAG "hal_ble"
 #define MAX_MTU 517 // Max possible mtu size
 /** @brief Set a global log limit for this file */
-#define LOG_LEVEL_BLE ESP_LOG_INFO
 
 /// @brief Battery level monitor queue
 QueueHandle_t battery_q;
-/// @brief Input queue for sending joystick reports
-QueueHandle_t joystick_q;
 /// @brief Input queue for sending keyboard reports
 QueueHandle_t keyboard_q;
-/// @brief Input queue for sending mouse reports
-QueueHandle_t mouse_q;
-/// @brief Input queue for sending media reports
-QueueHandle_t media_q;
-
-/** @brief Connection ID for an opened HID connection */
-static uint16_t hid_conn_id = 0;
-/** @brief Do we have a secure connection? */
-static bool sec_conn = false;
-/** @brief Callback for HID events. */
-//static void hidd_event_callback(esp_hidd_cb_event_t event, esp_hidd_cb_param_t *param);
-/** @brief Full UUID for the HID service */
-static uint8_t hidd_service_uuid128[] = {
-		/* LSB <--------------------------------------------------------------------------------> MSB */
-		//first uuid, 16bit, [12],[13] is the value
-		0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00,
-		0x12, 0x18, 0x00, 0x00, };
-
-/** @brief Advertising data for BLE */
-static esp_ble_adv_data_t hidd_adv_data = { .set_scan_rsp = false,
-		.include_name = true, .include_txpower = true, .min_interval = 0x0006, //slave connection min interval, Time = min_interval * 1.25 msec
-		.max_interval = 0x0010, //slave connection max interval, Time = max_interval * 1.25 msec
-		.appearance = 0x03c0,       //HID Generic,
-		.manufacturer_len = 0, .p_manufacturer_data = NULL, .service_data_len =
-				0, .p_service_data = NULL, .service_uuid_len =
-				sizeof(hidd_service_uuid128), .p_service_uuid =
-				hidd_service_uuid128, .flag = 0x6, };
-
-/** @brief Advertising parameters */
-static esp_ble_adv_params_t hidd_adv_params = { .adv_int_min = 0x20,
-		.adv_int_max = 0x30, .adv_type = ADV_TYPE_IND, .own_addr_type =
-				BLE_ADDR_TYPE_PUBLIC,
-		//.peer_addr            =
-		//.peer_addr_type       =
-		.channel_map = ADV_CHNL_ALL, .adv_filter_policy =
-				ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY, };
-
-///@brief Is Keyboard interface active?
-uint8_t activateKeyboard = 0;
-///@brief Is Mouse interface active?
-uint8_t activateMouse = 0;
-///@brief Is Joystick interface active?
-uint8_t activateJoystick = 0;
-///@brief Is Media interface active?
-uint8_t activateMedia = 0;
 
 uint8_t battery_report[1] = { 0 };
-uint8_t key_report[HID_KEYBOARD_IN_RPT_LEN] = { 0 };
-uint8_t mouse_report[HID_MOUSE_IN_RPT_LEN] = { 0 };
-uint8_t media_report[HID_CC_IN_RPT_LEN] = { 0 };
-uint8_t joystick_report[HID_JOYSTICK_IN_RPT_LEN] = { 0 };
+uint8_t key_report[REPORT_LEN] = { 0 };
 
-/** @brief Callback for HID events. */
-static void hidd_event_callback(esp_hidd_cb_event_t event,
-		esp_hidd_cb_param_t *param) {
-	switch (event) {
-	case ESP_HIDD_EVENT_REG_FINISH:
-		if (param->init_finish.state == ESP_HIDD_INIT_OK) {
-			//esp_bd_addr_t rand_addr = {0x04,0x11,0x11,0x11,0x11,0x05};
+static esp_hidd_dev_t* hid_dev;
 
-			esp_ble_gap_set_device_name(GATTS_TAG);
-			esp_ble_gap_config_adv_data(&hidd_adv_data);
-		}
-		break;
+const unsigned char hidapiReportMap[] = { //8 bytes input, 8 bytes feature
+    0x05, 0x01,  // Usage Page (Generic Desktop)
+    0x09, 0x02,  // Usage (Mouse)
+    0xA1, 0x01,  // Collection (Application)
+    0x85, 0x01,  // Report Id (1)
+    0x09, 0x01,  //   Usage (Pointer)
+    0xA1, 0x00,  //   Collection (Physical)
+    0x05, 0x09,  //     Usage Page (Buttons)
+    0x19, 0x01,  //     Usage Minimum (01) - Button 1
+    0x29, 0x03,  //     Usage Maximum (03) - Button 3
+    0x15, 0x00,  //     Logical Minimum (0)
+    0x25, 0x01,  //     Logical Maximum (1)
+    0x75, 0x01,  //     Report Size (1)
+    0x95, 0x03,  //     Report Count (3)
+    0x81, 0x02,  //     Input (Data, Variable, Absolute) - Button states
+    0x75, 0x05,  //     Report Size (5)
+    0x95, 0x01,  //     Report Count (1)
+    0x81, 0x01,  //     Input (Constant) - Padding or Reserved bits
+    0x05, 0x01,  //     Usage Page (Generic Desktop)
+    0x09, 0x30,  //     Usage (X)
+    0x09, 0x31,  //     Usage (Y)
+    0x09, 0x38,  //     Usage (Wheel)
+    0x15, 0x81,  //     Logical Minimum (-127)
+    0x25, 0x7F,  //     Logical Maximum (127)
+    0x75, 0x08,  //     Report Size (8)
+    0x95, 0x03,  //     Report Count (3)
+    0x81, 0x06,  //     Input (Data, Variable, Relative) - X & Y coordinate
+    0xC0,        //   End Collection
+    0xC0,        // End Collection
 
-	case ESP_BAT_EVENT_REG:
-		break;
-	case ESP_HIDD_EVENT_DEINIT_FINISH:
-		break;
-	case ESP_HIDD_EVENT_BLE_CONNECT:
-		ESP_LOGI(LOG_TAG, "ESP_HIDD_EVENT_BLE_CONNECT");
-		hid_conn_id = param->connect.conn_id;
-		break;
-	case ESP_HIDD_EVENT_BLE_DISCONNECT:
-		sec_conn = false;
-		ESP_LOGI(LOG_TAG, "ESP_HIDD_EVENT_BLE_DISCONNECT");
-		esp_ble_gap_start_advertising(&hidd_adv_params);
-		break;
-	case ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT:
-		ESP_LOGI(LOG_TAG, "%s, ESP_HIDD_EVENT_BLE_VENDOR_REPORT_WRITE_EVT",
-				__func__);
-		ESP_LOG_BUFFER_HEX(LOG_TAG, param->vendor_write.data,
-				param->vendor_write.length);
-		break;
-	default:
-		break;
-	}
-	return;
+    0x05, 0x01,  // Usage Pg (Generic Desktop)
+    0x09, 0x06,  // Usage (Keyboard)
+    0xA1, 0x01,  // Collection: (Application)
+    0x85, 0x02,  // Report Id (2)
+    //
+    0x05, 0x07,  //   Usage Pg (Key Codes)
+    0x19, 0xE0,  //   Usage Min (224)
+    0x29, 0xE7,  //   Usage Max (231)
+    0x15, 0x00,  //   Log Min (0)
+    0x25, 0x01,  //   Log Max (1)
+    //
+    //   Modifier byte
+    0x75, 0x01,  //   Report Size (1)
+    0x95, 0x08,  //   Report Count (8)
+    0x81, 0x02,  //   Input: (Data, Variable, Absolute)
+    //
+    //   Reserved byte
+    0x95, 0x01,  //   Report Count (1)
+    0x75, 0x08,  //   Report Size (8)
+    0x81, 0x01,  //   Input: (Constant)
+    //
+    //   LED report
+    0x95, 0x05,  //   Report Count (5)
+    0x75, 0x01,  //   Report Size (1)
+    0x05, 0x08,  //   Usage Pg (LEDs)
+    0x19, 0x01,  //   Usage Min (1)
+    0x29, 0x05,  //   Usage Max (5)
+    0x91, 0x02,  //   Output: (Data, Variable, Absolute)
+    //
+    //   LED report padding
+    0x95, 0x01,  //   Report Count (1)
+    0x75, 0x03,  //   Report Size (3)
+    0x91, 0x01,  //   Output: (Constant)
+    //
+    //   Key arrays (6 bytes)
+    0x95, 0x06,  //   Report Count (6)
+    0x75, 0x08,  //   Report Size (8)
+    0x15, 0x00,  //   Log Min (0)
+    0x25, 0x65,  //   Log Max (101)
+    0x05, 0x07,  //   Usage Pg (Key Codes)
+    0x19, 0x00,  //   Usage Min (0)
+    0x29, 0x65,  //   Usage Max (101)
+    0x81, 0x00,  //   Input: (Data, Array)
+    //
+    0xC0,        // End Collection
+    //
+    0x05, 0x0C,   // Usage Pg (Consumer Devices)
+    0x09, 0x01,   // Usage (Consumer Control)
+    0xA1, 0x01,   // Collection (Application)
+    0x85, 0x03,   // Report Id (3)
+    0x09, 0x02,   //   Usage (Numeric Key Pad)
+    0xA1, 0x02,   //   Collection (Logical)
+    0x05, 0x09,   //     Usage Pg (Button)
+    0x19, 0x01,   //     Usage Min (Button 1)
+    0x29, 0x0A,   //     Usage Max (Button 10)
+    0x15, 0x01,   //     Logical Min (1)
+    0x25, 0x0A,   //     Logical Max (10)
+    0x75, 0x04,   //     Report Size (4)
+    0x95, 0x01,   //     Report Count (1)
+    0x81, 0x00,   //     Input (Data, Ary, Abs)
+    0xC0,         //   End Collection
+    0x05, 0x0C,   //   Usage Pg (Consumer Devices)
+    0x09, 0x86,   //   Usage (Channel)
+    0x15, 0xFF,   //   Logical Min (-1)
+    0x25, 0x01,   //   Logical Max (1)
+    0x75, 0x02,   //   Report Size (2)
+    0x95, 0x01,   //   Report Count (1)
+    0x81, 0x46,   //   Input (Data, Var, Rel, Null)
+    0x09, 0xE9,   //   Usage (Volume Up)
+    0x09, 0xEA,   //   Usage (Volume Down)
+    0x15, 0x00,   //   Logical Min (0)
+    0x75, 0x01,   //   Report Size (1)
+    0x95, 0x02,   //   Report Count (2)
+    0x81, 0x02,   //   Input (Data, Var, Abs)
+    0x09, 0xE2,   //   Usage (Mute)
+    0x09, 0x30,   //   Usage (Power)
+    0x09, 0x83,   //   Usage (Recall Last)
+    0x09, 0x81,   //   Usage (Assign Selection)
+    0x09, 0xB0,   //   Usage (Play)
+    0x09, 0xB1,   //   Usage (Pause)
+    0x09, 0xB2,   //   Usage (Record)
+    0x09, 0xB3,   //   Usage (Fast Forward)
+    0x09, 0xB4,   //   Usage (Rewind)
+    0x09, 0xB5,   //   Usage (Scan Next)
+    0x09, 0xB6,   //   Usage (Scan Prev)
+    0x09, 0xB7,   //   Usage (Stop)
+    0x15, 0x01,   //   Logical Min (1)
+    0x25, 0x0C,   //   Logical Max (12)
+    0x75, 0x04,   //   Report Size (4)
+    0x95, 0x01,   //   Report Count (1)
+    0x81, 0x00,   //   Input (Data, Ary, Abs)
+    0x09, 0x80,   //   Usage (Selection)
+    0xA1, 0x02,   //   Collection (Logical)
+    0x05, 0x09,   //     Usage Pg (Button)
+    0x19, 0x01,   //     Usage Min (Button 1)
+    0x29, 0x03,   //     Usage Max (Button 3)
+    0x15, 0x01,   //     Logical Min (1)
+    0x25, 0x03,   //     Logical Max (3)
+    0x75, 0x02,   //     Report Size (2)
+    0x81, 0x00,   //     Input (Data, Ary, Abs)
+    0xC0,           //   End Collection
+    0x81, 0x03,   //   Input (Const, Var, Abs)
+    0xC0,            // End Collectionq
+};
+
+static esp_hid_raw_report_map_t ble_report_maps[] = {
+    {
+        .data = hidapiReportMap,
+        .len = sizeof(hidapiReportMap)
+    }
+};
+
+static esp_hid_device_config_t ble_hid_config = {
+    .vendor_id          = 0x16C0,
+    .product_id         = 0x05DF,
+    .version            = 0x0100,
+    .device_name        = "ESP BLE HID2",
+    .manufacturer_name  = "Espressif",
+    .serial_number      = "1234567890",
+    .report_maps        = ble_report_maps,
+    .report_maps_len    = 1
+};
+
+static esp_err_t init_ble_gap_adv_data(uint16_t appearance, const char *device_name)
+{
+
+    esp_err_t ret;
+
+    const uint8_t hidd_service_uuid128[] = {
+        0xfb, 0x34, 0x9b, 0x5f, 0x80, 0x00, 0x00, 0x80, 0x00, 0x10, 0x00, 0x00, 0x12, 0x18, 0x00, 0x00,
+    };
+
+    esp_ble_adv_data_t ble_adv_data = {
+        .set_scan_rsp = false,
+        .include_name = true,
+        .include_txpower = true,
+        .min_interval = 0x0006, //slave connection min interval, Time = min_interval * 1.25 msec
+        .max_interval = 0x0010, //slave connection max interval, Time = max_interval * 1.25 msec
+        .appearance = appearance,
+        .manufacturer_len = 0,
+        .p_manufacturer_data =  NULL,
+        .service_data_len = 0,
+        .p_service_data = NULL,
+        .service_uuid_len = sizeof(hidd_service_uuid128),
+        .p_service_uuid = (uint8_t *)hidd_service_uuid128,
+        .flag = 0x6,
+    };
+
+    esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;
+    //esp_ble_io_cap_t iocap = ESP_IO_CAP_OUT;//you have to enter the key on the host
+    //esp_ble_io_cap_t iocap = ESP_IO_CAP_IN;//you have to enter the key on the device
+    esp_ble_io_cap_t iocap = ESP_IO_CAP_IO;//you have to agree that key matches on both
+    //esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE;//device is not capable of input or output, unsecure
+    uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
+    uint8_t rsp_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
+    uint8_t key_size = 16; //the key size should be 7~16 bytes
+    uint32_t passkey = 1234;//ESP_IO_CAP_OUT
+
+    if ((ret = esp_ble_gap_set_security_param(ESP_BLE_SM_AUTHEN_REQ_MODE, &auth_req, 1)) != ESP_OK) {
+        ESP_LOGE(TAG, "GAP set_security_param AUTHEN_REQ_MODE failed: %d", ret);
+        return ret;
+    }
+
+    if ((ret = esp_ble_gap_set_security_param(ESP_BLE_SM_IOCAP_MODE, &iocap, 1)) != ESP_OK) {
+        ESP_LOGE(TAG, "GAP set_security_param IOCAP_MODE failed: %d", ret);
+        return ret;
+    }
+
+    if ((ret = esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key, 1)) != ESP_OK) {
+        ESP_LOGE(TAG, "GAP set_security_param SET_INIT_KEY failed: %d", ret);
+        return ret;
+    }
+
+    if ((ret = esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key, 1)) != ESP_OK) {
+        ESP_LOGE(TAG, "GAP set_security_param SET_RSP_KEY failed: %d", ret);
+        return ret;
+    }
+
+    if ((ret = esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size, 1)) != ESP_OK) {
+        ESP_LOGE(TAG, "GAP set_security_param MAX_KEY_SIZE failed: %d", ret);
+        return ret;
+    }
+
+    if ((ret = esp_ble_gap_set_security_param(ESP_BLE_SM_SET_STATIC_PASSKEY, &passkey, sizeof(uint32_t))) != ESP_OK) {
+        ESP_LOGE(TAG, "GAP set_security_param SET_STATIC_PASSKEY failed: %d", ret);
+        return ret;
+    }
+
+    if ((ret = esp_ble_gap_set_device_name(device_name)) != ESP_OK) {
+        ESP_LOGE(TAG, "GAP set_device_name failed: %d", ret);
+        return ret;
+    }
+
+    if ((ret = esp_ble_gap_config_adv_data(&ble_adv_data)) != ESP_OK) {
+        ESP_LOGE(TAG, "GAP config_adv_data failed: %d", ret);
+        return ret;
+    }
+
+    return ret;
+}
+
+static esp_err_t esp_hid_ble_gap_adv_start(void)
+{
+    static esp_ble_adv_params_t hidd_adv_params = {
+        .adv_int_min        = 0x20,
+        .adv_int_max        = 0x30,
+        .adv_type           = ADV_TYPE_IND,
+        .own_addr_type      = BLE_ADDR_TYPE_PUBLIC,
+        .channel_map        = ADV_CHNL_ALL,
+        .adv_filter_policy  = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
+    };
+    return esp_ble_gap_start_advertising(&hidd_adv_params);
+}
+
+static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
+{
+    esp_hidd_event_t event = (esp_hidd_event_t)id;
+    esp_hidd_event_data_t *param = (esp_hidd_event_data_t *)event_data;
+
+    switch (event) {
+    case ESP_HIDD_START_EVENT: {
+        ESP_LOGI(TAG, "START");
+        esp_hid_ble_gap_adv_start();
+        break;
+    }
+    case ESP_HIDD_CONNECT_EVENT: {
+        ESP_LOGI(TAG, "CONNECT");
+        break;
+    }
+    case ESP_HIDD_PROTOCOL_MODE_EVENT: {
+        ESP_LOGI(TAG, "PROTOCOL MODE[%u]: %s", param->protocol_mode.map_index, param->protocol_mode.protocol_mode ? "REPORT" : "BOOT");
+        break;
+    }
+    case ESP_HIDD_CONTROL_EVENT: {
+        ESP_LOGI(TAG, "CONTROL[%u]: %sSUSPEND", param->control.map_index, param->control.control ? "EXIT_" : "");
+        break;
+    }
+    case ESP_HIDD_OUTPUT_EVENT: {
+        ESP_LOGI(TAG, "OUTPUT[%u]: %8s ID: %2u, Len: %d, Data:", param->output.map_index, esp_hid_usage_str(param->output.usage), param->output.report_id, param->output.length);
+        ESP_LOG_BUFFER_HEX(TAG, param->output.data, param->output.length);
+        break;
+    }
+    case ESP_HIDD_FEATURE_EVENT: {
+        ESP_LOGI(TAG, "FEATURE[%u]: %8s ID: %2u, Len: %d, Data:", param->feature.map_index, esp_hid_usage_str(param->feature.usage), param->feature.report_id, param->feature.length);
+        ESP_LOG_BUFFER_HEX(TAG, param->feature.data, param->feature.length);
+        break;
+    }
+    case ESP_HIDD_DISCONNECT_EVENT: {
+        ESP_LOGI(TAG, "DISCONNECT: %s", esp_hid_disconnect_reason_str(esp_hidd_dev_transport_get(param->disconnect.dev), param->disconnect.reason));
+        esp_hid_ble_gap_adv_start();
+        break;
+    }
+    case ESP_HIDD_STOP_EVENT: {
+        ESP_LOGI(TAG, "STOP");
+        break;
+    }
+    default:
+        break;
+    }
+    return;
 }
 
 /** @brief Callback for GAP events */
-static void gap_event_handler(esp_gap_ble_cb_event_t event,
-		esp_ble_gap_cb_param_t *param) {
-	switch (event) {
-	case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
-		esp_ble_gap_start_advertising(&hidd_adv_params);
-		break;
-	case ESP_GAP_BLE_SEC_REQ_EVT:
-		for (int i = 0; i < ESP_BD_ADDR_LEN; i++) {
-			ESP_LOGD(LOG_TAG, "%x:", param->ble_security.ble_req.bd_addr[i]);
-		}
-		esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
-		break;
-	case ESP_GAP_BLE_AUTH_CMPL_EVT:
-		sec_conn = true;
-		esp_bd_addr_t bd_addr;
-		memcpy(bd_addr, param->ble_security.auth_cmpl.bd_addr,
-				sizeof(esp_bd_addr_t));
-		ESP_LOGI(LOG_TAG, "remote BD_ADDR: %08x%04x",
-				(bd_addr[0] << 24) + (bd_addr[1] << 16) + (bd_addr[2] << 8)
-						+ bd_addr[3], (bd_addr[4] << 8) + bd_addr[5]);
-		ESP_LOGI(LOG_TAG, "address type = %d",
-				param->ble_security.auth_cmpl.addr_type);
-		ESP_LOGI(LOG_TAG, "pair status = %s",
-				param->ble_security.auth_cmpl.success ? "success" : "fail");
-		if (!param->ble_security.auth_cmpl.success) {
-			ESP_LOGE(LOG_TAG, "fail reason = 0x%x",
-					param->ble_security.auth_cmpl.fail_reason);
-		}
-		break;
-	default:
-		break;
-	}
+static void ble_gap_event_handler(esp_gap_ble_cb_event_t event,
+                                  esp_ble_gap_cb_param_t *param)
+{
+    switch (event) {
+        /*
+         * ADVERTISEMENT
+         * */
+    case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
+        ESP_LOGV(TAG, "BLE GAP ADV_DATA_SET_COMPLETE");
+        break;
+
+    case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
+        ESP_LOGV(TAG, "BLE GAP ADV_START_COMPLETE");
+        break;
+
+        /*
+         * AUTHENTICATION
+         * */
+    case ESP_GAP_BLE_AUTH_CMPL_EVT:
+        if (!param->ble_security.auth_cmpl.success) {
+            ESP_LOGE(TAG, "BLE GAP AUTH ERROR: 0x%x", param->ble_security.auth_cmpl.fail_reason);
+        } else {
+            ESP_LOGI(TAG, "BLE GAP AUTH SUCCESS");
+        }
+        break;
+
+    case ESP_GAP_BLE_KEY_EVT: //shows the ble key info share with peer device to the user.
+        //ESP_LOGI(TAG, "BLE GAP KEY type = %s", esp_ble_key_type_str(param->ble_security.ble_key.key_type));
+        break;
+
+    case ESP_GAP_BLE_PASSKEY_NOTIF_EVT: // ESP_IO_CAP_OUT
+        // The app will receive this evt when the IO has Output capability and the peer device IO has Input capability.
+        // Show the passkey number to the user to input it in the peer device.
+        ESP_LOGI(TAG, "BLE GAP PASSKEY_NOTIF passkey:%d", param->ble_security.key_notif.passkey);
+        break;
+
+    case ESP_GAP_BLE_NC_REQ_EVT: // ESP_IO_CAP_IO
+        // The app will receive this event when the IO has DisplayYesNO capability and the peer device IO also has DisplayYesNo capability.
+        // show the passkey number to the user to confirm it with the number displayed by peer device.
+        ESP_LOGI(TAG, "BLE GAP NC_REQ passkey:%d", param->ble_security.key_notif.passkey);
+        esp_ble_confirm_reply(param->ble_security.key_notif.bd_addr, true);
+        break;
+
+    case ESP_GAP_BLE_PASSKEY_REQ_EVT: // ESP_IO_CAP_IN
+        // The app will receive this evt when the IO has Input capability and the peer device IO has Output capability.
+        // See the passkey number on the peer device and send it back.
+        ESP_LOGI(TAG, "BLE GAP PASSKEY_REQ");
+        //esp_ble_passkey_reply(param->ble_security.ble_req.bd_addr, true, 1234);
+        break;
+
+    case ESP_GAP_BLE_SEC_REQ_EVT:
+        ESP_LOGI(TAG, "BLE GAP SEC_REQ");
+        // Send the positive(true) security response to the peer device to accept the security request.
+        // If not accept the security request, should send the security response with negative(false) accept value.
+        esp_ble_gap_security_rsp(param->ble_security.ble_req.bd_addr, true);
+        break;
+
+    default:
+        //ESP_LOGV(TAG, "BLE GAP EVENT %s", ble_gap_evt_str(event));
+        break;
+    }
 }
+
+esp_gatt_if_t gatt_if;
 
 void halBLETask_battery(void * params) {
 
@@ -165,25 +402,21 @@ void halBLETask_battery(void * params) {
 		xQueueReset(battery_q);
 
 	if(battery_q != NULL)
-		{
-			while (1){
-				if(xQueueReceive(battery_q, &battery_report, portMAX_DELAY)){
-					if(sec_conn == false)
-						continue;
+    {
+        while (1){
+            if(xQueueReceive(battery_q, &battery_report, portMAX_DELAY)){
+                if (!esp_hidd_dev_connected(hid_dev))
+                    continue;
 
 				uint8_t battery_lev = *battery_report;
-				ESP_LOGI(HID_LE_PRF_TAG, "set battery value on conn %d, hanlde %d, value %d, length %d\n", 
-		 				hid_conn_id, 42, battery_lev, sizeof(battery_lev));
-				esp_ble_gatts_set_attr_value(42, sizeof(uint8_t), &battery_lev);
-				esp_ble_gatts_send_indicate(hidd_le_env.gatt_if, hid_conn_id, 42, 
-				sizeof(uint8_t), &battery_lev, false);
-				}
-				else {
-					ESP_LOGE(LOG_TAG, "ble hid queue not initialized, retry in 1s");
-					vTaskDelay(1000 / portTICK_PERIOD_MS);
-				}
-			}
-		}
+
+                esp_hidd_dev_battery_set(hid_dev, battery_lev);
+            } else {
+                ESP_LOGE(TAG, "ble hid queue not initialized, retry in 1s");
+                vTaskDelay(1000 / portTICK_PERIOD_MS);
+            }
+        }
+    }
 		
 }
 /** @brief CONTINOUS TASK - sending HID commands via BLE
@@ -200,235 +433,107 @@ void halBLETask_keyboard(void * params) {
 
 	//check if queue is initialized
 	if (keyboard_q != NULL) {
-		{
-			while (1) {
-				//pend on MQ, if timeout triggers, just wait again.
-				if (xQueueReceive(keyboard_q, &key_report, portMAX_DELAY)) {
-					//if we are not connected, discard.
-					if (sec_conn == false)
-						continue;
-					hid_dev_send_report(hidd_le_env.gatt_if, hid_conn_id,
-					HID_RPT_ID_KEY_IN, HID_REPORT_TYPE_INPUT,
-							HID_KEYBOARD_IN_RPT_LEN, key_report);
-				}
+        while (1) {
+            //pend on MQ, if timeout triggers, just wait again.
+            if (xQueueReceive(keyboard_q, &key_report, portMAX_DELAY)) {
+                //if we are not connected, discard.
 
-			}
-		}
+                if (!esp_hidd_dev_connected(hid_dev))
+                    continue;
+
+                esp_hidd_dev_input_set(hid_dev, 0, 2, key_report, REPORT_LEN);
+            }
+
+        }
 	} else {
-		ESP_LOGE(LOG_TAG, "ble hid queue not initialized, retry in 1s");
+		ESP_LOGE(TAG, "ble hid queue not initialized, retry in 1s");
 		vTaskDelay(1000 / portTICK_PERIOD_MS);
 	}
 
 }
 
-void halBLETask_mouse(void * params) {
+static esp_err_t init_ble_gap(void)
+{
+    esp_err_t ret;
 
-	//Empty queue if initialized (there might be something left from last connection)
-
-	if (mouse_q != NULL)
-		xQueueReset(mouse_q);
-
-	//check if queue is initialized
-	if (mouse_q != NULL) {
-		{
-			while (1) {
-
-				//pend on MQ, if timeout triggers, just wait again.
-				if (xQueueReceive(mouse_q, &mouse_report, portMAX_DELAY)) {
-
-					//if we are not connected, discard.
-					if (sec_conn == false)
-						continue;
-					hid_dev_send_report(hidd_le_env.gatt_if, hid_conn_id,
-					HID_RPT_ID_MOUSE_IN, HID_REPORT_TYPE_INPUT,
-							HID_MOUSE_IN_RPT_LEN, mouse_report);
-				}
-			}
-		}
-	} else {
-		ESP_LOGE(LOG_TAG, "ble hid queue not initialized, retry in 1s");
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
-	}
-
+    if ((ret = esp_ble_gap_register_callback(ble_gap_event_handler)) != ESP_OK) {
+        ESP_LOGE(TAG, "esp_ble_gap_register_callback failed: %d", ret);
+        return ret;
+    }
+    return ret;
 }
 
-void halBLETask_joystick(void * params) {
+static esp_err_t init_low_level(esp_bt_mode_t mode)
+{
+    esp_err_t ret;
+    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
 
-	//Empty queue if initialized (there might be something left from last connection)
-	if (joystick_q != NULL)
-		xQueueReset(joystick_q);
+    ret = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+    if (ret) {
+        ESP_LOGE(TAG, "esp_bt_controller_mem_release failed: %d", ret);
+        return ret;
+    }
 
-	//check if queue is initialized
-	if (joystick_q != NULL) {
-		{
-			while (1) {
-				//pend on MQ, if timeout triggers, just wait again.
-				if (xQueueReceive(joystick_q, &joystick_report,
-						portMAX_DELAY)) {
+    ret = esp_bt_controller_init(&bt_cfg);
+    if (ret) {
+        ESP_LOGE(TAG, "esp_bt_controller_init failed: %d", ret);
+        return ret;
+    }
 
-					//if we are not connected, discard.
-					if (sec_conn == false)
-						continue;
-					hid_dev_send_report(hidd_le_env.gatt_if, hid_conn_id,
-					HID_RPT_ID_JOY_IN, HID_REPORT_TYPE_INPUT,
-							HID_JOYSTICK_IN_RPT_LEN, joystick_report);
-				}
-			}
-		}
-	} else {
-		ESP_LOGE(LOG_TAG, "ble hid queue not initialized, retry in 1s");
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
-	}
+    ret = esp_bt_controller_enable(mode);
+    if (ret) {
+        ESP_LOGE(TAG, "esp_bt_controller_enable failed: %d", ret);
+        return ret;
+    }
 
-}
+    ret = esp_bluedroid_init();
+    if (ret) {
+        ESP_LOGE(TAG, "esp_bluedroid_init failed: %d", ret);
+        return ret;
+    }
 
-void halBLETask_media(void * params) {
+    ret = esp_bluedroid_enable();
+    if (ret) {
+        ESP_LOGE(TAG, "esp_bluedroid_enable failed: %d", ret);
+        return ret;
+    }
 
-	//Empty queue if initialized (there might be something left from last connection)
-	if (media_q != NULL)
-		xQueueReset(media_q);
+    if (mode & ESP_BT_MODE_BLE) {
+        ret = init_ble_gap();
+        if (ret) {
+            return ret;
+        }
+    }
 
-	//check if queue is initialized
-	if (media_q != NULL) {
-		{
-			while (1) {
-
-				//pend on MQ, if timeout triggers, just wait again.
-				if (xQueueReceive(media_q, &media_report, portMAX_DELAY)) {
-
-					//if we are not connected, discard.
-					if (sec_conn == false)
-						continue;
-					hid_dev_send_report(hidd_le_env.gatt_if, hid_conn_id,
-					HID_RPT_ID_CC_IN, HID_REPORT_TYPE_INPUT, HID_CC_IN_RPT_LEN,
-							media_report);
-				}
-			}
-		}
-	} else {
-		ESP_LOGE(LOG_TAG, "ble hid queue not initialized, retry in 1s");
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
-	}
-
-}
-
-/** @brief Activate/deactivate pairing mode
- * @param enable If set to != 0, pairing will be enabled. Disabled if == 0
- * @return ESP_OK on success, ESP_FAIL otherwise*/
-esp_err_t halBLESetPairing(uint8_t enable);
-
-/** @brief Get connection status
- * @return 0 if not connected, != 0 if connected */
-uint8_t halBLEIsConnected(void) {
-	if (sec_conn == false)
-		return 0;
-	else
-		return 1;
-}
-
-/** @brief En- or Disable BLE interface.
- * 
- * This method is used to enable or disable the BLE interface. Currently, the ESP32
- * cannot use WiFi and BLE simultaneously. Therefore, when enabling wifi, it is
- * necessary to disable BLE prior calling taskWebGUIEnDisable.
- * 
- * @note Calling this method prior to initializing BLE via halBLEInit will
- * result in an error!
- * @return ESP_OK on success, ESP_FAIL otherwise
- * @param onoff If != 0, switch on BLE, switch off if 0.
- * */
-esp_err_t halBLEEnDisable(int onoff) {
-	return ESP_OK;
+    return ret;
 }
 
 /** @brief Main init function to start HID interface (C interface)
  * @see hid_ble */
 esp_err_t halBLEInit(uint8_t enableKeyboard, uint8_t enableMedia,
 		uint8_t enableMouse, uint8_t enableJoystick) {
-	activateKeyboard = enableKeyboard;
-	activateMedia = enableMedia;
-	activateMouse = enableMouse;
-	activateJoystick = enableJoystick;
-
 	//initialise queues, even if they might not be used.
 	battery_q = xQueueCreate(32, 1* sizeof(uint8_t));
-	mouse_q = xQueueCreate(32, HID_MOUSE_IN_RPT_LEN * sizeof(uint8_t));
 	keyboard_q = xQueueCreate(32, REPORT_LEN * sizeof(uint8_t));
-	joystick_q = xQueueCreate(32, HID_JOYSTICK_IN_RPT_LEN * sizeof(uint8_t));
-	media_q = xQueueCreate(32, HID_CC_IN_RPT_LEN * sizeof(uint8_t));
 
-	esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
-	esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
-	esp_err_t ret = esp_bt_controller_init(&bt_cfg);
-	if (ret) {
-		ESP_LOGE(LOG_TAG, "%s initialize controller failed\n", __func__);
-		return ESP_FAIL;
-	}
+    ESP_LOGI(TAG, "setting hid gap, mode:%d", ESP_BT_MODE_BLE);
+    esp_err_t ret = init_low_level(ESP_BT_MODE_BLE);
+    ESP_ERROR_CHECK( ret );
 
-	ret = esp_bt_controller_enable(ESP_BT_MODE_BLE);
-	if (ret) {
-		ESP_LOGE(LOG_TAG, "%s enable controller failed\n", __func__);
-		return ESP_FAIL;
-	}
+    ret = init_ble_gap_adv_data(ESP_HID_APPEARANCE_KEYBOARD, ble_hid_config.device_name);
+    ESP_ERROR_CHECK( ret );
 
-	ret = esp_bluedroid_init();
-	if (ret) {
-		ESP_LOGE(LOG_TAG, "%s init bluedroid failed\n", __func__);
-		return ESP_FAIL;
-	}
-
-	ret = esp_bluedroid_enable();
-	if (ret) {
-		ESP_LOGE(LOG_TAG, "%s init bluedroid failed\n", __func__);
-		return ESP_FAIL;
-	}
-
-	if (!hidd_le_env.enabled) {
-		memset(&hidd_le_env, 0, sizeof(hidd_le_env_t));
-		hidd_le_env.enabled = true;
-	}
-
-	esp_ble_gap_register_callback(gap_event_handler);
-
-	hidd_le_env.hidd_cb = hidd_event_callback;
-	if (hidd_register_cb() != ESP_OK) {
-		ESP_LOGE(LOG_TAG, "register CB failed");
-		return ESP_FAIL;
-	}
-	esp_ble_gatts_app_register(BATTRAY_APP_ID);
-	if (esp_ble_gatts_app_register(HIDD_APP_ID) != ESP_OK) {
-		ESP_LOGE(LOG_TAG, "Register App failed");
-		return ESP_FAIL;
-	}
-
-	/* set the security iocap & auth_req & key size & init key response key parameters to the stack*/
-	esp_ble_auth_req_t auth_req = ESP_LE_AUTH_BOND; //bonding with peer device after authentication
-	esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE; //set the IO capability to No output No input
-	uint8_t key_size = 16;      //the key size should be 7~16 bytes
-	uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
-	uint8_t rsp_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
-	esp_ble_gap_set_security_param(ESP_BLE_SM_AUTHEN_REQ_MODE, &auth_req,
-			sizeof(uint8_t));
-	esp_ble_gap_set_security_param(ESP_BLE_SM_IOCAP_MODE, &iocap,
-			sizeof(uint8_t));
-	esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE, &key_size,
-			sizeof(uint8_t));
-	/* If your BLE device act as a Slave, the init_key means you hope which types of key of the master should distribut to you,
-	 and the response key means which key you can distribut to the Master;
-	 If your BLE device act as a master, the response key means you hope which types of key of the slave should distribut to you, 
-	 and the init key means which key you can distribut to the slave. */
-	esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY, &init_key,
-			sizeof(uint8_t));
-	esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY, &rsp_key,
-			sizeof(uint8_t));
+    if ((ret = esp_ble_gatts_register_callback(esp_hidd_gatts_event_handler)) != ESP_OK) {
+        ESP_LOGE(TAG, "GATTS register callback failed: %d", ret);
+        return ret;
+    }
+    ESP_LOGI(TAG, "setting ble device");
+    ESP_ERROR_CHECK(
+        esp_hidd_dev_init(&ble_hid_config, ESP_HID_TRANSPORT_BLE, ble_hidd_event_callback, &hid_dev));
 
 	//create BLE task
-	//xTaskCreate(&halBLETask, "ble_task", TASK_BLE_STACKSIZE, NULL, HAL_BLE_TASK_PRIORITY_BASE, NULL);
 	TaskHandle_t xBLETask_battery;
 	TaskHandle_t xBLETask_keyboard;
-	TaskHandle_t xBLETask_mouse;
-	TaskHandle_t xBLETask_media;
-	TaskHandle_t xBLETask_joystick;
 
 	xTaskCreatePinnedToCore(halBLETask_battery, "ble_task_battery",
 			TASK_BLE_STACKSIZE, NULL, configMAX_PRIORITIES, &xBLETask_battery,
@@ -436,17 +541,9 @@ esp_err_t halBLEInit(uint8_t enableKeyboard, uint8_t enableMedia,
 	xTaskCreatePinnedToCore(halBLETask_keyboard, "ble_task_keyboard",
 			TASK_BLE_STACKSIZE, NULL, configMAX_PRIORITIES, &xBLETask_keyboard,
 			0);
-	xTaskCreatePinnedToCore(halBLETask_mouse, "ble_task_mouse",
-			TASK_BLE_STACKSIZE, NULL, configMAX_PRIORITIES, &xBLETask_mouse, 0);
-	xTaskCreatePinnedToCore(halBLETask_media, "ble_task_media",
-			TASK_BLE_STACKSIZE, NULL, configMAX_PRIORITIES, &xBLETask_media, 0);
-	xTaskCreatePinnedToCore(halBLETask_joystick, "ble_task_joystick",
-			TASK_BLE_STACKSIZE, NULL, configMAX_PRIORITIES, &xBLETask_joystick,
-			0);
 
 	//set log level according to define
-	esp_log_level_set(HID_LE_PRF_TAG, LOG_LEVEL_BLE);
-	esp_log_level_set(LOG_TAG, LOG_LEVEL_BLE);
+	esp_log_level_set(TAG, ESP_LOG_INFO);
 
 	return ESP_OK;
 }

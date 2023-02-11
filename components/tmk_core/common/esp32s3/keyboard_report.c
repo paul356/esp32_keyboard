@@ -6,9 +6,7 @@
 #include "tinyusb.h"
 #include "esp_log.h"
 
-extern QueueHandle_t mouse_q;
 extern QueueHandle_t keyboard_q;
-extern QueueHandle_t joystick_q;
 
 static void send_keyboard_to_queue(report_keyboard_t*);
 static uint8_t keyboard_leds_status(void);
@@ -30,7 +28,7 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
     uint8_t report_state[REPORT_LEN] = {0};
 
     //Do not send anything if queues are uninitialized
-    if (mouse_q == NULL || keyboard_q == NULL || joystick_q == NULL) {
+    if (keyboard_q == NULL) {
         ESP_LOGE("report", "queues not initialized");
         return;
     }
@@ -41,7 +39,7 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
     report_state[1] = 0;
 
     int index = 0;
-    for (uint16_t i = 0; index < REPORT_COUNT_BYTES && i < KEYBOARD_REPORT_BITS; i++) {
+    for (uint16_t i = 0; i < REPORT_COUNT_BYTES && index < KEYBOARD_REPORT_BITS; i++) {
         if (report->nkro.bits[i]) {
             for (uint16_t j = 0; j < 8 && ((1 << j) & report->nkro.bits[i]); j++) {
                 report_state[index + MOD_LED_BYTES] = (i << 3) + j;
@@ -54,7 +52,7 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
     report_state[1] = report->reserved;
 
     int index = 0;
-    for (uint16_t i = 0; i < REPORT_COUNT_BYTES && i < KEYBOARD_REPORT_KEYS; i++) {
+    for (uint16_t i = 0; i < REPORT_COUNT_BYTES && index < KEYBOARD_REPORT_KEYS; i++) {
         if (report->keys[i]) {
             report_state[index + MOD_LED_BYTES] = report->keys[i];
             index++;
