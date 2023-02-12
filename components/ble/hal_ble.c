@@ -520,7 +520,7 @@ esp_err_t halBLEInit(uint8_t enableKeyboard, uint8_t enableMedia,
     esp_err_t ret = init_low_level(ESP_BT_MODE_BLE);
     ESP_ERROR_CHECK( ret );
 
-    ret = init_ble_gap_adv_data(ESP_HID_APPEARANCE_KEYBOARD, ble_hid_config.device_name);
+    ret = init_ble_gap_adv_data(ESP_HID_APPEARANCE_GENERIC, ble_hid_config.device_name);
     ESP_ERROR_CHECK( ret );
 
     if ((ret = esp_ble_gatts_register_callback(esp_hidd_gatts_event_handler)) != ESP_OK) {
