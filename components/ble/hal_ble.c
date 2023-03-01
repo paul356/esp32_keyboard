@@ -39,39 +39,10 @@ uint8_t key_report[REPORT_LEN] = { 0 };
 static esp_hidd_dev_t* hid_dev;
 
 const unsigned char hidapiReportMap[] = { //8 bytes input, 8 bytes feature
-    0x05, 0x01,  // Usage Page (Generic Desktop)
-    0x09, 0x02,  // Usage (Mouse)
-    0xA1, 0x01,  // Collection (Application)
-    0x85, 0x01,  // Report Id (1)
-    0x09, 0x01,  //   Usage (Pointer)
-    0xA1, 0x00,  //   Collection (Physical)
-    0x05, 0x09,  //     Usage Page (Buttons)
-    0x19, 0x01,  //     Usage Minimum (01) - Button 1
-    0x29, 0x03,  //     Usage Maximum (03) - Button 3
-    0x15, 0x00,  //     Logical Minimum (0)
-    0x25, 0x01,  //     Logical Maximum (1)
-    0x75, 0x01,  //     Report Size (1)
-    0x95, 0x03,  //     Report Count (3)
-    0x81, 0x02,  //     Input (Data, Variable, Absolute) - Button states
-    0x75, 0x05,  //     Report Size (5)
-    0x95, 0x01,  //     Report Count (1)
-    0x81, 0x01,  //     Input (Constant) - Padding or Reserved bits
-    0x05, 0x01,  //     Usage Page (Generic Desktop)
-    0x09, 0x30,  //     Usage (X)
-    0x09, 0x31,  //     Usage (Y)
-    0x09, 0x38,  //     Usage (Wheel)
-    0x15, 0x81,  //     Logical Minimum (-127)
-    0x25, 0x7F,  //     Logical Maximum (127)
-    0x75, 0x08,  //     Report Size (8)
-    0x95, 0x03,  //     Report Count (3)
-    0x81, 0x06,  //     Input (Data, Variable, Relative) - X & Y coordinate
-    0xC0,        //   End Collection
-    0xC0,        // End Collection
-
     0x05, 0x01,  // Usage Pg (Generic Desktop)
     0x09, 0x06,  // Usage (Keyboard)
     0xA1, 0x01,  // Collection: (Application)
-    0x85, 0x02,  // Report Id (2)
+    0x85, 0x01,  // Report Id (1)
     //
     0x05, 0x07,  //   Usage Pg (Key Codes)
     0x19, 0xE0,  //   Usage Min (224)
@@ -113,6 +84,37 @@ const unsigned char hidapiReportMap[] = { //8 bytes input, 8 bytes feature
     0x81, 0x00,  //   Input: (Data, Array)
     //
     0xC0,        // End Collection
+    
+    /*
+    0x05, 0x01,  // Usage Page (Generic Desktop)
+    0x09, 0x02,  // Usage (Mouse)
+    0xA1, 0x01,  // Collection (Application)
+    0x85, 0x02,  // Report Id (2)
+    0x09, 0x01,  //   Usage (Pointer)
+    0xA1, 0x00,  //   Collection (Physical)
+    0x05, 0x09,  //     Usage Page (Buttons)
+    0x19, 0x01,  //     Usage Minimum (01) - Button 1
+    0x29, 0x03,  //     Usage Maximum (03) - Button 3
+    0x15, 0x00,  //     Logical Minimum (0)
+    0x25, 0x01,  //     Logical Maximum (1)
+    0x75, 0x01,  //     Report Size (1)
+    0x95, 0x03,  //     Report Count (3)
+    0x81, 0x02,  //     Input (Data, Variable, Absolute) - Button states
+    0x75, 0x05,  //     Report Size (5)
+    0x95, 0x01,  //     Report Count (1)
+    0x81, 0x01,  //     Input (Constant) - Padding or Reserved bits
+    0x05, 0x01,  //     Usage Page (Generic Desktop)
+    0x09, 0x30,  //     Usage (X)
+    0x09, 0x31,  //     Usage (Y)
+    0x09, 0x38,  //     Usage (Wheel)
+    0x15, 0x81,  //     Logical Minimum (-127)
+    0x25, 0x7F,  //     Logical Maximum (127)
+    0x75, 0x08,  //     Report Size (8)
+    0x95, 0x03,  //     Report Count (3)
+    0x81, 0x06,  //     Input (Data, Variable, Relative) - X & Y coordinate
+    0xC0,        //   End Collection
+    0xC0,        // End Collection
+
     //
     0x05, 0x0C,   // Usage Pg (Consumer Devices)
     0x09, 0x01,   // Usage (Consumer Control)
@@ -170,7 +172,8 @@ const unsigned char hidapiReportMap[] = { //8 bytes input, 8 bytes feature
     0x81, 0x00,   //     Input (Data, Ary, Abs)
     0xC0,           //   End Collection
     0x81, 0x03,   //   Input (Const, Var, Abs)
-    0xC0,            // End Collectionq
+    0xC0,            // End Collection
+    */
 };
 
 static esp_hid_raw_report_map_t ble_report_maps[] = {
@@ -184,7 +187,7 @@ static esp_hid_device_config_t ble_hid_config = {
     .vendor_id          = 0x16C0,
     .product_id         = 0x05DF,
     .version            = 0x0100,
-    .device_name        = "ESP BLE HID2",
+    .device_name        = "ESP BLE HID3",
     .manufacturer_name  = "Espressif",
     .serial_number      = "1234567890",
     .report_maps        = ble_report_maps,
@@ -216,11 +219,11 @@ static esp_err_t init_ble_gap_adv_data(uint16_t appearance, const char *device_n
         .flag = 0x6,
     };
 
-    esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_MITM_BOND;
+    esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_BOND;
     //esp_ble_io_cap_t iocap = ESP_IO_CAP_OUT;//you have to enter the key on the host
     //esp_ble_io_cap_t iocap = ESP_IO_CAP_IN;//you have to enter the key on the device
-    esp_ble_io_cap_t iocap = ESP_IO_CAP_IO;//you have to agree that key matches on both
-    //esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE;//device is not capable of input or output, unsecure
+    //esp_ble_io_cap_t iocap = ESP_IO_CAP_IO;//you have to agree that key matches on both
+    esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE;//device is not capable of input or output, unsecure
     uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
     uint8_t rsp_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
     uint8_t key_size = 16; //the key size should be 7~16 bytes
@@ -438,10 +441,12 @@ void halBLETask_keyboard(void * params) {
             if (xQueueReceive(keyboard_q, &key_report, portMAX_DELAY)) {
                 //if we are not connected, discard.
 
+                ESP_LOGI(TAG, "before send key to computer");
                 if (!esp_hidd_dev_connected(hid_dev))
                     continue;
 
-                esp_hidd_dev_input_set(hid_dev, 0, 2, key_report, REPORT_LEN);
+                ESP_LOGI(TAG, "send key to computer");
+                esp_hidd_dev_input_set(hid_dev, 0, 1, key_report, REPORT_LEN);
             }
 
         }
@@ -520,7 +525,7 @@ esp_err_t halBLEInit(uint8_t enableKeyboard, uint8_t enableMedia,
     esp_err_t ret = init_low_level(ESP_BT_MODE_BLE);
     ESP_ERROR_CHECK( ret );
 
-    ret = init_ble_gap_adv_data(ESP_HID_APPEARANCE_GENERIC, ble_hid_config.device_name);
+    ret = init_ble_gap_adv_data(ESP_HID_APPEARANCE_KEYBOARD, ble_hid_config.device_name);
     ESP_ERROR_CHECK( ret );
 
     if ((ret = esp_ble_gatts_register_callback(esp_hidd_gatts_event_handler)) != ESP_OK) {
@@ -540,7 +545,7 @@ esp_err_t halBLEInit(uint8_t enableKeyboard, uint8_t enableMedia,
 			0);
 	xTaskCreatePinnedToCore(halBLETask_keyboard, "ble_task_keyboard",
 			TASK_BLE_STACKSIZE, NULL, configMAX_PRIORITIES, &xBLETask_keyboard,
-			0);
+			1);
 
 	//set log level according to define
 	esp_log_level_set(TAG, ESP_LOG_INFO);

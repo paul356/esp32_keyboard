@@ -87,17 +87,28 @@ static void key_reports(void *pvParameters)
 static void send_keys(void *pParam)
 {
     TickType_t xLastWakeTime;
-    const TickType_t xFrequency = configTICK_RATE_HZ * 15;
+    const TickType_t xFrequency = configTICK_RATE_HZ;
 
     xLastWakeTime = xTaskGetTickCount();
+    bool state = true;
     while (1) {
-        uint8_t keycode[6] = {0x4, 0, 0, 0, 0, 0};
+        uint8_t keycode[] = {0, 0, 0, 0, 0, 0, 0, 0};
 
         (void)xTaskDelayUntil(&xLastWakeTime, xFrequency);
 
         // check interface readiness
-        if (tud_hid_ready())
-            tud_hid_keyboard_report(1, 0, keycode);
+        //if (tud_hid_ready())
+        //    tud_hid_keyboard_report(1, 0, keycode);
+
+        ESP_LOGI (TAG, "send_keys func runs %u", xLastWakeTime);
+
+        if (state) {
+            keycode[3] = 4;
+        } else {
+            keycode[3] = 0;
+        }
+        state = !state;
+        xQueueSend(keyboard_q, keycode, 0);
     }
 }
 
