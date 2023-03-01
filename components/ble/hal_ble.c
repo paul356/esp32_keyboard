@@ -441,11 +441,9 @@ void halBLETask_keyboard(void * params) {
             if (xQueueReceive(keyboard_q, &key_report, portMAX_DELAY)) {
                 //if we are not connected, discard.
 
-                ESP_LOGI(TAG, "before send key to computer");
                 if (!esp_hidd_dev_connected(hid_dev))
                     continue;
 
-                ESP_LOGI(TAG, "send key to computer");
                 esp_hidd_dev_input_set(hid_dev, 0, 1, key_report, REPORT_LEN);
             }
 
