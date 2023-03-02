@@ -195,7 +195,7 @@ static void enable_usb_hid(void)
 
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
 
-    /*
+#if CONFIG_TINYUSB_CDC_ENABLED
     tinyusb_config_cdcacm_t amc_cfg = {
         .usb_dev = TINYUSB_USBDEV_0,
         .cdc_port = TINYUSB_CDC_ACM_0,
@@ -207,7 +207,7 @@ static void enable_usb_hid(void)
     };
 
     ESP_ERROR_CHECK(tusb_cdc_acm_init(&amc_cfg));
-    */
+#endif
 
     debug_enable = false;
     debug_matrix = false;
