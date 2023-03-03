@@ -36,6 +36,8 @@ QueueHandle_t keyboard_q;
 uint8_t battery_report[1] = { 0 };
 uint8_t key_report[REPORT_LEN] = { 0 };
 
+int BLE_EN = 0;
+
 static esp_hidd_dev_t* hid_dev;
 
 const unsigned char hidapiReportMap[] = { //8 bytes input, 8 bytes feature

@@ -54,7 +54,6 @@ extern "C" {
 #include "keyboard_config.h"
 #include "nvs_funcs.h"
 #include "nvs_keymaps.h"
-#include "keycode_conv.h"
 #include "esp32s3/keyboard_report.h"
 #include "action_layer.h"
 #include "wait.h"

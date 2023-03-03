@@ -1,12 +1,10 @@
 #include "host.h"
 #include "keyboard_report.h"
 #include "keyboard_config.h"
-#include "keycode_conv.h"
 #include "wait.h"
 #include "tinyusb.h"
 #include "esp_log.h"
-
-extern QueueHandle_t keyboard_q;
+#include "hal_ble.h"
 
 static void send_keyboard_to_queue(report_keyboard_t*);
 static uint8_t keyboard_leds_status(void);
