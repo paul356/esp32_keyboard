@@ -50,33 +50,46 @@ static esp_err_t serve_static_files(httpd_req_t* req)
 
 static esp_err_t layouts_json(httpd_req_t* req)
 {
+    esp_err_t err;
+
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr_chunk(req, "{\"layouts\":{");
+    httpd_resp_sendstr_chunk(req, "{\"layouts\":{\n");
     for (int i = 0; i < layers_num; i ++) {
         httpd_resp_sendstr_chunk(req, "\"");
         httpd_resp_sendstr_chunk(req, layer_names_arr[i]);
         httpd_resp_sendstr_chunk(req, "\":[");
 
         for (int j = 0; j < MATRIX_ROWS; j++) {
+            httpd_resp_sendstr_chunk(req, "\n  [");
             for (int k = 0; k < MATRIX_COLS; k++) {
                 uint16_t key_code = keymaps[i][j][k];
                 httpd_resp_sendstr_chunk(req, "\"");
                 const char* keyName = GetKeyCodeName(key_code);
-                if (keyName != NULL) {
-                    httpd_resp_sendstr_chunk(req, keyName);
+                if (keyName != NULL && keyName[0] != '\0') {
+                    err = httpd_resp_sendstr_chunk(req, keyName);
                 } else {
-                    httpd_resp_sendstr_chunk(req, GetKeyCodeName(KC_TRNS));
+                    keyName = GetKeyCodeName(KC_TRNS);
+                    err = httpd_resp_sendstr_chunk(req, keyName);
+                }
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "send error, keyName is \"%s\"", keyName);
                 }
                 httpd_resp_sendstr_chunk(req, "\"");
-                if (j != MATRIX_ROWS - 1 || k != MATRIX_COLS - 1) {
+                if (k != MATRIX_COLS - 1) {
                     httpd_resp_sendstr_chunk(req, ",");
                 }
             }
+            if (j != MATRIX_ROWS - 1) {
+                httpd_resp_sendstr_chunk(req, "],");
+            } else {
+                httpd_resp_sendstr_chunk(req, "]");
+            }
         }
         
-        httpd_resp_sendstr_chunk(req, "]");
         if (i != layers_num - 1) {
-            httpd_resp_sendstr_chunk(req, ",");
+            httpd_resp_sendstr_chunk(req, "\n],\n");
+        } else {
+            httpd_resp_sendstr_chunk(req, "\n]\n");
         }
     }
     httpd_resp_sendstr_chunk(req, "}}");
@@ -88,23 +101,23 @@ static esp_err_t layouts_json(httpd_req_t* req)
 static esp_err_t keycodes_json(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr_chunk(req, "{\"keycodes\":[");
+    httpd_resp_sendstr_chunk(req, "{\"keycodes\":[\n");
     uint16_t keyCodeNum = GetKeyCodeNum();
     bool firstKey = true;
     for (uint16_t kc = 0; kc < keyCodeNum; kc++) {
         const char* keyName = GetKeyCodeName(kc);
         if (keyName != NULL && keyName[0] != '\0') {
             if (firstKey) {
-                httpd_resp_sendstr_chunk(req, "\"");
+                httpd_resp_sendstr_chunk(req, "  \"");
                 firstKey = false;
             } else {
-                httpd_resp_sendstr_chunk(req, ",\"");
+                httpd_resp_sendstr_chunk(req, ",\n  \"");
             }
             httpd_resp_sendstr_chunk(req, keyName);
             httpd_resp_sendstr_chunk(req, "\"");
         }
     }
-    httpd_resp_sendstr_chunk(req, "]}");
+    httpd_resp_sendstr_chunk(req, "\n]}");
     httpd_resp_sendstr_chunk(req, NULL);
     
     return ESP_OK;

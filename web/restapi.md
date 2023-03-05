@@ -49,3 +49,17 @@
     "keycodes" : [] // empty array
 }
 ```
+
+5. 键盘状态
+* Method: GET
+* URI: /api/device-status
+* Input: none
+* Output:
+```
+{
+    "boot_partition" : "ota_a"|"ota_b",
+    "ble_state" : "关闭"|"未连接"|"已连接",
+    "usb_state" : "打开"|"关闭",
+    "start_time" : "start date"
+}
+```
