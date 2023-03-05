@@ -25,12 +25,6 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
 {
     uint8_t report_state[REPORT_LEN] = {0};
 
-    //Do not send anything if queues are uninitialized
-    if (keyboard_q == NULL) {
-        ESP_LOGE("report", "queues not initialized");
-        return;
-    }
-
 #ifdef NKRO_ENABLE
     //Check if the report was modified, if so send it
     report_state[0] = report->nkro.mods;
@@ -67,7 +61,7 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
         tud_hid_n_keyboard_report(0, 1, report_state[0], &report_state[2]);
     }
 
-    if (BLE_EN == 1) {
+    if (keyboard_q) {
         xQueueSend(keyboard_q, report_state, (TickType_t) 0);
     }
 }

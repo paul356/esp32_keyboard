@@ -41,8 +41,6 @@
 /** @brief Stack size for BLE task */
 #define TASK_BLE_STACKSIZE 2048
 
-extern int BLE_EN;
-
 /** @brief Queue for sending keyboard reports
  * @see keyboard_command_t */
 extern QueueHandle_t battery_q;
