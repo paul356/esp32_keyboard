@@ -6,3 +6,11 @@
     text-align : center;
     margin : 1px;
 }
+
+.status-item {
+    display : inline-block;
+    border : 1px outset blue;
+    padding : 20px;
+    margin : 1px;
+    text-align : center;
+}

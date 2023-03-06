@@ -1,14 +1,18 @@
 #include "esp_http_server.h"
 #include "esp_log.h"
 #include "esp_ota_ops.h"
+#include "esp_random.h"
 #include "keyboard_config.h"
 #include "key_definitions.h"
 #include "nvs_keymaps.h"
 #include "nvs_funcs.h"
 #include "cJSON.h"
 #include "keymap.h"
+#include "hal_ble.h"
 
 #define TAG "[HTTPD]"
+
+static time_t s_init_version;
 
 static esp_err_t serve_static_files(httpd_req_t* req)
 {
@@ -68,8 +72,7 @@ static esp_err_t layouts_json(httpd_req_t* req)
                 if (keyName != NULL && keyName[0] != '\0') {
                     err = httpd_resp_sendstr_chunk(req, keyName);
                 } else {
-                    keyName = GetKeyCodeName(KC_TRNS);
-                    err = httpd_resp_sendstr_chunk(req, keyName);
+                    err = httpd_resp_sendstr_chunk(req, " ");
                 }
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "send error, keyName is \"%s\"", keyName);
@@ -333,10 +336,43 @@ static esp_err_t upload_bin_file(httpd_req_t* req)
     return ESP_OK;
 }
 
+static esp_err_t get_device_status(httpd_req_t* req)
+{
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr_chunk(req, "{\n");
+
+    // boot partition
+    const esp_partition_t* curr_part = esp_ota_get_running_partition();
+    httpd_resp_sendstr_chunk(req, "\"boot_partition\" : \"");
+    httpd_resp_sendstr_chunk(req, curr_part->label);
+    httpd_resp_sendstr_chunk(req, "\",\n");
+
+    // ble_state
+    httpd_resp_sendstr_chunk(req, "\"ble_state\" : ");
+    httpd_resp_sendstr_chunk(req, isBLERunning() ? "true,\n" : "false,\n");
+
+    // usb_state
+    httpd_resp_sendstr_chunk(req, "\"usb_state\" : true,\n");
+
+    char str_buf[25];
+    snprintf(str_buf, sizeof(str_buf), "%lu", s_init_version);
+    // start_time
+    httpd_resp_sendstr_chunk(req, "\"init_version\" : \"");
+    httpd_resp_sendstr_chunk(req, str_buf);
+    httpd_resp_sendstr_chunk(req, "\"\n");
+
+    httpd_resp_sendstr_chunk(req, "}");
+    httpd_resp_sendstr_chunk(req, NULL);
+
+    return ESP_OK;
+}
+
 esp_err_t start_file_server()
 {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+
+    s_init_version = esp_random();
 
     // match uri by strncmp
     config.uri_match_fn = httpd_uri_match_wildcard;
@@ -385,6 +421,16 @@ esp_err_t start_file_server()
     };
 
     httpd_register_uri_handler(server, &reset_uri);
+
+    /* keyboard status query api */
+    httpd_uri_t status_uri = {
+        .uri       = "/api/device-status",
+        .method    = HTTP_GET,
+        .handler   = get_device_status,
+        .user_ctx  = NULL
+    };
+
+    httpd_register_uri_handler(server, &status_uri);
 
     httpd_uri_t upload_uri = {
         .uri       = "/upload/bin_file",

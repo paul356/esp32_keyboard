@@ -54,4 +54,6 @@ extern QueueHandle_t keyboard_q;
 esp_err_t halBLEInit(uint8_t enableKeyboard, uint8_t enableMedia,
 		uint8_t enableMouse, uint8_t enableJoystick);
 
+bool isBLERunning();
+
 #endif /* _HAL_BLE_H_ */

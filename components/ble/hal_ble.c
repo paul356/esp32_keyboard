@@ -511,10 +511,16 @@ static esp_err_t init_low_level(esp_bt_mode_t mode)
     return ret;
 }
 
+bool isBLERunning()
+{
+    return keyboard_q != NULL && hid_dev != NULL;
+}
+
 /** @brief Main init function to start HID interface (C interface)
  * @see hid_ble */
 esp_err_t halBLEInit(uint8_t enableKeyboard, uint8_t enableMedia,
-		uint8_t enableMouse, uint8_t enableJoystick) {
+		uint8_t enableMouse, uint8_t enableJoystick)
+{
 	//initialise queues, even if they might not be used.
 	battery_q = xQueueCreate(32, 1* sizeof(uint8_t));
 	keyboard_q = xQueueCreate(32, REPORT_LEN * sizeof(uint8_t));
