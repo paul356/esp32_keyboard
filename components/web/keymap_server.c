@@ -85,7 +85,7 @@ static esp_err_t layouts_json(httpd_req_t* req)
                 httpd_resp_sendstr_chunk(req, "]");
             }
         }
-        
+
         if (i != layers_num - 1) {
             httpd_resp_sendstr_chunk(req, "\n],\n");
         } else {
@@ -119,7 +119,7 @@ static esp_err_t keycodes_json(httpd_req_t* req)
     }
     httpd_resp_sendstr_chunk(req, "\n]}");
     httpd_resp_sendstr_chunk(req, NULL);
-    
+
     return ESP_OK;
 }
 
@@ -219,28 +219,28 @@ static esp_err_t reset_keymap(httpd_req_t* req)
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, NULL);
         return ESP_ERR_NO_MEM;
     }
-    
+
     int ret = httpd_req_recv(req, body, buf_len);
     if (ret <= 0) {
         free(body);
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, NULL);
         return ESP_ERR_INVALID_ARG;
     }
-    
+
     cJSON* root = cJSON_ParseWithLength(body, buf_len);
     free(body);
     if (!root) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid json");
         return ESP_ERR_NO_MEM;
     }
-    
+
     cJSON* pos = cJSON_GetObjectItem(root, "positions");
     if (!pos || !cJSON_IsArray(pos) || cJSON_GetArraySize(pos) != 0) {
         cJSON_Delete(root);
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "no positions in json");
         return ESP_ERR_INVALID_ARG;
     }
-    
+
     cJSON* kc  = cJSON_GetObjectItem(root, "keycodes");
     if (!kc || !cJSON_IsArray(kc) || cJSON_GetArraySize(kc) != 0) {
         cJSON_Delete(root);
@@ -255,7 +255,7 @@ static esp_err_t reset_keymap(httpd_req_t* req)
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "reset fail");
         return ESP_FAIL;        
     }
-    
+
     httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
 }
@@ -283,7 +283,7 @@ static esp_err_t upload_bin_file(httpd_req_t* req)
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "can't begin ota");
         return ESP_FAIL;
     }
-    
+
     while (accumu_len < file_len) {
         int recieved = httpd_req_recv(req, recv_buf, MAX_BUF_SIZE);
         if (recieved <= 0) {
@@ -394,7 +394,7 @@ esp_err_t start_file_server()
     };
 
     httpd_register_uri_handler(server, &upload_uri);
-    
+
     /* URI handler for getting uploaded files */
     httpd_uri_t get_uri = {
         .uri       = "/*",  // Match all URIs of type /path/to/file
