@@ -6,10 +6,10 @@
     <link rel="stylesheet" href="style.css" />
     <script src="app.js"></script>
   </head>
-  <body>
+  <body onload="render_layouts()">
     <div id="app">
       <div class="banner" id="status_line"></div>
-      <div class="app" id="key_layouts"></div>
+      <div class="layouts" id="key_layouts"></div>
       <div class="action">
         <button class="btn" id="button_ok">确定</button>
         <button class="btn" id="button_reset">重置</button>
@@ -21,8 +21,6 @@
         <label for="bin_file">选择升级文件包:</label>
         <input type="file" id="bin_file" name="bin_file" accept=".bin" onchange="clear_label()"
                />
-      </div>
-      <div>
         <button id="upload" type="button" onclick="upload()">Submit</button>
       </div>
       <div>
