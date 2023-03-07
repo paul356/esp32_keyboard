@@ -1,3 +1,7 @@
+var keymap_layouts = {};
+var keymap_changed = {};
+var keycode_array = null;
+
 function clear_label()
 {
     document.getElementById("upload_resp").innerHTML = "";
@@ -62,12 +66,20 @@ function _create_div(content, attrs)
     return _create_element("div", content, attrs);
 }
 
+function _keystroke_clicked(event)
+{
+    
+}
+
 function _render_keymap(layout_div, name, keymap)
 {
+    keymap_layouts[name] = keymap;
+    keymap_changed[name] = false;
+    
     layout_div.append(_create_div(name, {"class" : "title"}));
     
     let render_key = function(key, index, arr) {
-        layout_div.append(_create_div(key, {"class" : "keystroke"}));
+        layout_div.append(_create_div(keycode_array[key], {"class" : "keystroke"}));
     }
 
     let render_row = function(row, index, arr) {
@@ -85,6 +97,26 @@ function _render_status_line(status_div, status_json)
     for (let item in status_json) {
         status_div.append(_create_div(item + ":" + status_json[item], {"class" : "status-item"}));
     }
+}
+
+function _get_keycodes()
+{
+    let keycode_path = "/api/keycodes";
+
+    let xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (xhttp.readyState == 4) {
+            if (xhttp.status == 200) {
+                let keycode_json = JSON.parse(xhttp.responseText);
+                keycode_array = keycode_json["keycodes"];
+            } else {
+                _handle_server_error(xhttp);
+            }
+        }
+    }
+
+    xhttp.open("GET", keycode_path, false);
+    xhttp.send();    
 }
 
 function render_status_line()
@@ -110,6 +142,8 @@ function render_status_line()
 
 function render_layouts()
 {
+    _get_keycodes();
+    
     let layouts_path = "/api/layouts";
 
     let xhttp = new XMLHttpRequest();

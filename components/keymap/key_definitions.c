@@ -4,7 +4,7 @@
 
 const char* key_code_name[] = {
 	"",
-	"___",
+	"",
 	"",
 	"",
 	"A",

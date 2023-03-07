@@ -67,17 +67,17 @@ static esp_err_t layouts_json(httpd_req_t* req)
             httpd_resp_sendstr_chunk(req, "\n  [");
             for (int k = 0; k < MATRIX_COLS; k++) {
                 uint16_t key_code = keymaps[i][j][k];
-                httpd_resp_sendstr_chunk(req, "\"");
                 const char* keyName = GetKeyCodeName(key_code);
                 if (keyName != NULL && keyName[0] != '\0') {
-                    err = httpd_resp_sendstr_chunk(req, keyName);
+                    char str_buf[25];
+                    snprintf(str_buf, sizeof(str_buf), "%hu", key_code);
+                    err = httpd_resp_sendstr_chunk(req, str_buf);
                 } else {
-                    err = httpd_resp_sendstr_chunk(req, " ");
+                    err = httpd_resp_sendstr_chunk(req, "0");
                 }
                 if (err != ESP_OK) {
                     ESP_LOGE(TAG, "send error, keyName is \"%s\"", keyName);
                 }
-                httpd_resp_sendstr_chunk(req, "\"");
                 if (k != MATRIX_COLS - 1) {
                     httpd_resp_sendstr_chunk(req, ",");
                 }
@@ -109,16 +109,21 @@ static esp_err_t keycodes_json(httpd_req_t* req)
     bool firstKey = true;
     for (uint16_t kc = 0; kc < keyCodeNum; kc++) {
         const char* keyName = GetKeyCodeName(kc);
-        if (keyName != NULL && keyName[0] != '\0') {
-            if (firstKey) {
-                httpd_resp_sendstr_chunk(req, "  \"");
-                firstKey = false;
-            } else {
-                httpd_resp_sendstr_chunk(req, ",\n  \"");
-            }
-            httpd_resp_sendstr_chunk(req, keyName);
-            httpd_resp_sendstr_chunk(req, "\"");
+
+        if (firstKey) {
+            httpd_resp_sendstr_chunk(req, "  \"");
+            firstKey = false;
+        } else {
+            httpd_resp_sendstr_chunk(req, ",\n  \"");
         }
+
+        if (keyName != NULL && keyName[0] != '\0') {
+            httpd_resp_sendstr_chunk(req, keyName);
+        } else {
+            httpd_resp_sendstr_chunk(req, "[ ]");
+        }
+
+        httpd_resp_sendstr_chunk(req, "\"");
     }
     httpd_resp_sendstr_chunk(req, "\n]}");
     httpd_resp_sendstr_chunk(req, NULL);
