@@ -18,8 +18,8 @@ function upload()
 {
     document.getElementById("upload_resp").innerHTML = "";
 
-    var upload_path = "/upload/bin_file";
-    var fileInput = document.getElementById("bin_file").files;
+    let upload_path = "/upload/bin_file";
+    let fileInput = document.getElementById("bin_file").files;
 
     if (fileInput.length == 0) {
         alert("No file selected!");
@@ -27,8 +27,8 @@ function upload()
         document.getElementById("bin_file").disabled = true;
         document.getElementById("upload").disabled = true;
 
-        var file = fileInput[0];
-        var xhttp = new XMLHttpRequest();
+        let file = fileInput[0];
+        let xhttp = new XMLHttpRequest();
         xhttp.onreadystatechange = function() {
             if (xhttp.readyState == 4) {
                 if (xhttp.status == 200) {
@@ -47,8 +47,8 @@ function upload()
 
 function _create_element(tag, content, attrs)
 {
-    var div = document.createElement(tag);
-    for (var attr in attrs) {
+    let div = document.createElement(tag);
+    for (let attr in attrs) {
         div.setAttribute(attr, attrs[attr]);
     }
     if (content != null) {
@@ -66,15 +66,15 @@ function _render_keymap(layout_div, name, keymap)
 {
     layout_div.append(_create_div(name, {"class" : "title"}));
     
-    var render_key = function(key, index, arr) {
+    let render_key = function(key, index, arr) {
         layout_div.append(_create_div(key, {"class" : "keystroke"}));
     }
 
-    var render_row = function(row, index, arr) {
+    let render_row = function(row, index, arr) {
         // render row here
         row.forEach(render_key);
         layout_div.append(_create_element("br", null, {}));
-    };
+    }
     keymap.forEach(render_row);
 }
 
@@ -82,21 +82,21 @@ function _render_status_line(status_div, status_json)
 {
     status_div.append(_create_div("设备状态", {"class" : "title"}));
 
-    for (var item in status_json) {
+    for (let item in status_json) {
         status_div.append(_create_div(item + ":" + status_json[item], {"class" : "status-item"}));
     }
 }
 
 function render_status_line()
 {
-    var status_path = "/api/device-status";
+    let status_path = "/api/device-status";
 
-    var xhttp = new XMLHttpRequest();
+    let xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function() {
         if (xhttp.readyState == 4) {
             if (xhttp.status == 200) {
-                var status_div = document.getElementById("status_line");
-                var status_json = JSON.parse(xhttp.responseText);
+                let status_div = document.getElementById("status_line");
+                let status_json = JSON.parse(xhttp.responseText);
                 _render_status_line(status_div, status_json);
             } else {
                 _handle_server_error(xhttp);
@@ -110,16 +110,16 @@ function render_status_line()
 
 function render_layouts()
 {
-    var layouts_path = "/api/layouts";
+    let layouts_path = "/api/layouts";
 
-    var xhttp = new XMLHttpRequest();
+    let xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function() {
         if (xhttp.readyState == 4) {
             if (xhttp.status == 200) {
-                var layout_div = document.getElementById("key_layouts");
-                var layout_json = JSON.parse(xhttp.responseText);
-                var keymap = layout_json["layouts"];
-                for (var layer in keymap) {
+                let layout_div = document.getElementById("key_layouts");
+                let layout_json = JSON.parse(xhttp.responseText);
+                let keymap = layout_json["layouts"];
+                for (let layer in keymap) {
                     _render_keymap(layout_div, layer, keymap[layer]);
                 }
             } else {
