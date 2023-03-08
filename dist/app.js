@@ -68,22 +68,57 @@ function _create_div(content, attrs)
 
 function _keystroke_clicked(event)
 {
-    
+    let target_div = event.target;
+
+    let select = _create_element("select", null, {"class" : "keystroke"});
+    let add_option = function(opt, index, arr) {
+        let option = _create_element("option", opt, {});
+        select.append(option);
+    }
+    keycode_array.forEach(add_option);
+
+    let layer_name = target_div.getAttribute("layer-name");
+    let i = parseInt(target_div.getAttribute("row"));
+    let j = parseInt(target_div.getAttribute("col"));
+
+    let focus_out = function(event) {
+        select.replaceWith(target_div);
+    }
+
+    let selected = function(event) {
+        if (keymap_layouts[layer_name][i][j] != select.selectedIndex) {
+            keymap_layouts[layer_name][i][j] = select.selectedIndex;
+            target_div.innerHTML = keycode_array[select.selectedIndex];
+            keymap_changed[layer_name][i][j] = true;
+        }
+    }
+    select.addEventListener("focusout", focus_out);
+    select.addEventListener("change", selected);
+
+    target_div.replaceWith(select);
+    select.selectedIndex = keymap_layouts[layer_name][i][j];
+    select.focus();
 }
 
 function _render_keymap(layout_div, name, keymap)
 {
     keymap_layouts[name] = keymap;
-    keymap_changed[name] = false;
+    keymap_changed[name] = new Array(keymap.length);
+    for (let idx = 0; idx < keymap.length; idx += 1) {
+        keymap_changed[name][idx] = new Array(keymap[idx].length);
+        keymap_changed[name][idx].fill(false);
+    }
     
     layout_div.append(_create_div(name, {"class" : "title"}));
     
-    let render_key = function(key, index, arr) {
-        layout_div.append(_create_div(keycode_array[key], {"class" : "keystroke"}));
-    }
-
-    let render_row = function(row, index, arr) {
+    let render_row = function(row, i, rows) {
         // render row here
+        let render_key = function(key, j, row) {
+            let key_div = _create_div(keycode_array[key], {"class" : "keystroke", "layer-name" : name, "row" : i, "col" : j});
+            key_div.addEventListener("click", _keystroke_clicked);
+            layout_div.append(key_div);
+        }
+
         row.forEach(render_key);
         layout_div.append(_create_element("br", null, {}));
     }
@@ -164,5 +199,78 @@ function render_layouts()
 
     xhttp.open("GET", layouts_path, true);
     xhttp.send();
+}
+
+function _update_keymap_layer(layer_name)
+{
+    let update_arr = [];
+    let keycodes = [];
+    let col_size = keymap_changed[layer_name][0].length;
+
+    let visit_row = function(row, i, arr) {
+        let visit_col = function(changed, j, arr) {
+            if (changed) {
+                update_arr.push(i * col_size + j);
+                keycodes.push(keymap_layouts[layer_name][i][j]);
+            }
+        }
+        row.forEach(visit_col);
+    }
+
+    keymap_changed[layer_name].forEach(visit_row);
+
+    if (update_arr.length == 0) {
+        return;
+    }
+
+    let update_path = "/api/keymap";
+
+    let xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (xhttp.readyState == 4) {
+            if (xhttp.status == 200) {
+                document.getElementById("button_ok").disabled = false;
+            } else {
+                _handle_server_error(xhttp);
+            }
+        }
+    }
+
+    document.getElementById("button_ok").disabled = true;
+
+    xhttp.open("PUT", update_path, true);
+    xhttp.setRequestHeader("Content-Type", "application/json");
+    let data = JSON.stringify({"layer" : layer_name, "positions" : update_arr, "keycodes" : keycodes});
+    xhttp.send(data);
+}
+
+function update_keymap()
+{
+    for (let layer_name in keymap_changed) {
+        _update_keymap_layer(layer_name);
+    }
+}
+
+function restore_default_keymap()
+{
+    let reset_path = "/api/keymap";
+
+    let xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (xhttp.readyState == 4) {
+            if (xhttp.status == 200) {
+                location.reload();
+            } else {
+                _handle_server_error(xhttp);
+            }
+        }
+    }
+
+    document.getElementById("button_reset").disabled = true;
+
+    xhttp.open("POST", reset_path, true);
+    xhttp.setRequestHeader("Content-Type", "application/json");
+    let data = JSON.stringify({"positions" : [], "keycodes" : []});
+    xhttp.send(data);
 }
 

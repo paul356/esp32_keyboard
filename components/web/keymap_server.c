@@ -199,11 +199,18 @@ static esp_err_t update_keymap(httpd_req_t* req)
     memcpy(temp_layer, keymaps[layer_index], sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
     for(uint16_t i = 0; i < cJSON_GetArraySize(positions); ++i){
         uint16_t pos = (uint16_t)cJSON_GetArrayItem(positions, i)->valueint;
-        const char* keyname = cJSON_GetArrayItem(keycodes, i)->valuestring;
-        int keycode = GetKeyCodeWithName(keyname);
-        ESP_LOGI(TAG, "PUT: pos = '%d', keycode = '%d'", pos, keycode);
-        if(keycode < 0) continue; // ignore invalid keycode
-        ESP_LOGI(TAG, "PUT: keycode = '%d' -> '%d'", temp_layer[pos], keycode);
+        uint16_t keycode = (uint16_t)cJSON_GetArrayItem(keycodes, i)->valueint;
+        ESP_LOGI(TAG, "%s: pos = '%hu', keycode = '%hu'", __FUNCTION__, pos, keycode);
+
+        if (pos >= MATRIX_ROWS * MATRIX_COLS) {
+            ESP_LOGE(TAG, "%s: invalid position %hu", __FUNCTION__, pos);
+            continue;
+        } else if (GetKeyCodeName(keycode) == NULL) {
+            ESP_LOGE(TAG, "%s: invalid keycode %hu", __FUNCTION__, keycode);
+            continue;
+        }
+
+        ESP_LOGI(TAG, "%s: keycode = '%hu' -> '%hu'", __FUNCTION__, temp_layer[pos], keycode);
         temp_layer[pos] = keycode;
     }
 
