@@ -44,7 +44,6 @@
 #endif
 #include "debug.h"
 
-extern "C" {
 //HID Ble functions
 //#include "HID_kbdmousejoystick.h"
 #include "hal_ble.h"
@@ -61,7 +60,6 @@ extern "C" {
 extern esp_err_t start_file_server();
 extern void wifi_init_softap(void);
 extern void rtc_matrix_deinit(void);
-}
 
 #define KEY_REPORT_TAG "KEY_REPORT"
 #define SYSTEM_REPORT_TAG "KEY_REPORT"
@@ -213,7 +211,7 @@ static void enable_usb_hid(void)
     debug_keyboard = false;
 }
 
-extern "C" void app_main()
+void app_main()
 {
     esp_err_t ret;
     esp_log_level_set("*", ESP_LOG_INFO);
