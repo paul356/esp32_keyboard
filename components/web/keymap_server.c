@@ -216,7 +216,7 @@ static esp_err_t update_keymap(httpd_req_t* req)
 
     // save layout
     memcpy((void*)(&keymaps[layer_index][0][0]), temp_layer, sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
-    nvs_write_layout(temp_layer, layer_name);
+    nvs_write_layout(layer_name, temp_layer);
 
     cJSON_Delete(root);
 

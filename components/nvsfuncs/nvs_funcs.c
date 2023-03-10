@@ -49,7 +49,7 @@ uint8_t layers_num=0;
 
 const uint16_t keymaps[LAYERS][MATRIX_ROWS][MATRIX_COLS];
 
-static esp_err_t nvs_read_blob(const char* namespace, const char* key, void* buffer, size_t* buf_size)
+esp_err_t nvs_read_blob(const char* namespace, const char* key, void* buffer, size_t* buf_size)
 {
 	ESP_LOGI(NVS_TAG,"Opening NVS handle for %s", namespace);
     nvs_handle handle;
@@ -83,7 +83,7 @@ void nvs_read_layout(const char* layout_name, uint16_t buffer[MATRIX_ROWS*MATRIX
     }
 }
 
-static esp_err_t nvs_write_blob(const char* namespace, const char* key, void* buffer, size_t buf_size)
+esp_err_t nvs_write_blob(const char* namespace, const char* key, void* buffer, size_t buf_size)
 {
 	ESP_LOGI(NVS_TAG,"Opening NVS handle");
     nvs_handle handle;
@@ -117,7 +117,7 @@ static void nvs_write_layout_matrix(uint16_t layout[MATRIX_ROWS * MATRIX_COLS], 
 }
 
 //add or overwrite a keymap to the nvs, also take care of layers_num, layer_names_arr
-void nvs_write_layout(uint16_t layout[MATRIX_ROWS * MATRIX_COLS], const char* layout_name){
+void nvs_write_layout(const char* layout_name, uint16_t layout[MATRIX_ROWS * MATRIX_COLS]){
 
 	ESP_LOGI(NVS_TAG,"Adding/Modifying Layout");
 	uint8_t FOUND_MATCH = 0;
@@ -268,7 +268,7 @@ void nvs_write_keymap_cfg(uint8_t layers, char **layer_names_arr){
 	free(layer_names);
 }
 
-void nvs_store_layouts(void)
+void nvs_save_layouts(void)
 {
     ESP_LOGI(NVS_TAG, "Storing layouts");
 
@@ -298,7 +298,7 @@ esp_err_t nvs_reset_layouts(void)
 
     // layout is copy from default, save these configs
     layers_num = LAYERS;
-    nvs_store_layouts();
+    nvs_save_layouts();
     
     return ESP_OK;
 }

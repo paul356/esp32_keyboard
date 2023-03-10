@@ -24,20 +24,34 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
     }
 }
 
-void wifi_init_softap(void)
+esp_err_t wifi_init_softap(void)
 {
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    esp_err_t ret = esp_netif_init();
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    
+    ret = esp_event_loop_create_default();
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
     esp_netif_create_default_wifi_ap();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    ret = esp_wifi_init(&cfg);
+    if (ret != ESP_OK) {
+        return ret;
+    }
 
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
-                                                        ESP_EVENT_ANY_ID,
-                                                        &wifi_event_handler,
-                                                        NULL,
-                                                        NULL));
+    ret = esp_event_handler_instance_register(WIFI_EVENT,
+                                              ESP_EVENT_ANY_ID,
+                                              &wifi_event_handler,
+                                              NULL,
+                                              NULL);
+    if (ret != ESP_OK) {
+        return ret;
+    }
 
     wifi_config_t wifi_config = {
         .ap = {
@@ -53,10 +67,20 @@ void wifi_init_softap(void)
         wifi_config.ap.authmode = WIFI_AUTH_OPEN;
     }
 
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
-    ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
-    ESP_ERROR_CHECK(esp_wifi_start());
+    ret = esp_wifi_set_mode(WIFI_MODE_AP);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    ret = esp_wifi_set_config(WIFI_IF_AP, &wifi_config);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    ret = esp_wifi_start();
+    if (ret != ESP_OK) {
+        return ret;
+    }
 
     ESP_LOGI(TAG, "wifi_init_softap finished. SSID:%s password:%s channel:%d",
              EXAMPLE_ESP_WIFI_SSID, EXAMPLE_ESP_WIFI_PASS, EXAMPLE_ESP_WIFI_CHANNEL);
+    return ESP_OK;
 }

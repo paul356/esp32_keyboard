@@ -4,3 +4,7 @@ cmake-*
 .idea/
 sdkconfig.old
 node_modules
+*~
+*#
+.#*
+cscope.*
