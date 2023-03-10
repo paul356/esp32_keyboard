@@ -1,52 +1,6 @@
 #ifndef KEYBOARD_CONFIG_H
 #define KEYBOARD_CONFIG_H
 
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <string.h>
-#include <inttypes.h>
-#include "driver/gpio.h"
-#include "driver/touch_pad.h"
-#include "driver/adc.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/event_groups.h"
-
-#define MODULE_ID "LOLIN 32"
-#define GATTS_TAG "MK32 V3.1" // The device's name
-#define MAX_BT_DEVICENAME_LENGTH 40
-
-#define MASTER  // undefine if you are not flashing the main controller
-//#define SPLIT_MASTER	 // undefine if keyboard is not split and master
-//#define SLAVE	 // undefine if keyboard is master
-
-//#define NKRO // does not work on Android and iOS!,  we can get 18KRO on those
-
-//Encoder definitions
-//#define R_ENCODER // undefine if no rotary encoder is used
-//#define R_ENCODER_SLAVE // undefine if no rotary encoder is used on slave pad
-#define ENCODER_A_PIN GPIO_NUM_17 // encoder phase A pin
-#define ENCODER_B_PIN GPIO_NUM_34// encoder phase B pin
-#define ENCODER_S_PIN GPIO_NUM_16// encoder switch pin
-
-//OLED Parameters
-//#define OLED_ENABLE //undefine if no oled is used
-#define ROTATION DEG270
-#define OLED_SDA_PIN GPIO_NUM_35
-#define OLED_SCL_PIN GPIO_NUM_36
-
-/*Battery monitoring
- * Please read check battery_monitor.h for resistor values before applying
- * use ADC1 only,  */
-
-//#define BATT_STAT //define to enable battery monitoring
-#define BATT_PIN ADC1_CHANNEL_7 //gpio pin 35, refer to the esp32 before modifying
-
-//deep sleep parameters, mind that reconnecting after deep sleep might take a minute or two
-//#define SLEEP_MINS 45 // undefine if you do not need deep sleep, otherwise define number of minutes for deepsleep
-
 /*
  *---------------------------- Everything below here should not be modified for standard usage----------------------
  *
@@ -60,15 +14,6 @@
 
 #define LAYERS 3
 #define MAX_LAYOUT_NAME_LENGTH 15
-
-typedef struct config_data {
-	char bt_device_name[MAX_BT_DEVICENAME_LENGTH];
-} config_data_t;
-
-extern uint8_t current_layout;
-extern uint8_t curr_led;
-
-extern TaskHandle_t xKeyreportTask;
 
 #endif
 //

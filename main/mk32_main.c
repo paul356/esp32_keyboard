@@ -42,6 +42,7 @@
 #if CONFIG_TINYUSB_CDC_ENABLED
 #include "tusb_cdc_acm.h"
 #endif
+#include "port_mgmt.h"
 #include "debug.h"
 
 //HID Ble functions
@@ -67,19 +68,9 @@ extern void rtc_matrix_deinit(void);
 #define USEC_TO_SEC 1000000
 #define SEC_TO_MIN 60
 #define TAG "main"
+#define KEYBOARD_TASK_PERIOD 5000 // 5ms
 
 bool DEEP_SLEEP = true; // flag to check if we need to go to deep sleep
-
-TaskHandle_t xKeyreportTask;
-
-//How to handle key reports
-static void key_reports(void *pvParameters)
-{
-    while (1) {
-        keyboard_task();
-        wait_ms(5);
-    }
-}
 
 static void send_keys(void *pParam)
 {
@@ -211,6 +202,30 @@ static void enable_usb_hid(void)
     debug_keyboard = false;
 }
 
+//How to handle key reports
+static void keyboard_timer_func(void *pvParameters)
+{
+    keyboard_task();
+}
+
+void start_keyboard_timer()
+{
+    esp_timer_create_args_t timer_args = {&keyboard_timer_func, NULL, ESP_TIMER_TASK, "kb_task", true};
+    esp_timer_handle_t timer_handle = NULL;
+    
+    esp_err_t ret = esp_timer_create(&timer_args, &timer_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Create esp timer failed, ret=%d", ret);
+        return;
+    }
+
+    ret = esp_timer_start_periodic(timer_handle, KEYBOARD_TASK_PERIOD);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Start peroidic timer failed, ret=%d", ret);
+        return;
+    }
+}
+
 void app_main()
 {
     esp_err_t ret;
@@ -220,46 +235,42 @@ void app_main()
     //    pm_config.max_freq_mhz = 10;
     //    pm_config.min_freq_mhz = 10;
     //    esp_pm_configure(&pm_config);
-    
-    // set pin to gpio mode in case
-    matrix_setup();
-
-    matrix_init();
-    default_layer_set(0x1 << 0);
-
-    // Initialize NVS.
-    ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
-        ESP_ERROR_CHECK (nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-
-    wifi_init_softap();
-
-    //Loading layouts from nvs (if found)
-    nvs_load_layouts();
-    //activate keyboard BT stack
-    //halBLEInit(1, 1, 1, 0);
-    ESP_LOGI("BLE", "initialized");
-
-    // Start the keyboard Tasks
-    // Create the key scanning task on core 1 (otherwise it will crash)
-    xTaskCreatePinnedToCore(key_reports, "key report task", 8192,
-                            xKeyreportTask, configMAX_PRIORITIES, NULL, 1);
-    ESP_LOGI("Keyboard task", "initialized");
-
-#ifdef SLEEP_MINS
-    xTaskCreatePinnedToCore(deep_sleep, "deep sleep task", 4096, NULL,
-                            configMAX_PRIORITIES, NULL, 1);
-    ESP_LOGI("Sleep", "initialized");
-#endif
 
     (void)register_keyboard_reporter();
     enable_usb_hid();
+
+    bool keyboard_inited = false;
+    while (true) {
+        if (tud_ready() && !keyboard_inited) {
+            matrix_setup();
+            matrix_init();
+            default_layer_set(0x1);
+
+            // Initialize NVS.
+            ret = nvs_flash_init();
+            if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
+                ESP_ERROR_CHECK (nvs_flash_erase());
+                ret = nvs_flash_init();
+            }
+            ESP_ERROR_CHECK(ret);
+
+            //Loading layouts from nvs (if found)
+            nvs_load_layouts();
+
+            start_keyboard_timer();
+
+            ESP_ERROR_CHECK(start_file_server());
+
+            keyboard_inited = true;
+        }
+
+        if (keyboard_inited) {
+            ESP_LOGI("MAIN", "MAIN finished...");
+            vTaskDelay(5000 / portTICK_PERIOD_MS);
+        } else {
+            vTaskDelay(5 / portTICK_PERIOD_MS);
+        }
+    }
+    
     //xTaskCreatePinnedToCore(send_keys, "period send key", 1024, NULL, configMAX_PRIORITIES, NULL, 1);
-
-    ESP_ERROR_CHECK(start_file_server());
-
-    ESP_LOGI("MAIN", "MAIN finished...");
 }

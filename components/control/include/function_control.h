@@ -1,9 +1,8 @@
 #ifndef __FUNCTION_CONTROL_H__
 #define __FUNCTION_CONTROL_H__
 
+#include <stdbool.h>
 #include "esp_err.h"
-
-typedef _Bool bool;
 
 esp_err_t toggle_wifi_state(bool enabled);
 bool is_wifi_enabled();
