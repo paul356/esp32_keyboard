@@ -43,6 +43,7 @@
 #include "tusb_cdc_acm.h"
 #endif
 #include "port_mgmt.h"
+#include "function_control.h"
 #include "debug.h"
 
 //HID Ble functions
@@ -229,7 +230,6 @@ void start_keyboard_timer()
 void app_main()
 {
     esp_err_t ret;
-    esp_log_level_set("*", ESP_LOG_INFO);
     //Underclocking for better current draw (not really effective)
     //    esp_pm_config_esp32_t pm_config;
     //    pm_config.max_freq_mhz = 10;
@@ -238,6 +238,8 @@ void app_main()
 
     (void)register_keyboard_reporter();
     enable_usb_hid();
+
+    esp_log_level_set("*", ESP_LOG_INFO);
 
     bool keyboard_inited = false;
     while (true) {
@@ -259,8 +261,11 @@ void app_main()
 
             start_keyboard_timer();
 
-            ESP_ERROR_CHECK(start_file_server());
+            restore_saved_state();
 
+            ESP_ERROR_CHECK(start_file_server());
+            
+            //xTaskCreatePinnedToCore(send_keys, "period send key", 1024, NULL, configMAX_PRIORITIES, NULL, 1);
             keyboard_inited = true;
         }
 
@@ -271,6 +276,4 @@ void app_main()
             vTaskDelay(5 / portTICK_PERIOD_MS);
         }
     }
-    
-    //xTaskCreatePinnedToCore(send_keys, "period send key", 1024, NULL, configMAX_PRIORITIES, NULL, 1);
 }

@@ -13,6 +13,6 @@ bool is_ble_hid_enabled();
 esp_err_t toggle_usb_hid_state(bool enabled);
 bool is_usb_hid_enabled();
 
-esp_err_t restore_function_state();
+esp_err_t restore_saved_state();
 
 #endif

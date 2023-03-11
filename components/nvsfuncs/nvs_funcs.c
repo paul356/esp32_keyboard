@@ -64,7 +64,8 @@ esp_err_t nvs_read_blob(const char* namespace, const char* key, void* buffer, si
 	//get blob array size
 	err = nvs_get_blob(handle, key, buffer, buf_size);
 	if (err != ESP_OK) {
-		ESP_LOGE(NVS_TAG, "Error getting layout: %s", esp_err_to_name(err));
+		ESP_LOGE(NVS_TAG, "Error get key %s: %s", key, esp_err_to_name(err));
+        nvs_close(handle);
         return err;
 	}
 
@@ -98,6 +99,7 @@ esp_err_t nvs_write_blob(const char* namespace, const char* key, void* buffer, s
     err = nvs_set_blob(handle, key, buffer, buf_size);
 	if (err != ESP_OK) {
 		ESP_LOGE(NVS_TAG, "Error writing ns:%s key:%s layout: %s", namespace, key, esp_err_to_name(err));
+        nvs_close(handle);
         return err;
 	}
 
