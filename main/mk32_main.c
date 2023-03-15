@@ -44,6 +44,7 @@
 #endif
 #include "port_mgmt.h"
 #include "function_control.h"
+#include "status_display.h"
 #include "debug.h"
 
 //HID Ble functions
@@ -243,7 +244,8 @@ void app_main()
 
     bool keyboard_inited = false;
     while (true) {
-        if (tud_ready() && !keyboard_inited) {
+        if (/*tud_ready() && */!keyboard_inited) {
+            vTaskDelay(5 / portTICK_PERIOD_MS);
             matrix_setup();
             matrix_init();
             default_layer_set(0x1);
@@ -264,6 +266,8 @@ void app_main()
             restore_saved_state();
 
             ESP_ERROR_CHECK(start_file_server());
+
+            (void)init_display();
             
             //xTaskCreatePinnedToCore(send_keys, "period send key", 1024, NULL, configMAX_PRIORITIES, NULL, 1);
             keyboard_inited = true;
@@ -271,6 +275,7 @@ void app_main()
 
         if (keyboard_inited) {
             ESP_LOGI("MAIN", "MAIN finished...");
+            update_display(0);
             vTaskDelay(5000 / portTICK_PERIOD_MS);
         } else {
             vTaskDelay(5 / portTICK_PERIOD_MS);
