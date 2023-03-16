@@ -34,7 +34,7 @@ static esp_err_t save_function_state(const char* state_prefix)
 static esp_err_t init_default_state()
 {
     esp_err_t ret;
-        function_control_t init_state = {true, false, true, true};
+    function_control_t init_state = {true, true, true, true};
 
     ret = toggle_ble_hid_internal(init_state.is_ble_hid_enabled);
     if (ret != ESP_OK) {
@@ -94,16 +94,18 @@ esp_err_t restore_saved_state()
     return ESP_OK;
 }
 
-#define CHECK_PERSISTED_FLAG()                                          \
-    do {                                                                \
-        if (!function_state.persisted) {                                \
-            esp_err_t ret = restore_saved_state();                      \
-            if (ret != ESP_OK) {                                        \
-                ESP_LOGE(TAG, "%s: Fail to get saved state, ret=%d", __FUNCTION__, ret); \
-                return ret;                                             \
-            }                                                           \
-        }                                                               \
-    } while (0)
+static esp_err_t CHECK_PERSISTED_FLAG(void)
+{
+    if (!function_state.persisted) {
+        esp_err_t ret = restore_saved_state();
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "%s: Fail to get saved state, ret=%d", __FUNCTION__, ret);
+            return ret;
+        }
+    }
+
+    return ESP_OK;
+}
     
 
 static esp_err_t toggle_wifi_internal(bool enabled)
@@ -123,14 +125,17 @@ static esp_err_t toggle_wifi_internal(bool enabled)
 
 esp_err_t toggle_wifi_state(bool enabled)
 {
-    CHECK_PERSISTED_FLAG();
+    esp_err_t ret = CHECK_PERSISTED_FLAG();
+    if (ret != ESP_OK) {
+        return ret;
+    }
 
     // Already enabled or disabled, just skip
     if (function_state.is_wifi_enabled == enabled) {
         return ESP_OK;
     }
 
-    esp_err_t ret = toggle_wifi_internal(enabled);
+    ret = toggle_wifi_internal(enabled);
     if (ret != ESP_OK) {
         return ret;
     }
@@ -138,6 +143,16 @@ esp_err_t toggle_wifi_state(bool enabled)
     function_state.is_wifi_enabled = enabled;
 
     return save_function_state("wifi");
+}
+
+bool is_wifi_enabled(void)
+{
+    esp_err_t ret = CHECK_PERSISTED_FLAG();
+    if (ret != ESP_OK) {
+        return false;
+    }
+
+    return function_state.is_wifi_enabled;
 }
 
 static esp_err_t toggle_ble_hid_internal(bool enabled)
@@ -157,14 +172,17 @@ static esp_err_t toggle_ble_hid_internal(bool enabled)
 
 esp_err_t toggle_ble_hid_state(bool enabled)
 {
-    CHECK_PERSISTED_FLAG();
+    esp_err_t ret = CHECK_PERSISTED_FLAG();
+    if (ret != ESP_OK) {
+        return ret;
+    }
 
     // Already enabled or disabled, just skip
     if (function_state.is_ble_hid_enabled == enabled) {
         return ESP_OK;
     }
 
-    esp_err_t ret = toggle_ble_hid_internal(enabled);
+    ret = toggle_ble_hid_internal(enabled);
     if (ret != ESP_OK) {
         return ret;
     }
@@ -174,9 +192,22 @@ esp_err_t toggle_ble_hid_state(bool enabled)
     return save_function_state("ble_hid");
 }
 
+bool is_ble_hid_enabled(void)
+{
+    esp_err_t ret = CHECK_PERSISTED_FLAG();
+    if (ret != ESP_OK) {
+        return false;
+    }
+
+    return function_state.is_ble_hid_enabled;    
+}
+
 esp_err_t toggle_usb_hid_state(bool enabled)
 {
-    CHECK_PERSISTED_FLAG();
+    esp_err_t ret = CHECK_PERSISTED_FLAG();
+    if (ret != ESP_OK) {
+        return ret;
+    }
 
     // Already enabled or disabled, just skip
     if (function_state.is_usb_hid_enabled == enabled) {
@@ -186,5 +217,15 @@ esp_err_t toggle_usb_hid_state(bool enabled)
     function_state.is_ble_hid_enabled = enabled;
 
     return save_function_state("ble_hid");
+}
+
+bool is_usb_hid_enabled(void)
+{
+    esp_err_t ret = CHECK_PERSISTED_FLAG();
+    if (ret != ESP_OK) {
+        return false;
+    }
+
+    return function_state.is_usb_hid_enabled;    
 }
 

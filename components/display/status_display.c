@@ -7,6 +7,7 @@
 #include "lvgl.h"
 #include "esp_lvgl_port.h"
 #include "key_definitions.h"
+#include "function_control.h"
 
 #define DISPLAY_PIN_I2C_SDA GPIO_NUM_35
 #define DISPLAY_PIN_I2C_SCL GPIO_NUM_36
@@ -22,12 +23,12 @@
 #define TAG "[DISPLAY]"
 
 enum DISPLAY_OBJ_E {
-    ICON_WIFI,
     ICON_BLE,
-    ICON_WEB,
-    LABEL_KEY,
+    ICON_USB,
+    ICON_WIFI,
     LINE_FRAME,
     LINE_HORI_BAR,
+    LABEL_KEY,
     DISPLAY_OBJ_MAX
 };
 
@@ -127,7 +128,9 @@ static bool notify_lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io, esp_lcd_
 static esp_err_t init_lvgl_port(void)
 {
     ESP_LOGI(TAG, "Initialize LVGL");
-    const lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+    lvgl_port_cfg_t lvgl_cfg = ESP_LVGL_PORT_INIT_CONFIG();
+    lvgl_cfg.task_priority = configMAX_PRIORITIES - 1;
+    lvgl_cfg.task_affinity = 1;
     lvgl_port_init(&lvgl_cfg);
 
     const lvgl_port_display_cfg_t disp_cfg = {
@@ -178,23 +181,29 @@ static void create_objects(void)
 
     lv_obj_t* scr = lv_disp_get_scr_act(s_disp);
 
-    lv_obj_t* wifi_img = lv_img_create(scr);
-    LV_IMG_DECLARE(wifi_icon);
-    lv_img_set_src(wifi_img, &wifi_icon);
-    lv_obj_align(wifi_img, LV_ALIGN_TOP_LEFT, 0+8, 0);
-    s_objects[ICON_WIFI] = wifi_img;
+    if (is_usb_hid_enabled()) {
+        lv_obj_t* usb_img = lv_img_create(scr);
+        LV_IMG_DECLARE(usb_icon);
+        lv_img_set_src(usb_img, &usb_icon);
+        lv_obj_align(usb_img, LV_ALIGN_TOP_LEFT, 8, 0);
+        s_objects[ICON_USB] = usb_img;
+    }
 
-    lv_obj_t* ble_icon = lv_img_create(scr);
-    LV_IMG_DECLARE(bluetooth_icon);
-    lv_img_set_src(ble_icon, &bluetooth_icon);
-    lv_obj_align(ble_icon, LV_ALIGN_TOP_LEFT, 48+8, 0);
-    s_objects[ICON_BLE] = ble_icon;
+    if (is_ble_hid_enabled()) {
+        lv_obj_t* ble_img = lv_img_create(scr);
+        LV_IMG_DECLARE(bluetooth_icon);
+        lv_img_set_src(ble_img, &bluetooth_icon);
+        lv_obj_align(ble_img, LV_ALIGN_TOP_LEFT, 48+8, 0);
+        s_objects[ICON_BLE] = ble_img;
+    }
 
-    lv_obj_t* web_icon = lv_img_create(scr);
-    //LV_IMG_DECLARE(bluetooth_icon);
-    lv_img_set_src(web_icon, &bluetooth_icon);
-    lv_obj_align(web_icon, LV_ALIGN_TOP_LEFT, 96+8, 0);
-    s_objects[ICON_WEB] = web_icon;
+    if (is_wifi_enabled()) {
+        lv_obj_t* wifi_img = lv_img_create(scr);
+        LV_IMG_DECLARE(wifi_icon);
+        lv_img_set_src(wifi_img, &wifi_icon);
+        lv_obj_align(wifi_img, LV_ALIGN_TOP_LEFT, 96, 0);
+        s_objects[ICON_WIFI] = wifi_img;
+    }
 
     lv_obj_t* frame_line = lv_line_create(scr);
     lv_line_set_points(frame_line, frame_pts, 5);
@@ -208,18 +217,19 @@ static void create_objects(void)
 
     lv_obj_t* key_label = lv_label_create(scr);
     lv_label_set_long_mode(key_label, LV_LABEL_LONG_DOT);
-    lv_label_set_text(key_label, "Key here");
+    lv_label_set_text(key_label, "____");
     lv_obj_align(key_label, LV_ALIGN_TOP_LEFT, 32, 40);
     s_objects[LABEL_KEY] = key_label;
 }
 
 void update_display(uint16_t last_key)
 {
-    if (!s_objects[LINE_FRAME]) {
-        create_objects();
-    }
-
-    if (last_key) {
-        lv_label_set_text(s_objects[LABEL_KEY], GetKeyCodeName(last_key));
-    }
+    if (s_disp) {
+        if (!s_objects[LINE_FRAME]) {
+            create_objects();
+        } else if (last_key) {
+            ESP_LOGI(TAG, "update LVGL label %hu", last_key);
+            lv_label_set_text(s_objects[LABEL_KEY], GetKeyCodeName(last_key));
+        }
+    }        
 }

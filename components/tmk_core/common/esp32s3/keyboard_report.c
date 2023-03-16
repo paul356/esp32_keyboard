@@ -5,6 +5,7 @@
 #include "tinyusb.h"
 #include "esp_log.h"
 #include "hal_ble.h"
+#include "status_display.h"
 
 static void send_keyboard_to_queue(report_keyboard_t*);
 static uint8_t keyboard_leds_status(void);
@@ -64,4 +65,6 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
     if (keyboard_q) {
         xQueueSend(keyboard_q, report_state, (TickType_t) 0);
     }
+
+    update_display(report_state[2]);
 }

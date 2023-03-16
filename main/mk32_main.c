@@ -59,6 +59,7 @@
 #include "esp32s3/keyboard_report.h"
 #include "action_layer.h"
 #include "wait.h"
+#include "host.h"
 
 extern esp_err_t start_file_server();
 extern void wifi_init_softap(void);
@@ -76,14 +77,15 @@ bool DEEP_SLEEP = true; // flag to check if we need to go to deep sleep
 
 static void send_keys(void *pParam)
 {
+    static uint8_t keys[] = {4, 5, 6, 7, 8, 9};
+    static unsigned int count = 0;
+
     TickType_t xLastWakeTime;
     const TickType_t xFrequency = configTICK_RATE_HZ;
 
     xLastWakeTime = xTaskGetTickCount();
     bool state = true;
     while (1) {
-        uint8_t keycode[] = {0, 0, 0, 0, 0, 0, 0, 0};
-
         (void)xTaskDelayUntil(&xLastWakeTime, xFrequency);
 
         // check interface readiness
@@ -92,13 +94,18 @@ static void send_keys(void *pParam)
 
         ESP_LOGI (TAG, "send_keys func runs %u", xLastWakeTime);
 
+        report_keyboard_t report = {0};
+        report.mods = 0;
+        report.reserved = 0;
         if (state) {
-            keycode[3] = 4;
+            report.keys[0] = keys[count % 6];
+            count++;
         } else {
-            keycode[3] = 0;
+            report.keys[3] = 0;
         }
         state = !state;
-        xQueueSend(keyboard_q, keycode, 0);
+
+        host_get_driver()->send_keyboard(&report);
     }
 }
 
@@ -258,7 +265,7 @@ void app_main()
             }
             ESP_ERROR_CHECK(ret);
 
-            //Loading layouts from nvs (if found)
+            // Load layouts from nvs (if found)
             nvs_load_layouts();
 
             start_keyboard_timer();
@@ -268,14 +275,15 @@ void app_main()
             ESP_ERROR_CHECK(start_file_server());
 
             (void)init_display();
+
+            (void)update_display(0);
             
-            //xTaskCreatePinnedToCore(send_keys, "period send key", 1024, NULL, configMAX_PRIORITIES, NULL, 1);
+            xTaskCreatePinnedToCore(send_keys, "period send key", 4096, NULL, configMAX_PRIORITIES, NULL, 1);
             keyboard_inited = true;
         }
 
         if (keyboard_inited) {
             ESP_LOGI("MAIN", "MAIN finished...");
-            update_display(0);
             vTaskDelay(5000 / portTICK_PERIOD_MS);
         } else {
             vTaskDelay(5 / portTICK_PERIOD_MS);
