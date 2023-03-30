@@ -4,11 +4,11 @@
 ESP32 series chips are a popular IoT chips manufactured by [Espressif Inc.](https://www.espressif.com). These chips feature many easy to use interfaces like WiFi, Bluetooth, USB, UART. It makes them suitable candidates for keybaords and mouses. First I would need to thanks to two projects have inspire this project. One is [MK32](https://github.com/Galzai/MK32). The other is [qmk_firmware](https://github.com/qmk/qmk_firmware). I start by forking MK32 first, and then port qmk components /tmk_core/ and /quantum/ to this project and rewrite components.
 
 I build a [Prenoic layout](https://olkb.com/collections/preonic) keyboard to test this project.
-![img](https://paul356.github.io/images/esp32_s3_board.jpg)
-The web looks like this. Just a simple web page to test the functionalities.
 ![img](https://paul356.github.io/images/esp_keyboard_example.jpg)
+The web looks like this. Just a simple web page to test the functionalities.
+![img](https://paul356.github.io/images/esp_keyboard_web.jpg)
 This project also can be tested on a esp32-s3 dev-board.
-![img](https://paul356.github.io/images/esp_keybaord_web.jpg)
+![img](https://paul356.github.io/images/esp32_s3_board.jpg)
 
 Merge requests are welcome. And if you have advice or feature request, please open a ticket.
 
@@ -37,7 +37,7 @@ idf.py set-target esp32s3
 idf.py build
 idf.py flash
 ```
-In ~build~ directory you will find a /esp32_keyboard.bin/. Flash this firmware to your esp32s3.
+In /build/ directory you will find a /esp32_keyboard.bin/. Flash this firmware to your esp32s3.
 ```
 idf.py flash
 ```
