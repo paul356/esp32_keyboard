@@ -3,7 +3,7 @@
 ### Introduction
 ESP32 series chips are a popular IoT chips manufactured by [Espressif Inc.](https://www.espressif.com). These chips feature many easy to use interfaces like WiFi, Bluetooth, USB, UART. It makes them suitable candidates for keybaords and mouses. First I would need to thanks to two projects have inspire this project. One is [MK32](https://github.com/Galzai/MK32). The other is [qmk_firmware](https://github.com/qmk/qmk_firmware). I start by forking MK32 first, and then port qmk components `tmk_core` and `quantum` to this project and rewrite components.
 
-I build a [Prenoic layout](https://olkb.com/collections/preonic) keyboard to test this project.
+I build a [Prenoic](https://olkb.com/collections/preonic) keyboard to test this project.
 
 ![img](https://paul356.github.io/images/esp_keyboard_example.jpg)
 
@@ -29,10 +29,10 @@ Until now (2023/03/30) I have finished or barely finished these functionalities.
 - I2C Display Support (LED controller 1306)
 
 ### Planned Features
-- Beautify Web GUI (Employ [numl.design](https://numl.design/))
+- Beautify Web GUI (use [numl.design](https://numl.design/))
 - Macro Definition Trough Web
-- Key Recording (Controversial Feature)
-- Power Resume (Can't wake up from USB suspend now)
+- Key Recording
+- Power Resume (esp32_keyboard can't wake up from USB suspend by now)
 
 ### Build Process
 It requires [a modified esp-idf version 4.4.4](https://github.com/paul356/esp-idf) to build this project. The changes are adding tinyusb HID support, esp_lvgl_port and lvgl 8.3. Please note Epressif has removed tinyusb from esp-idf 5.0. So esp-idf 5.0 can't be used. After you have esp-idf [installed and configured](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#manual-installation), run following commands.
