@@ -252,7 +252,7 @@ void app_main()
     bool keyboard_inited = false;
     while (true) {
         if (/*tud_ready() && */!keyboard_inited) {
-            vTaskDelay(5 / portTICK_PERIOD_MS);
+            vTaskDelay(500 / portTICK_PERIOD_MS);
             matrix_setup();
             matrix_init();
             default_layer_set(0x1);
@@ -278,7 +278,7 @@ void app_main()
 
             (void)update_display(0);
             
-            xTaskCreatePinnedToCore(send_keys, "period send key", 4096, NULL, configMAX_PRIORITIES, NULL, 1);
+            //xTaskCreatePinnedToCore(send_keys, "period send key", 4096, NULL, configMAX_PRIORITIES, NULL, 1);
             keyboard_inited = true;
         }
 

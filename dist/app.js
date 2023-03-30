@@ -18,7 +18,7 @@ function _handle_server_error(xhttp)
     }
 }
 
-function upload()
+function upload_bin()
 {
     document.getElementById("upload_resp").innerHTML = "";
 
