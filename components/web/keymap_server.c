@@ -14,6 +14,18 @@
 
 static time_t s_init_version;
 
+static int s_suspend_state;
+
+void tud_suspend_cb(void)
+{
+    s_suspend_state = 1;
+}
+
+void tud_resume_cb(void)
+{
+    s_suspend_state = 3;
+}
+
 static esp_err_t serve_static_files(httpd_req_t* req)
 {
     extern const unsigned char index_html_start[] asm("_binary_index_html_start");
@@ -369,9 +381,14 @@ static esp_err_t get_device_status(httpd_req_t* req)
     char str_buf[25];
     snprintf(str_buf, sizeof(str_buf), "%lu", s_init_version);
     // start_time
-    httpd_resp_sendstr_chunk(req, "\"init_version\" : \"");
+    httpd_resp_sendstr_chunk(req, "\"init_version\" : ");
     httpd_resp_sendstr_chunk(req, str_buf);
-    httpd_resp_sendstr_chunk(req, "\"\n");
+    httpd_resp_sendstr_chunk(req, ",\n");
+
+    snprintf(str_buf, sizeof(str_buf), "%u", s_suspend_state);
+    httpd_resp_sendstr_chunk(req, "\"suspend_state\" : ");
+    httpd_resp_sendstr_chunk(req, str_buf);
+    httpd_resp_sendstr_chunk(req, "\n");
 
     httpd_resp_sendstr_chunk(req, "}");
     httpd_resp_sendstr_chunk(req, NULL);
