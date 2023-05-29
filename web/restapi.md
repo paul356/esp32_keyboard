@@ -66,3 +66,17 @@
     "start_time" : "start date"
 }
 ```
+
+6. 修改键盘功能开关
+* Method: PUT
+* URI: /api/switches/(BLE|WiFi|USB)
+* Input:
+```
+{
+    "enabled" : true|false,
+    "ssid" : "ssid id",
+    "passwd" : "passwd",
+    "name" : "ble name"
+}
+```
+* Output: none

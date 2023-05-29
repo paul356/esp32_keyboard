@@ -84,7 +84,7 @@ void nvs_read_layout(const char* layout_name, uint16_t buffer[MATRIX_ROWS*MATRIX
     }
 }
 
-esp_err_t nvs_write_blob(const char* namespace, const char* key, void* buffer, size_t buf_size)
+esp_err_t nvs_write_blob(const char* namespace, const char* key, const void* buffer, size_t buf_size)
 {
 	ESP_LOGI(NVS_TAG,"Opening NVS handle");
     nvs_handle handle;

@@ -181,7 +181,7 @@ static void create_objects(void)
 
     lv_obj_t* scr = lv_disp_get_scr_act(s_disp);
 
-    if (is_usb_hid_enabled()) {
+    if (is_usb_enabled()) {
         lv_obj_t* usb_img = lv_img_create(scr);
         LV_IMG_DECLARE(usb_icon);
         lv_img_set_src(usb_img, &usb_icon);
@@ -189,7 +189,7 @@ static void create_objects(void)
         s_objects[ICON_USB] = usb_img;
     }
 
-    if (is_ble_hid_enabled()) {
+    if (is_ble_enabled()) {
         lv_obj_t* ble_img = lv_img_create(scr);
         LV_IMG_DECLARE(bluetooth_icon);
         lv_img_set_src(ble_img, &bluetooth_icon);

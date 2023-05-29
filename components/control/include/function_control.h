@@ -4,14 +4,14 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
-esp_err_t toggle_wifi_state(bool enabled);
+esp_err_t update_wifi_state(bool enabled, const char* ssid, const char* passwd);
 bool is_wifi_enabled();
 
-esp_err_t toggle_ble_hid_state(bool enabled);
-bool is_ble_hid_enabled();
+esp_err_t update_ble_state(bool enabled, const char* name);
+bool is_ble_enabled();
 
-esp_err_t toggle_usb_hid_state(bool enabled);
-bool is_usb_hid_enabled();
+esp_err_t update_usb_state(bool enabled);
+bool is_usb_enabled();
 
 esp_err_t restore_saved_state();
 
