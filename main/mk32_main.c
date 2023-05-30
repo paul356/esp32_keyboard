@@ -270,7 +270,7 @@ void app_main()
 
             start_keyboard_timer();
 
-            restore_saved_state();
+            ESP_ERROR_CHECK(restore_saved_state());
 
             ESP_ERROR_CHECK(start_file_server());
 

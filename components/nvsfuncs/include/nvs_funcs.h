@@ -23,7 +23,7 @@ extern const uint16_t _LAYERS[LAYERS][MATRIX_ROWS][MATRIX_COLS];
 
 esp_err_t nvs_read_blob(const char* namespace, const char* key, void* buffer, size_t* buf_size);
 
-esp_err_t nvs_write_blob(const char* namespace, const char* key, void* buffer, size_t buf_size);
+esp_err_t nvs_write_blob(const char* namespace, const char* key, const void* buffer, size_t buf_size);
 
 /*
  * @read a layout from nvs

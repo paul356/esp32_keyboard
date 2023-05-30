@@ -2,6 +2,7 @@
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_random.h"
+#include "esp_check.h"
 #include "keyboard_config.h"
 #include "key_definitions.h"
 #include "nvs_keymaps.h"
@@ -9,10 +10,35 @@
 #include "cJSON.h"
 #include "keymap.h"
 #include "hal_ble.h"
+#include "function_control.h"
 
 #define TAG "[HTTPD]"
+#define ARRAY_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
 
 static time_t s_init_version;
+
+static esp_err_t parse_http_req(httpd_req_t* req, cJSON** root)
+{
+    size_t buf_len = req->content_len;
+    char* body = (char*)malloc(buf_len);
+    if (!body) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    int ret = httpd_req_recv(req, body, buf_len);
+    if (ret <= 0) {
+        free(body);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *root = cJSON_ParseWithLength(body, buf_len);
+    free(body);
+    if (!root) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    return ESP_OK;
+}
 
 static esp_err_t serve_static_files(httpd_req_t* req)
 {
@@ -132,7 +158,7 @@ static esp_err_t keycodes_json(httpd_req_t* req)
 }
 
 #define MAX_BUF_SIZE 1024
-char recv_buf[MAX_BUF_SIZE];
+static char recv_buf[MAX_BUF_SIZE];
 static esp_err_t update_keymap(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "text/plain");
@@ -283,7 +309,7 @@ static esp_err_t upload_bin_file(httpd_req_t* req)
 
     ESP_LOGI(TAG, "Starting OTA ...");
 
-    esp_partition_t* update_partition = NULL;
+    const esp_partition_t* update_partition = NULL;
 
     update_partition = esp_ota_get_next_update_partition(NULL);
     if (!update_partition) {
@@ -361,10 +387,11 @@ static esp_err_t get_device_status(httpd_req_t* req)
 
     // ble_state
     httpd_resp_sendstr_chunk(req, "\"ble_state\" : ");
-    httpd_resp_sendstr_chunk(req, isBLERunning() ? "true,\n" : "false,\n");
+    httpd_resp_sendstr_chunk(req, is_ble_enabled() ? "true,\n" : "false,\n");
 
     // usb_state
-    httpd_resp_sendstr_chunk(req, "\"usb_state\" : true,\n");
+    httpd_resp_sendstr_chunk(req, "\"usb_state\" : ");
+    httpd_resp_sendstr_chunk(req, is_usb_enabled() ? "true,\n" : "false,\n");    
 
     char str_buf[25];
     snprintf(str_buf, sizeof(str_buf), "%lu", s_init_version);
@@ -378,6 +405,104 @@ static esp_err_t get_device_status(httpd_req_t* req)
 
     return ESP_OK;
 }
+
+static esp_err_t modify_functions(httpd_req_t* req)
+{
+    const char* prefix = "/api/switches/";
+    const char* last_token = &req->uri[strlen(prefix)];
+    esp_err_t ret;
+
+    cJSON* root = NULL;
+    esp_err_t err = parse_http_req(req, &root);
+    if (err != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "fail to parse http request");
+        return err;
+    }
+
+    if (strcmp(last_token, "WiFi") == 0) {
+        cJSON_bool enabled = false;
+        const char* ssid = NULL;
+        const char* passwd = NULL;
+
+        cJSON* enabledItem = cJSON_GetObjectItem(root, "enabled");
+        if (enabledItem) {
+            enabled = cJSON_IsTrue(enabledItem);
+        }
+
+        cJSON* ssidItem = cJSON_GetObjectItem(root, "ssid");
+        if (ssidItem) {
+            if (!enabledItem) enabled = true;
+            ssid = cJSON_GetStringValue(ssidItem);
+        }
+
+        cJSON* passwdItem = cJSON_GetObjectItem(root, "passwd");
+        if (passwdItem) {
+            if (!enabledItem) enabled = true;
+            passwd = cJSON_GetStringValue(passwdItem);
+        }
+
+        if (enabledItem || ssidItem || passwdItem) {
+            ESP_GOTO_ON_ERROR(update_wifi_state(enabled, ssid, passwd), err_out, TAG, "fail to update wifi state");
+        }
+    } else if (strcmp(last_token, "BLE") == 0) {
+        cJSON_bool enabled = false;
+        const char* name = NULL;
+
+        cJSON* enabledItem = cJSON_GetObjectItem(root, "enabled");
+        if (enabledItem) {
+            enabled = cJSON_IsTrue(enabledItem);
+        }
+
+        cJSON* nameItem = cJSON_GetObjectItem(root, "name");
+        if (nameItem) {
+            if (!enabledItem) enabled = true;
+            name = cJSON_GetStringValue(nameItem);
+        }
+
+        if (enabledItem || nameItem) {
+            ESP_GOTO_ON_ERROR(update_ble_state(enabled, name), err_out, TAG, "fail to update ble state");
+        }
+    } else if (strcmp(last_token, "USB") == 0) {
+        cJSON_bool enabled = false;
+
+        cJSON* enabledItem = cJSON_GetObjectItem(root, "enabled");
+        if (enabledItem) {
+            enabled = cJSON_IsTrue(enabledItem);
+
+            ESP_GOTO_ON_ERROR(update_usb_state(enabled), err_out, TAG, "fail to update usb state");
+        }
+    } else {
+        ESP_LOGE(TAG, "unkown url %s", last_token);
+        ret = ESP_ERR_INVALID_ARG;
+        goto err_out;
+    }
+
+    cJSON_Delete(root);
+    httpd_resp_sendstr_chunk(req, NULL);    
+    return ESP_OK;
+
+err_out:
+    cJSON_Delete(root);
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Oops. Something is wrong.");
+    return ret;
+}
+
+static struct {
+    const char*    uri;
+    httpd_method_t method;
+    esp_err_t (*handler)(httpd_req_t* req);
+    void*          user_ctx;
+} handler_uris[] = {
+    /* URI handler for getting uploaded files */
+    {"/api/layouts",           HTTP_GET,      layouts_json,           NULL},
+    {"/api/keycodes",          HTTP_GET,      keycodes_json,          NULL},
+    {"/api/keymap",            HTTP_PUT,      update_keymap,          NULL},
+    {"/api/keymap",            HTTP_POST,     reset_keymap,           NULL},
+    {"/api/device-status",     HTTP_GET,      get_device_status,      NULL},
+    {"/upload/bin_file",       HTTP_POST,     upload_bin_file,        NULL},
+    {"/api/switches/*",        HTTP_PUT,      modify_functions,       NULL},
+    {"/*",                     HTTP_GET,      serve_static_files,     NULL},
+};
 
 esp_err_t start_file_server()
 {
@@ -395,73 +520,15 @@ esp_err_t start_file_server()
         return ESP_FAIL;
     }
 
-    /* URI handler for getting uploaded files */
-    httpd_uri_t layouts_uri = {
-        .uri       = "/api/layouts",  // return keyboard layouts
-        .method    = HTTP_GET,
-        .handler   = layouts_json,
-        .user_ctx  = NULL    // Pass server data as context
-    };
-
-    httpd_register_uri_handler(server, &layouts_uri);
-
-    httpd_uri_t keycodes_uri = {
-        .uri       = "/api/keycodes",  // return valid keycodes
-        .method    = HTTP_GET,
-        .handler   = keycodes_json,
-        .user_ctx  = NULL    // Pass server data as context
-    };
-
-    httpd_register_uri_handler(server, &keycodes_uri);
-
-    /* URI handler for getting uploaded files */
-    httpd_uri_t update_uri = {
-        .uri       = "/api/keymap",  // update keymap of specified keys
-        .method    = HTTP_PUT,
-        .handler   = update_keymap,
-        .user_ctx  = NULL    // Pass server data as context
-    };
-
-    httpd_register_uri_handler(server, &update_uri);
-
-    /* URI handler for getting uploaded files */
-    httpd_uri_t reset_uri = {
-        .uri       = "/api/keymap",  // reset keymap to default value
-        .method    = HTTP_POST,
-        .handler   = reset_keymap,
-        .user_ctx  = NULL    // Pass server data as context
-    };
-
-    httpd_register_uri_handler(server, &reset_uri);
-
-    /* keyboard status query api */
-    httpd_uri_t status_uri = {
-        .uri       = "/api/device-status",
-        .method    = HTTP_GET,
-        .handler   = get_device_status,
-        .user_ctx  = NULL
-    };
-
-    httpd_register_uri_handler(server, &status_uri);
-
-    httpd_uri_t upload_uri = {
-        .uri       = "/upload/bin_file",
-        .method    = HTTP_POST,
-        .handler   = upload_bin_file,
-        .user_ctx  = NULL
-    };
-
-    httpd_register_uri_handler(server, &upload_uri);
-
-    /* URI handler for getting uploaded files */
-    httpd_uri_t get_uri = {
-        .uri       = "/*",  // Match all URIs of type /path/to/file
-        .method    = HTTP_GET,
-        .handler   = serve_static_files,
-        .user_ctx  = NULL    // Pass server data as context
-    };
-
-    httpd_register_uri_handler(server, &get_uri);
+    for (int i = 0; i < ARRAY_LEN(handler_uris); i++) {
+        httpd_uri_t uri = {
+            .uri      = handler_uris[i].uri,
+            .method   = handler_uris[i].method,
+            .handler  = handler_uris[i].handler,
+            .user_ctx = handler_uris[i].user_ctx
+        };
+        httpd_register_uri_handler(server, &uri);
+    }
 
     return ESP_OK;
 }

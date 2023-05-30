@@ -3,229 +3,283 @@
 #include "nvs_funcs.h"
 #include "nvs.h"
 #include "esp_log.h"
+#include "esp_random.h"
 #include "hal_ble.h"
 #include "wifi_ap.h"
 
-#define FUNCTION_CTRL_NAMESPACE "FUNC_CTRL"
 #define TAG "FUNC_CTRL"
+#define FUNCTION_CTRL_NAMESPACE "FUNC_CTRL"
 
-typedef struct _function_control_t {
-    bool is_usb_hid_enabled;
-    bool is_ble_hid_enabled;
-    bool is_wifi_enabled;
-    bool persisted; // false when program is inited
-} function_control_t;
+#define MAX_CONFIG_VALUE_LEN 16
+#define MAX_CONFIG_KEY_LEN 16
 
-static function_control_t function_state = {false, false, false, false};
+#define WIFI_SSID_INIT_TEMPLATE "KB-%u"
+#define WIFI_SSID_ID_MOD 1000
 
-static esp_err_t toggle_ble_hid_internal(bool enabled);
-static esp_err_t toggle_wifi_internal(bool enabled);
+#define BLE_NAME_INIT_TEMPLATE WIFI_SSID_INIT_TEMPLATE
+#define BLE_NAME_ID_MOD WIFI_SSID_ID_MOD
 
-static esp_err_t save_function_state(const char* state_prefix)
-{
-    esp_err_t ret = nvs_write_blob(FUNCTION_CTRL_NAMESPACE, FUNCTION_CTRL_NAMESPACE, &function_state, sizeof(function_control_t));
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Fail to save %s function state, ret=%d", state_prefix, ret);            
-    }
+#define ARRAY_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
 
-    return ret;    
+#define CONFIG_VALUE_GETTER_SETTER(function, item_name) \
+static esp_err_t load_##function##_##item_name(function_control_e funct, const char* name, control_state_t* config) \
+{ \
+    size_t len = sizeof(config->function.item_name); \
+    return load_config_value(funct, name, &(config->function.item_name), &len); \
+} \
+static esp_err_t save_##function##_##item_name(function_control_e funct, const char* name, const control_state_t* config) \
+{ \
+    return save_config_value(funct, name, &(config->function.item_name), sizeof(config->function.item_name)); \
 }
 
-static esp_err_t init_default_state()
+typedef enum _function_control_e {
+    WIFI,
+    BLE,
+    USB,
+    FUNCTION_BUTT
+} function_control_e;
+
+typedef union _control_state_t {
+    struct {
+        bool enabled;
+        char ssid[MAX_CONFIG_VALUE_LEN];
+        char passwd[MAX_CONFIG_VALUE_LEN];
+    } wifi;
+    struct {
+        bool enabled;
+        char name[MAX_CONFIG_VALUE_LEN];
+    } ble;
+    struct {
+        bool enabled;
+    } usb;
+} control_state_t;
+
+typedef esp_err_t (*read_item_func)(function_control_e function, const char* item_name, control_state_t* config);
+typedef esp_err_t (*write_item_func)(function_control_e function, const char* item_name, const control_state_t* config);
+typedef void (*default_value_func)(control_state_t* config);
+
+typedef struct _config_item_t {
+    const char *item_name;
+    read_item_func read_func;
+    write_item_func write_func;
+    default_value_func gen_default;
+} config_item_t;
+
+typedef struct _function_config_t {
+    int config_num;
+    const config_item_t* config_items;
+} function_config_t;
+
+static void set_default_wifi_enabled(control_state_t* config);
+static void set_default_wifi_ssid(control_state_t* config);
+static void set_default_wifi_passwd(control_state_t* config);
+static void set_default_ble_enabled(control_state_t* config);
+static void set_default_ble_name(control_state_t* config);
+static void set_default_usb_values(control_state_t* config);
+
+static esp_err_t load_config_value(function_control_e function, const char* item_name, void* config_value, size_t* len);
+static esp_err_t save_config_value(function_control_e function, const char* item_name, const void* config_value, size_t len);
+
+CONFIG_VALUE_GETTER_SETTER(wifi, enabled)
+CONFIG_VALUE_GETTER_SETTER(wifi, ssid)
+CONFIG_VALUE_GETTER_SETTER(wifi, passwd)
+CONFIG_VALUE_GETTER_SETTER(ble, enabled)
+CONFIG_VALUE_GETTER_SETTER(ble, name)
+CONFIG_VALUE_GETTER_SETTER(usb, enabled)
+
+static config_item_t wifi_config[] = {
+    {"enabled", &load_wifi_enabled, &save_wifi_enabled, set_default_wifi_enabled},
+    {"ssid",    &load_wifi_ssid,    &save_wifi_ssid,    set_default_wifi_ssid},
+    {"passwd",  &load_wifi_passwd,  &save_wifi_passwd,  set_default_wifi_passwd}
+};
+
+static config_item_t ble_config[] = {
+    {"enabled", &load_ble_enabled,  &save_ble_enabled, set_default_ble_enabled},
+    {"name",    &load_ble_name,     &save_ble_name,    set_default_ble_name}
+};
+
+static config_item_t usb_config[] = {
+    {"enabled", &load_usb_enabled,  &save_usb_enabled, set_default_usb_values}
+};
+
+static function_config_t function_config_entries[] = {
+    {
+        ARRAY_LEN(wifi_config), wifi_config
+    },
+    {
+        ARRAY_LEN(ble_config), ble_config
+    },
+    {
+        ARRAY_LEN(usb_config), usb_config
+    }
+};
+
+static control_state_t function_state;
+
+static const char* function_config_prefix[] = {"WIFI_", "BLE_", "USB_"};
+
+esp_err_t load_config_value(
+    function_control_e function,
+    const char* item_name,
+    void* config_value,
+    size_t* len)
 {
-    esp_err_t ret;
-    function_control_t init_state = {true, true, true, true};
+    char key[MAX_CONFIG_KEY_LEN];
 
-    ret = toggle_ble_hid_internal(init_state.is_ble_hid_enabled);
-    if (ret != ESP_OK) {
-        return ret;
-    }
+    snprintf(key, sizeof(key), "%s%s", function_config_prefix[function], item_name);
 
-    ret = toggle_wifi_internal(init_state.is_wifi_enabled);
-    if (ret != ESP_OK) {
-        return ret;
-    }
+    return nvs_read_blob(FUNCTION_CTRL_NAMESPACE, key, config_value, len);
+}
 
-    function_state = init_state;
-    ret = save_function_state(__FUNCTION__);
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "Fail to persist default function state to nvs storage");
+esp_err_t save_config_value(
+    function_control_e function,
+    const char* item_name,
+    const void* config_value,
+    size_t len)
+{
+    char key[MAX_CONFIG_KEY_LEN];
+
+    snprintf(key, sizeof(key), "%s%s", function_config_prefix[function], item_name);
+
+    return nvs_write_blob(FUNCTION_CTRL_NAMESPACE, key, config_value, len);
+}
+
+void set_default_wifi_enabled(control_state_t* state)
+{
+    state->wifi.enabled = true;
+}
+void set_default_wifi_ssid(control_state_t* state)
+{
+    snprintf(state->wifi.ssid, sizeof(state->wifi.ssid), WIFI_SSID_INIT_TEMPLATE, esp_random() % WIFI_SSID_ID_MOD);
+}
+void set_default_wifi_passwd(control_state_t* state)
+{
+    snprintf(state->wifi.passwd, sizeof(state->wifi.passwd), "%s", "1234567890");
+}
+
+void set_default_ble_enabled(control_state_t* state)
+{
+    state->ble.enabled = true;
+}
+void set_default_ble_name(control_state_t* state)
+{
+    snprintf(state->ble.name, sizeof(state->ble.name), BLE_NAME_INIT_TEMPLATE, esp_random() % BLE_NAME_ID_MOD);
+}
+
+void set_default_usb_values(control_state_t* state)
+{
+    state->usb.enabled = true;
+}
+
+static esp_err_t recover_persisted_config()
+{
+    for (int i = 0; i < ARRAY_LEN(function_config_entries); i++) {
+        for (int j = 0; j < function_config_entries[i].config_num; j++) {
+            const config_item_t* item = &(function_config_entries[i].config_items[j]);
+            const char* name = item->item_name;
+            esp_err_t err = item->read_func(i, name, &function_state);
+            if (err != ESP_OK && (err != ESP_ERR_NVS_NOT_FOUND || !item->gen_default)) {
+                return err;
+            } else if (err == ESP_ERR_NVS_NOT_FOUND) {
+                item->gen_default(&function_state);
+                item->write_func(i, name, &function_state);
+            }
+        }
     }
 
     return ESP_OK;
+}
+
+static esp_err_t update_persisted_config(function_control_e func)
+{
+    esp_err_t err = ESP_OK;
+
+    for (int i = 0; i < function_config_entries[func].config_num; i++) {
+        const config_item_t* item = &(function_config_entries[func].config_items[i]);
+        err = item->write_func(i, item->item_name, &function_state);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "fail to persist %s, err=%d", item->item_name, err);
+        }
+    }
+
+    return err;
 }
 
 esp_err_t restore_saved_state()
 {
-    // Check if it is already persisted
-    if (function_state.persisted) {
-        return ESP_OK;
-    }
-
-    function_control_t persisted_state;
-    size_t size = sizeof(function_control_t);
-    // Use namespace as KV key
-    esp_err_t ret = nvs_read_blob(FUNCTION_CTRL_NAMESPACE, FUNCTION_CTRL_NAMESPACE, &persisted_state, &size);
-    if (ret != ESP_OK && ret != ESP_ERR_NVS_NOT_FOUND) {
-        ESP_LOGE(TAG, "Fail to read blob %s, ret=%d", FUNCTION_CTRL_NAMESPACE, ret);
-        return ret;
-    } else if (ret == ESP_ERR_NVS_NOT_FOUND) {
-        // Use default value
-        return init_default_state();
-    }
-
-    ret = toggle_ble_hid_internal(persisted_state.is_ble_hid_enabled);
+    esp_err_t ret = recover_persisted_config();
     if (ret != ESP_OK) {
         return ret;
     }
 
-    ret = toggle_wifi_internal(persisted_state.is_wifi_enabled);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-
-    if (!persisted_state.persisted) {
-        ESP_LOGW(TAG, "Invalid \"persisted\" flag in nvs storage");
-        persisted_state.persisted = true;
-    }
-
-    function_state = persisted_state;
-
-    return ESP_OK;
-}
-
-static esp_err_t CHECK_PERSISTED_FLAG(void)
-{
-    if (!function_state.persisted) {
-        esp_err_t ret = restore_saved_state();
+    if (function_state.wifi.enabled) {
+        ret = wifi_init_softap(function_state.wifi.ssid, function_state.wifi.passwd);
         if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "%s: Fail to get saved state, ret=%d", __FUNCTION__, ret);
+            return ret;
+        }
+    }
+
+    if (function_state.ble.enabled) {
+        ret = halBLEInit(function_state.ble.name);
+        if (ret != ESP_OK) {
             return ret;
         }
     }
 
     return ESP_OK;
 }
-    
 
-static esp_err_t toggle_wifi_internal(bool enabled)
+esp_err_t update_wifi_state(bool enabled, const char* ssid, const char* passwd)
 {
+    esp_err_t err;
+    function_state.wifi.enabled = enabled;
+
+    if (ssid && strlen(ssid) > 0) {
+        snprintf(function_state.wifi.ssid, sizeof(function_state.wifi.ssid), "%s", ssid);
+    }
+
+    if (passwd && strlen(passwd) > 0) {
+        snprintf(function_state.wifi.passwd, sizeof(function_state.wifi.passwd), "%s", passwd);
+    }
+
     if (enabled) {
-        esp_err_t ret = wifi_init_softap();
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "%s: Fail to enable softap, ret=%d", __FUNCTION__, ret);
-            return ret;
-        }
+        err = wifi_update_softap(function_state.wifi.ssid, function_state.wifi.passwd);
     } else {
-        // TODO: add disable logic
+        err = wifi_stop_softap();
+    }
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "fail to %s wifi state, err=%d", enabled?"enable":"disable", err);
+        return err;
     }
 
-    return ESP_OK;
+    return update_persisted_config(WIFI);
 }
 
-esp_err_t toggle_wifi_state(bool enabled)
+esp_err_t update_ble_state(bool enabled, const char* name)
 {
-    esp_err_t ret = CHECK_PERSISTED_FLAG();
-    if (ret != ESP_OK) {
-        return ret;
-    }
+    // TODO: it is to be implemented.
+    return ESP_FAIL;
+}
 
-    // Already enabled or disabled, just skip
-    if (function_state.is_wifi_enabled == enabled) {
-        return ESP_OK;
-    }
+esp_err_t update_usb_state(bool enabled)
+{
+    function_state.usb.enabled = enabled;
 
-    ret = toggle_wifi_internal(enabled);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-
-    function_state.is_wifi_enabled = enabled;
-
-    return save_function_state("wifi");
+    return update_persisted_config(USB);
 }
 
 bool is_wifi_enabled(void)
 {
-    esp_err_t ret = CHECK_PERSISTED_FLAG();
-    if (ret != ESP_OK) {
-        return false;
-    }
-
-    return function_state.is_wifi_enabled;
+    return function_state.wifi.enabled;
 }
 
-static esp_err_t toggle_ble_hid_internal(bool enabled)
+bool is_ble_enabled(void)
 {
-    if (enabled) {
-        esp_err_t ret = halBLEInit(1, 1, 1, 0);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "%s: Fail to enable ble init, ret=%d", __FUNCTION__, ret);
-            return ret;
-        }
-    } else {
-        // TODO: add disable logic
-    }
-
-    return ESP_OK;
+    return function_state.ble.enabled;
 }
 
-esp_err_t toggle_ble_hid_state(bool enabled)
+bool is_usb_enabled(void)
 {
-    esp_err_t ret = CHECK_PERSISTED_FLAG();
-    if (ret != ESP_OK) {
-        return ret;
-    }
-
-    // Already enabled or disabled, just skip
-    if (function_state.is_ble_hid_enabled == enabled) {
-        return ESP_OK;
-    }
-
-    ret = toggle_ble_hid_internal(enabled);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-
-    function_state.is_ble_hid_enabled = enabled;
-
-    return save_function_state("ble_hid");
-}
-
-bool is_ble_hid_enabled(void)
-{
-    esp_err_t ret = CHECK_PERSISTED_FLAG();
-    if (ret != ESP_OK) {
-        return false;
-    }
-
-    return function_state.is_ble_hid_enabled;    
-}
-
-esp_err_t toggle_usb_hid_state(bool enabled)
-{
-    esp_err_t ret = CHECK_PERSISTED_FLAG();
-    if (ret != ESP_OK) {
-        return ret;
-    }
-
-    // Already enabled or disabled, just skip
-    if (function_state.is_usb_hid_enabled == enabled) {
-        return ESP_OK;
-    }
-
-    function_state.is_ble_hid_enabled = enabled;
-
-    return save_function_state("ble_hid");
-}
-
-bool is_usb_hid_enabled(void)
-{
-    esp_err_t ret = CHECK_PERSISTED_FLAG();
-    if (ret != ESP_OK) {
-        return false;
-    }
-
-    return function_state.is_usb_hid_enabled;    
+    return function_state.usb.enabled;
 }
 

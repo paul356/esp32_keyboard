@@ -20,9 +20,10 @@
 /** @file
  * @brief This file is a wrapper for the BLE-HID example of Espressif.
  */
-
+#include <string.h>
 #include "hal_ble.h"
 #include "esp_hidd.h"
+#include "esp_check.h"
 
 #define TAG "hal_ble"
 #define MAX_MTU 517 // Max possible mtu size
@@ -518,8 +519,7 @@ bool isBLERunning()
 
 /** @brief Main init function to start HID interface (C interface)
  * @see hid_ble */
-esp_err_t halBLEInit(uint8_t enableKeyboard, uint8_t enableMedia,
-		uint8_t enableMouse, uint8_t enableJoystick)
+esp_err_t halBLEInit(const char* name)
 {
 	//initialise queues, even if they might not be used.
 	battery_q = xQueueCreate(32, 1* sizeof(uint8_t));
@@ -529,6 +529,10 @@ esp_err_t halBLEInit(uint8_t enableKeyboard, uint8_t enableMedia,
     esp_err_t ret = init_low_level(ESP_BT_MODE_BLE);
     ESP_ERROR_CHECK( ret );
 
+    const char* dup_name = strdup(name);
+    ESP_RETURN_ON_FALSE(dup_name, ESP_ERR_NO_MEM, TAG, "no memory");
+
+    ble_hid_config.device_name = dup_name;
     ret = init_ble_gap_adv_data(ESP_HID_APPEARANCE_KEYBOARD, ble_hid_config.device_name);
     ESP_ERROR_CHECK( ret );
 

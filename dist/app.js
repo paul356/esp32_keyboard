@@ -125,13 +125,63 @@ function _render_keymap(layout_div, name, keymap)
     keymap.forEach(render_row);
 }
 
-function _render_status_line(status_div, status_json)
+function _get_button_str(state)
 {
+    return state ? "Turn Off" : "Turn On";
+}
+
+function _render_status_line(status_json)
+{
+    let status_div = document.getElementById("status_line");
     status_div.append(_create_div("设备状态", {"class" : "title"}));
 
     for (let item in status_json) {
         status_div.append(_create_div(item + ":" + status_json[item], {"class" : "status-item"}));
     }
+}
+
+function _button_clicked(event)
+{
+    let button = event.target;
+    let action_path_prefix = "/api/switches/";
+
+    let state = button.getAttribute("curr_state");
+    let funct = button.getAttribute("kb_function");
+
+    button.disabled = true;
+
+    let xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (xhttp.readyState == 4) {
+            if (xhttp.status == 200) {
+                button.innerHTML = _get_button_str(state == "false") + " " + funct;
+                button.setAttribute("curr_state", state == "false");
+                button.disabled = false;
+            } else {
+                _handle_server_error(xhttp);
+            }
+        }
+    };
+
+    xhttp.open("PUT", action_path_prefix + funct, false);
+
+    xhttp.setRequestHeader("Content-Type", "application/json");
+    let data = JSON.stringify({"enabled" : state == "false"});
+    xhttp.send(data);
+}
+
+function _render_switches_line(status_json)
+{
+    let switches_div = document.getElementById("switches_line");
+
+    let ble_switch = _create_element("button", _get_button_str(status_json["ble_state"]) + " BLE", {"curr_state" : status_json["ble_state"], "kb_function" : "BLE"});
+    let usb_switch = _create_element("button", _get_button_str(status_json["usb_state"]) + " USB", {"curr_state" : status_json["usb_state"], "kb_function" : "USB"});
+
+    ble_switch.addEventListener("click", _button_clicked);
+    usb_switch.addEventListener("click", _button_clicked);
+    
+    switches_div.append(ble_switch);
+    switches_div.append(usb_switch);
 }
 
 function _get_keycodes()
@@ -162,9 +212,9 @@ function render_status_line()
     xhttp.onreadystatechange = function() {
         if (xhttp.readyState == 4) {
             if (xhttp.status == 200) {
-                let status_div = document.getElementById("status_line");
                 let status_json = JSON.parse(xhttp.responseText);
-                _render_status_line(status_div, status_json);
+                _render_status_line(status_json);
+                _render_switches_line(status_json);
             } else {
                 _handle_server_error(xhttp);
             }
