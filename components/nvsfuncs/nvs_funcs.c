@@ -47,7 +47,7 @@ extern const uint16_t _LAYERS[LAYERS][MATRIX_ROWS][MATRIX_COLS];
 char **layer_names_arr;
 uint8_t layers_num=0;
 
-const uint16_t keymaps[LAYERS][MATRIX_ROWS][MATRIX_COLS];
+uint16_t keymaps[LAYERS][MATRIX_ROWS][MATRIX_COLS];
 
 esp_err_t nvs_read_blob(const char* namespace, const char* key, void* buffer, size_t* buf_size)
 {
@@ -111,7 +111,7 @@ esp_err_t nvs_write_blob(const char* namespace, const char* key, const void* buf
 }
 
 //add or overwrite a keymap to the nvs
-static void nvs_write_layout_matrix(uint16_t layout[MATRIX_ROWS * MATRIX_COLS], const char* layout_name){
+static void nvs_write_layout_matrix(const uint16_t layout[MATRIX_ROWS * MATRIX_COLS], const char* layout_name){
     esp_err_t err = nvs_write_blob(KEYMAP_NAMESPACE, layout_name, layout, sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
     if (err != ESP_OK) {
 		ESP_LOGE(NVS_TAG,"write ns:%s key:%s fail reason(%s)!\n", KEYMAP_NAMESPACE, layout_name, esp_err_to_name(err));

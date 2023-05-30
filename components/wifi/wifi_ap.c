@@ -3,8 +3,6 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
-#include "nvs_funcs.h"
-#include "nvs.h"
 
 #define EXAMPLE_ESP_WIFI_CHANNEL   1
 #define EXAMPLE_MAX_STA_CONN       2
@@ -47,7 +45,7 @@ static esp_err_t start_softap(const char* ssid, const char* passwd)
 
     memcpy(wifi_config.ap.ssid, ssid, MIN(strlen(ssid), sizeof(wifi_config.ap.ssid)));
     wifi_config.ap.ssid_len = MIN(strlen(ssid), sizeof(wifi_config.ap.ssid));
-    memcpy(wifi_config.ap.password, passwd, MIN(strlen(passwd), sizeof(wifi_config.ap.password)));
+    snprintf((char *)wifi_config.ap.password, sizeof(wifi_config.ap.password), "%s", passwd);
 
     if (strlen(passwd) == 0) {
         wifi_config.ap.authmode = WIFI_AUTH_OPEN;

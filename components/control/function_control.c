@@ -257,6 +257,7 @@ esp_err_t update_wifi_state(bool enabled, const char* ssid, const char* passwd)
 
 esp_err_t update_ble_state(bool enabled, const char* name)
 {
+    // TODO: it is to be implemented.
     return ESP_FAIL;
 }
 

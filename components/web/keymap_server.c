@@ -2,6 +2,7 @@
 #include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "esp_random.h"
+#include "esp_check.h"
 #include "keyboard_config.h"
 #include "key_definitions.h"
 #include "nvs_keymaps.h"
@@ -409,8 +410,9 @@ static esp_err_t modify_functions(httpd_req_t* req)
 {
     const char* prefix = "/api/switches/";
     const char* last_token = &req->uri[strlen(prefix)];
+    esp_err_t ret;
 
-    cJSON* root;
+    cJSON* root = NULL;
     esp_err_t err = parse_http_req(req, &root);
     if (err != ESP_OK) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "fail to parse http request");
@@ -440,12 +442,7 @@ static esp_err_t modify_functions(httpd_req_t* req)
         }
 
         if (enabledItem || ssidItem || passwdItem) {
-            esp_err_t err = update_wifi_state(enabled, ssid, passwd);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "fail to update wifi state");
-                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "fail to update wifi config");
-                return err;
-            }
+            ESP_GOTO_ON_ERROR(update_wifi_state(enabled, ssid, passwd), err_out, TAG, "fail to update wifi state");
         }
     } else if (strcmp(last_token, "BLE") == 0) {
         cJSON_bool enabled = false;
@@ -463,12 +460,7 @@ static esp_err_t modify_functions(httpd_req_t* req)
         }
 
         if (enabledItem || nameItem) {
-            esp_err_t err = update_ble_state(enabled, name);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "fail to update ble state");
-                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "fail to update ble config");
-                return err;
-            }
+            ESP_GOTO_ON_ERROR(update_ble_state(enabled, name), err_out, TAG, "fail to update ble state");
         }
     } else if (strcmp(last_token, "USB") == 0) {
         cJSON_bool enabled = false;
@@ -477,20 +469,22 @@ static esp_err_t modify_functions(httpd_req_t* req)
         if (enabledItem) {
             enabled = cJSON_IsTrue(enabledItem);
 
-            esp_err_t err = update_usb_state(enabled);
-            if (err != ESP_OK) {
-                ESP_LOGE(TAG, "fail to update usb state");
-                httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "fail to update usb config");
-                return err;
-            }
+            ESP_GOTO_ON_ERROR(update_usb_state(enabled), err_out, TAG, "fail to update usb state");
         }
     } else {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "unkown url");
-        return ESP_FAIL;
+        ESP_LOGE(TAG, "unkown url %s", last_token);
+        ret = ESP_ERR_INVALID_ARG;
+        goto err_out;
     }
 
+    cJSON_Delete(root);
     httpd_resp_sendstr_chunk(req, NULL);    
     return ESP_OK;
+
+err_out:
+    cJSON_Delete(root);
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Oops. Something is wrong.");
+    return ret;
 }
 
 static struct {
