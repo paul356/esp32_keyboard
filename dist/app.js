@@ -1,6 +1,9 @@
 var keymap_layouts = {};
 var keymap_changed = {};
-var keycode_array = null;
+var basic_key_codes = null;
+var quantum_funct_descs = null;
+var mod_bit_names = null;
+var max_layer_num = 0;
 
 function clear_label()
 {
@@ -66,38 +69,173 @@ function _create_div(content, attrs)
     return _create_element("div", content, attrs);
 }
 
-function _keystroke_clicked(event)
+function _funct_select(funct_name)
 {
-    let target_div = event.target;
+    var selected_index = -1;
+    let funct_select = _create_element("select", null, {});
 
-    let select = _create_element("select", null, {"class" : "keystroke"});
     let add_option = function(opt, index, arr) {
-        let option = _create_element("option", opt, {});
-        select.append(option);
+        if (opt["desc"] === funct_name) {
+            selected_index = index;
+        }
+        let option = _create_element("option", opt["desc"], {});
+        funct_select.append(option);
     }
-    keycode_array.forEach(add_option);
+    quantum_funct_descs.forEach(add_option);
 
-    let layer_name = target_div.getAttribute("layer-name");
+    /*let layer_name = target_div.getAttribute("layer-name");
     let i = parseInt(target_div.getAttribute("row"));
     let j = parseInt(target_div.getAttribute("col"));
 
     let focus_out = function(event) {
-        select.replaceWith(target_div);
+    select.replaceWith(target_div);
     }
 
     let selected = function(event) {
-        if (keymap_layouts[layer_name][i][j] != select.selectedIndex) {
-            keymap_layouts[layer_name][i][j] = select.selectedIndex;
-            target_div.innerHTML = keycode_array[select.selectedIndex];
-            keymap_changed[layer_name][i][j] = true;
-        }
+    if (keymap_layouts[layer_name][i][j] != select.selectedIndex) {
+    keymap_layouts[layer_name][i][j] = select.selectedIndex;
+    target_div.innerHTML = keycode_array[select.selectedIndex];
+    keymap_changed[layer_name][i][j] = true;
+    }
     }
     select.addEventListener("focusout", focus_out);
-    select.addEventListener("change", selected);
+    select.addEventListener("change", selected);*/
 
-    target_div.replaceWith(select);
-    select.selectedIndex = keymap_layouts[layer_name][i][j];
-    select.focus();
+    //target_div.replaceWith(select);
+    funct_select.selectedIndex = selected_index;
+
+    return funct_select;
+}
+
+function _basic_code_select(basic_code)
+{
+    var selected_index = -1;
+    let bs_select = _create_element("select", null, {});
+
+    let add_option = function(opt, index, arr) {
+        if (opt === basic_code) {
+            selected_index = index;
+        }
+        let option = _create_element("option", opt, {});
+        bs_select.append(option);
+    }
+    basic_key_codes.forEach(add_option);
+
+    bs_select.selectedIndex = selected_index;
+
+    return bs_select;
+}
+
+function _layer_select(layer_idx)
+{
+    var selected_index = -1;
+    let layer_select = _create_element("select", null, {});
+
+    let add_option = function(opt, index, arr) {
+        if (opt.toString() === layer_idx) {
+            selected_index = index;
+        }
+        let option = _create_element("option", opt.toString(), {});
+        layer_select.append(option);
+    }
+    let layers = [...Array(max_layer_num).keys()];
+    layers.forEach(add_option);
+
+    layer_select.selectedIndex = selected_index;
+
+    return layer_select;
+}
+
+function _mod_bit_select(mod_bits)
+{
+    let mod_bit_arr = mod_bits.split("|");
+    let selected_index = -1;
+
+    let mod_bit_select = _create_element("select", null, {"multiple" : ""});
+
+    let add_option = function(opt, index, arr) {
+        if (mod_bit_arr.includes(opt)) {
+            let option = _create_element("option", opt, {"selected" : ""});
+            mod_bit_select.append(option);
+        } else {
+            let option = _create_element("option", opt, {});
+            mod_bit_select.append(option);
+        }
+    }
+    mod_bit_names.forEach(add_option);
+
+    return mod_bit_select;
+}
+
+function _get_funct_desc(funct_name)
+{
+    return quantum_funct_descs.find(element => element["desc"] === funct_name);
+}
+
+function _keystroke_clicked(event)
+{
+    let target_div = event.target;
+    let layer_name = target_div.getAttribute("layer-name");
+    let row = parseInt(target_div.getAttribute("row"));
+    let col = parseInt(target_div.getAttribute("col"));
+
+    let full_key = keymap_layouts[layer_name][row][col];
+    let toks = full_key.split(" ");
+
+    let new_div = _create_div(null, {"class" : "keystroke"});
+
+    let funct_select = _funct_select(toks[0]);
+    new_div.append(funct_select);
+
+    let funct_desc = _get_funct_desc(toks[0]);
+
+    let arg_handler = function(opt, index, arr) {
+        switch (opt) {
+        case "layer_num":
+            new_div.append(_layer_select(toks[index + 1]));
+            break;
+        case "basic_code":
+            new_div.append(_basic_code_select(toks[index + 1]));
+            break;
+        case "mod_bits":
+            new_div.append(_mod_bit_select(toks[index + 1]));
+            break;
+        }
+    }
+    funct_desc["arg_types"].forEach(arg_handler);
+
+    let focus_out = function(event) {
+        var full_key = Array(new_div.children.length);
+        for (var i = 0; i < new_div.children.length; i++) {
+            let opts = new_div.children.item(i).selectedOptions;
+            var argument_value = Array(opts.length);
+            for (var j = 0; j < opts.length; j++) {
+                argument_value[j] = opts.item(j).label;
+            }
+            full_key[i] = argument_value.join("|");
+        }
+        let full_key_str = full_key.join(" ");
+        if (full_key_str !== keymap_layouts[layer_name][row][col]) {
+            keymap_layouts[layer_name][row][col] = full_key_str;
+            keymap_changed[layer_name][row][col] = true;
+            target_div.innerHTML = _get_display_key_name(full_key_str);
+        }
+        new_div.replaceWith(target_div);
+    }
+    new_div.addEventListener("focusout", focus_out);
+
+    target_div.replaceWith(new_div);
+    funct_select.focus();
+}
+
+function _get_display_key_name(full_key)
+{
+    let toks = full_key.split(' ')
+    if (toks[0] === 'BS') {
+        return toks[1];
+    } else {
+        return toks[0] + "(" + toks.slice(1).join(", ") + ")";
+    }
 }
 
 function _render_keymap(layout_div, name, keymap)
@@ -108,13 +246,14 @@ function _render_keymap(layout_div, name, keymap)
         keymap_changed[name][idx] = new Array(keymap[idx].length);
         keymap_changed[name][idx].fill(false);
     }
-    
+
     layout_div.append(_create_div(name, {"class" : "title"}));
-    
+
     let render_row = function(row, i, rows) {
         // render row here
         let render_key = function(key, j, row) {
-            let key_div = _create_div(keycode_array[key], {"class" : "keystroke", "layer-name" : name, "row" : i, "col" : j});
+            let dis_str = _get_display_key_name(key);
+            let key_div = _create_div(dis_str, {"class" : "keystroke", "layer-name" : name, "row" : i, "col" : j});
             key_div.addEventListener("click", _keystroke_clicked);
             layout_div.append(key_div);
         }
@@ -179,7 +318,7 @@ function _render_switches_line(status_json)
 
     ble_switch.addEventListener("click", _button_clicked);
     usb_switch.addEventListener("click", _button_clicked);
-    
+
     switches_div.append(ble_switch);
     switches_div.append(usb_switch);
 }
@@ -193,7 +332,10 @@ function _get_keycodes()
         if (xhttp.readyState == 4) {
             if (xhttp.status == 200) {
                 let keycode_json = JSON.parse(xhttp.responseText);
-                keycode_array = keycode_json["keycodes"];
+                basic_key_codes = keycode_json["keycodes"];
+                quantum_funct_descs = keycode_json["quantum_functs"];
+                mod_bit_names = keycode_json["mod_bits"];
+                max_layer_num = keycode_json["layer_num"];
             } else {
                 _handle_server_error(xhttp);
             }
@@ -228,7 +370,7 @@ function render_status_line()
 function render_layouts()
 {
     _get_keycodes();
-    
+
     let layouts_path = "/api/layouts";
 
     let xhttp = new XMLHttpRequest();
