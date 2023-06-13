@@ -229,7 +229,13 @@ void update_display(uint16_t last_key)
             create_objects();
         } else if (last_key) {
             ESP_LOGI(TAG, "update LVGL label %hu", last_key);
-            lv_label_set_text(s_objects[LABEL_KEY], GetKeyCodeName(last_key));
+            char scratch[32];
+            esp_err_t err = get_full_key_name(last_key, scratch, sizeof(scratch));
+            if (err != ESP_OK) {
+                lv_label_set_text(s_objects[LABEL_KEY], "ERR");
+            } else {
+                lv_label_set_text(s_objects[LABEL_KEY], scratch);
+            }
         }
     }        
 }

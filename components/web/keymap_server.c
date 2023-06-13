@@ -92,24 +92,28 @@ static esp_err_t layouts_json(httpd_req_t* req)
         for (int j = 0; j < MATRIX_ROWS; j++) {
             httpd_resp_sendstr_chunk(req, "\n  [");
             for (int k = 0; k < MATRIX_COLS; k++) {
-                uint16_t key_code = keymaps[i][j][k];
-                const char* keyName = GetKeyCodeName(key_code);
-                if (keyName != NULL && keyName[0] != '\0') {
-                    char str_buf[25];
-                    snprintf(str_buf, sizeof(str_buf), "%hu", key_code);
-                    err = httpd_resp_sendstr_chunk(req, str_buf);
+                httpd_resp_sendstr_chunk(req, "\"");
+
+                char scratch_buf[64];
+                err = get_full_key_name(keymaps[i][j][k], scratch_buf, sizeof(scratch_buf));
+                if (err == ESP_OK) {
+                    err = httpd_resp_sendstr_chunk(req, scratch_buf);
                 } else {
-                    err = httpd_resp_sendstr_chunk(req, "0");
+                    ESP_LOGE(TAG, "invalid key code 0x%x @[%d, %d, %d]", keymaps[i][j][k], i, j, k);
+                    err = httpd_resp_sendstr_chunk(req, "ERR");
                 }
                 if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "send error, keyName is \"%s\"", keyName);
+                    ESP_LOGE(TAG, "send error, keyName is 0x%x", keymaps[i][j][k]);
                 }
+
                 if (k != MATRIX_COLS - 1) {
-                    httpd_resp_sendstr_chunk(req, ",");
+                    httpd_resp_sendstr_chunk(req, "\", ");
+                } else {
+                    httpd_resp_sendstr_chunk(req, "\"");
                 }
             }
             if (j != MATRIX_ROWS - 1) {
-                httpd_resp_sendstr_chunk(req, "],");
+                httpd_resp_sendstr_chunk(req, "],\n");
             } else {
                 httpd_resp_sendstr_chunk(req, "]");
             }
@@ -127,31 +131,97 @@ static esp_err_t layouts_json(httpd_req_t* req)
     return ESP_OK;
 }
 
+static void quantum_desc_json(httpd_req_t* req, funct_desc_t* desc)
+{
+    char scratch[8];
+    httpd_resp_sendstr_chunk(req, "{\"desc\" : \"");
+    httpd_resp_sendstr_chunk(req, desc->desc);
+    httpd_resp_sendstr_chunk(req, "\", ");
+    httpd_resp_sendstr_chunk(req, "\"arg_types\" : [");
+    bool first_key = true;
+    for (int i = 0; i < desc->num_args; i++) {
+        if (first_key) {
+            first_key = false;
+        } else {
+            httpd_resp_sendstr_chunk(req, ", ");
+        }
+
+        switch (desc->arg_types[i]) {
+        case LAYER_NUM:
+            httpd_resp_sendstr_chunk(req, "\"layer_num\"");
+            break;
+        case BASIC_CODE:
+            httpd_resp_sendstr_chunk(req, "\"basic_code\"");
+            break;
+        case MOD_BITS:
+            httpd_resp_sendstr_chunk(req, "\"mod_bits\"");
+            break;
+        }
+    }
+    httpd_resp_sendstr_chunk(req, "]}");
+}
+
 static esp_err_t keycodes_json(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr_chunk(req, "{\"keycodes\":[\n");
-    uint16_t keyCodeNum = GetKeyCodeNum();
+    httpd_resp_sendstr_chunk(req, "{\n  \"keycodes\":[");
+    uint16_t keyCodeNum = get_max_basic_key_code();
     bool firstKey = true;
     for (uint16_t kc = 0; kc < keyCodeNum; kc++) {
-        const char* keyName = GetKeyCodeName(kc);
+        const char* keyName = get_basic_key_name(kc);
 
+        if (keyName) {
+            if (firstKey) {
+                httpd_resp_sendstr_chunk(req, "\"");
+                firstKey = false;
+            } else {
+                httpd_resp_sendstr_chunk(req, ", \"");
+            }
+
+            httpd_resp_sendstr_chunk(req, keyName);
+ 
+            httpd_resp_sendstr_chunk(req, "\"");
+        }
+    }
+    httpd_resp_sendstr_chunk(req, "],\n");
+
+    httpd_resp_sendstr_chunk(req, "  \"mod_bits\":[");
+    firstKey = true;
+    for (int i = 0; i < get_mod_bit_num(); i++) {
         if (firstKey) {
-            httpd_resp_sendstr_chunk(req, "  \"");
+            httpd_resp_sendstr_chunk(req, "\"");
             firstKey = false;
         } else {
-            httpd_resp_sendstr_chunk(req, ",\n  \"");
+            httpd_resp_sendstr_chunk(req, ", \"");
         }
 
-        if (keyName != NULL && keyName[0] != '\0') {
-            httpd_resp_sendstr_chunk(req, keyName);
-        } else {
-            httpd_resp_sendstr_chunk(req, "[ ]");
-        }
-
-        httpd_resp_sendstr_chunk(req, "\"");
+        httpd_resp_sendstr_chunk(req, get_mod_bit_name(i));
+ 
+        httpd_resp_sendstr_chunk(req, "\"");        
     }
-    httpd_resp_sendstr_chunk(req, "\n]}");
+    httpd_resp_sendstr_chunk(req, "],\n");
+                             
+    httpd_resp_sendstr_chunk(req, "  \"quantum_functs\":[");
+    firstKey = true;
+    for (int i = 0; i < get_total_funct_num(); i++) {
+        if (firstKey) {
+            firstKey = false;
+        } else {
+            httpd_resp_sendstr_chunk(req, ", ");
+        }
+
+        funct_desc_t desc;
+        get_funct_desc(i, &desc);
+        quantum_desc_json(req, &desc);
+    }
+    httpd_resp_sendstr_chunk(req, "],\n");
+
+    httpd_resp_sendstr_chunk(req, "  \"layer_num\":");
+    char scratch[8];
+    snprintf(scratch, sizeof(scratch), "%d", layers_num);
+    httpd_resp_sendstr_chunk(req, scratch);    
+    httpd_resp_sendstr_chunk(req, "\n}");
+
     httpd_resp_sendstr_chunk(req, NULL);
 
     return ESP_OK;
@@ -225,14 +295,18 @@ static esp_err_t update_keymap(httpd_req_t* req)
     memcpy(temp_layer, keymaps[layer_index], sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
     for(uint16_t i = 0; i < cJSON_GetArraySize(positions); ++i){
         uint16_t pos = (uint16_t)cJSON_GetArrayItem(positions, i)->valueint;
-        uint16_t keycode = (uint16_t)cJSON_GetArrayItem(keycodes, i)->valueint;
-        ESP_LOGI(TAG, "%s: pos = '%hu', keycode = '%hu'", __FUNCTION__, pos, keycode);
+        const char* keyname = cJSON_GetArrayItem(keycodes, i)->valuestring;
+        ESP_LOGI(TAG, "%s: pos = '%hu', keycode = '%s'", __FUNCTION__, pos, keyname);
 
         if (pos >= MATRIX_ROWS * MATRIX_COLS) {
             ESP_LOGE(TAG, "%s: invalid position %hu", __FUNCTION__, pos);
             continue;
-        } else if (GetKeyCodeName(keycode) == NULL) {
-            ESP_LOGE(TAG, "%s: invalid keycode %hu", __FUNCTION__, keycode);
+        }
+
+        uint16_t keycode;
+        esp_err_t err = parse_full_key_name(keyname, &keycode);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "cann't parse %s, err=%d", keyname, err);
             continue;
         }
 
