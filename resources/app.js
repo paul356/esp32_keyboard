@@ -4,6 +4,7 @@ var basic_key_codes = null;
 var quantum_funct_descs = null;
 var mod_bit_names = null;
 var max_layer_num = 0;
+var selected_key = null;
 
 function clear_label()
 {
@@ -83,25 +84,6 @@ function _funct_select(funct_name)
     }
     quantum_funct_descs.forEach(add_option);
 
-    /*let layer_name = target_div.getAttribute("layer-name");
-    let i = parseInt(target_div.getAttribute("row"));
-    let j = parseInt(target_div.getAttribute("col"));
-
-    let focus_out = function(event) {
-    select.replaceWith(target_div);
-    }
-
-    let selected = function(event) {
-    if (keymap_layouts[layer_name][i][j] != select.selectedIndex) {
-    keymap_layouts[layer_name][i][j] = select.selectedIndex;
-    target_div.innerHTML = keycode_array[select.selectedIndex];
-    keymap_changed[layer_name][i][j] = true;
-    }
-    }
-    select.addEventListener("focusout", focus_out);
-    select.addEventListener("change", selected);*/
-
-    //target_div.replaceWith(select);
     funct_select.selectedIndex = selected_index;
 
     return funct_select;
@@ -204,27 +186,61 @@ function _keystroke_clicked(event)
     }
     funct_desc["arg_types"].forEach(arg_handler);
 
-    let focus_out = function(event) {
-        var full_key = Array(new_div.children.length);
-        for (var i = 0; i < new_div.children.length; i++) {
-            let opts = new_div.children.item(i).selectedOptions;
-            var argument_value = Array(opts.length);
-            for (var j = 0; j < opts.length; j++) {
-                argument_value[j] = opts.item(j).label;
+    for (var i = 0; i < new_div.children.length; i++) {
+        let child = new_div.children.item(i);
+        child.addEventListener("blur", event => {
+            var full_key = Array(new_div.children.length);
+            for (var i = 0; i < new_div.children.length; i++) {
+                let opts = new_div.children.item(i).selectedOptions;
+                var argument_value = Array(opts.length);
+                for (var j = 0; j < opts.length; j++) {
+                    argument_value[j] = opts.item(j).label;
+                }
+                full_key[i] = argument_value.join("|");
             }
-            full_key[i] = argument_value.join("|");
-        }
-        let full_key_str = full_key.join(" ");
-        if (full_key_str !== keymap_layouts[layer_name][row][col]) {
-            keymap_layouts[layer_name][row][col] = full_key_str;
-            keymap_changed[layer_name][row][col] = true;
-            target_div.innerHTML = _get_display_key_name(full_key_str);
-        }
-        new_div.replaceWith(target_div);
+            let full_key_str = full_key.join(" ");
+            if (full_key_str !== keymap_layouts[layer_name][row][col]) {
+                keymap_layouts[layer_name][row][col] = full_key_str;
+                keymap_changed[layer_name][row][col] = true;
+                target_div.innerHTML = _get_display_key_name(full_key_str);
+            }
+         });
     }
-    new_div.addEventListener("focusout", focus_out);
+
+    funct_select.addEventListener("change", event => {
+        let new_funct_name = event.target.selectedOptions.item(0).label;
+
+        let curr_full_key = keymap_layouts[layer_name][row][col];
+        if (new_funct_name !== curr_full_key.split(" ")[0]) {
+            for (var i = 0; i < new_div.children.length; i++) {
+                let child = new_div.children.item(i);
+                if (child !== funct_select) {
+                    child.remove();
+                }
+            }
+
+            let funct_desc = _get_funct_desc(new_funct_name);
+            funct_desc["arg_types"].forEach((opt, index, arr) => {
+                switch (opt) {
+                case "layer_num":
+                    new_div.append(_layer_select("0"));
+                    break;
+                case "basic_code":
+                    new_div.append(_basic_code_select(basic_key_codes[0]));
+                    break;
+                case "mod_bits":
+                    new_div.append(_mod_bit_select(mod_bit_names[0]));
+                    break;
+                }
+            });
+        }
+    });
 
     target_div.replaceWith(new_div);
+    if (selected_key !== null) {
+        selected_key[1].replaceWith(selected_key[0]);
+    }
+    selected_key = [target_div, new_div];
     funct_select.focus();
 }
 
@@ -466,3 +482,27 @@ function restore_default_keymap()
     xhttp.send(data);
 }
 
+function is_child_of(elem, parent)
+{
+    let children = parent.children;
+    for (var i = 0; i < children.length; i++) {
+        if (elem === children.item(i)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function handle_blank_click()
+{
+    document.body.addEventListener("click", event => {
+        if (selected_key !== null &&
+            !is_child_of(event.target, selected_key[1]) &&
+            event.target !== selected_key[0] &&
+            event.target !== selected_key[1]) {
+            selected_key[1].replaceWith(selected_key[0]);
+            selected_key = null;
+        }
+    });
+}

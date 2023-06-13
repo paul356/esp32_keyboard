@@ -1,25 +1,25 @@
 <html>
   <head>
     <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-    <title>按键配置</title>
+    <title>Keyboard Configurator</title>
     <link rel="shortcut icon" href="#" />
     <link rel="stylesheet" href="style.css" />
     <script src="app.js"></script>
   </head>
-  <body onload="render_status_line(); render_layouts()">
+  <body onload="render_status_line(); render_layouts(); handle_blank_click()">
     <div id="app">
       <div class="banner" id="status_line"></div>
       <div class="banner" id="switches_line"></div>
       <div class="layouts" id="key_layouts"></div>
       <div class="action">
-        <button class="btn" id="button_ok" onclick="update_keymap()">确定</button>
-        <button class="btn" id="button_reset" onclick="restore_default_keymap()">重置</button>
+        <button class="btn" id="button_ok" onclick="update_keymap()">Update</button>
+        <button class="btn" id="button_reset" onclick="restore_default_keymap()">Reset</button>
       </div>
     </div>
     <br />
     <form action="/upload/bin_file" method="post" enctype="multipart/form-data">
       <div>
-        <label for="bin_file">选择升级文件包:</label>
+        <label for="bin_file">Choose an OTA Package to Upgrade:</label>
         <input type="file" id="bin_file" name="bin_file" accept=".bin" onchange="clear_label()"
                />
         <button id="upload" type="button" onclick="upload_bin()">Submit</button>
