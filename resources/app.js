@@ -494,8 +494,10 @@ function is_child_of(elem, parent)
     return false;
 }
 
-function handle_blank_click()
+function handle_body_clicks()
 {
+    // Body can recieve all bubbled clicks from its children and grandchildren.
+    // We will restore selected key back to a div if the user clicks on other keys or elements.
     document.body.addEventListener("click", event => {
         if (selected_key !== null &&
             !is_child_of(event.target, selected_key[1]) &&

@@ -30,171 +30,171 @@ typedef struct {
 } mod_bit_desc_t;
 
 const char* basic_key_codes[] = {
-	NULL,
-	"____",
-	NULL,
-	NULL,
-	"a",
-	"b",
-	"c",
-	"d",
-	"e",
-	"f",
-	"g",
-	"h",
-	"i",
-	"j",
-	"k",
-	"l",
-	"m", /* 0x10 */
-	"n",
-	"o",
-	"p",
-	"q",
-	"r",
-	"s",
-	"t",
-	"u",
-	"v",
-	"w",
-	"x",
-	"y",
-	"z",
-	"1",
-	"2",
-	"3", /* 0x20 */
-	"4",
-	"5",
-	"6",
-	"7",
-	"8",
-	"9",
-	"0",
-	"Ent",
-	"Esc",
-	"<--",
-	"TAB",
-	"Space",
-	"-",
-	"=",
-	"[",
-	"]", /* 0x30 */
-	"\\\\", /* \ (and |) */
-	"#(EU)", /* Non-US # and ~ (Typically near the Enter key) */
-	";", /* ; (and :) */
-	"'", /* ' and " */
-	"`", /* Grave accent and tilde */
-	",", /* ", and < */
-	".", /* . and > */
-	"/", /* / and ? */
-	"Caps",
-	"F1",
-	"F2",
-	"F3",
-	"F4",
-	"F5",
-	"F6",
-	"F7", /* 0x40 */
-	"F8",
-	"F9",
-	"F10",
-	"F11",
-	"F12",
-	"PrtSc",
-	"ScrLk",
-	"Pause",
-	"Ins",
-	"Home",
-	"PgUp",
-	"Del",
-	"End",
-	"PgDn",
-	"Left",
-	"Right", /* 0x50 */
-	"Down",
-	"Up",
-	"Num",
-	"KP_/",
-	"KP_*",
-	"KP_-",
-	"KP_+",
-	"KP_Ent",
-	"KP_1",
-	"KP_2",
-	"KP_3",
-	"KP_4",
-	"KP_5",
-	"KP_6",
-	"KP_7",
-	"KP_8", /* 0x60 */
-	"KP_9",
-	"KP_0",
-	"KP_.",
-	"\(EU)", /* Non-US \ and | (Typically near the Left-Shift key) */
-	"App",
-	NULL, /* from Power to EXSEL are not recognized by Windows and Mac*/
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL, /* 0x70 */
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL, /* 0x80 */
-	NULL,
-	NULL, /* locking Caps Lock */
-	NULL, /* locking Num Lock */
-	NULL, /* locking Scroll Lock */
-	NULL,
-	NULL, /* equal sign on AS/400 */
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL, /* 0x90 */
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL, /* 0xA0 */
-	NULL,
-	NULL,
-	NULL,
-	NULL, /* 0xA4 */
+    NULL,
+    "____",
+    NULL,
+    NULL,
+    "a",
+    "b",
+    "c",
+    "d",
+    "e",
+    "f",
+    "g",
+    "h",
+    "i",
+    "j",
+    "k",
+    "l",
+    "m", /* 0x10 */
+    "n",
+    "o",
+    "p",
+    "q",
+    "r",
+    "s",
+    "t",
+    "u",
+    "v",
+    "w",
+    "x",
+    "y",
+    "z",
+    "1",
+    "2",
+    "3", /* 0x20 */
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "0",
+    "Ent",
+    "Esc",
+    "<--",
+    "TAB",
+    "Space",
+    "-",
+    "=",
+    "[",
+    "]", /* 0x30 */
+    "\\\\", /* \ (and |) */
+    "#(EU)", /* Non-US # and ~ (Typically near the Enter key) */
+    ";", /* ; (and :) */
+    "'", /* ' and " */
+    "`", /* Grave accent and tilde */
+    ",", /* ", and < */
+    ".", /* . and > */
+    "/", /* / and ? */
+    "Caps",
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6",
+    "F7", /* 0x40 */
+    "F8",
+    "F9",
+    "F10",
+    "F11",
+    "F12",
+    "PrtSc",
+    "ScrLk",
+    "Pause",
+    "Ins",
+    "Home",
+    "PgUp",
+    "Del",
+    "End",
+    "PgDn",
+    "Left",
+    "Right", /* 0x50 */
+    "Down",
+    "Up",
+    "Num",
+    "KP_/",
+    "KP_*",
+    "KP_-",
+    "KP_+",
+    "KP_Ent",
+    "KP_1",
+    "KP_2",
+    "KP_3",
+    "KP_4",
+    "KP_5",
+    "KP_6",
+    "KP_7",
+    "KP_8", /* 0x60 */
+    "KP_9",
+    "KP_0",
+    "KP_.",
+    "\(EU)", /* Non-US \ and | (Typically near the Left-Shift key) */
+    "App",
+    NULL, /* from Power to EXSEL are not recognized by Windows and Mac*/
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL, /* 0x70 */
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL, /* 0x80 */
+    NULL,
+    NULL, /* locking Caps Lock */
+    NULL, /* locking Num Lock */
+    NULL, /* locking Scroll Lock */
+    NULL,
+    NULL, /* equal sign on AS/400 */
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL, /* 0x90 */
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL, /* 0xA0 */
+    NULL,
+    NULL,
+    NULL,
+    NULL, /* 0xA4 */
     NULL,
     NULL,
     NULL,
@@ -254,15 +254,15 @@ const char* basic_key_codes[] = {
     NULL,
     NULL,
     NULL,
-	/* Modifiers */
-	"LCtrl", /* 0xE0 */
-	"LShift",
-	"LAlt",
-	"LWin",
-	"RCtrl",
-	"RShift",
-	"RAlt",
-	"RWin",
+    /* Modifiers */
+    "LCtrl", /* 0xE0 */
+    "LShift",
+    "LAlt",
+    "LWin",
+    "RCtrl",
+    "RShift",
+    "RAlt",
+    "RWin",
 };
 
 const quantum_funct_desc_t quantum_functs[] = {
@@ -328,15 +328,15 @@ uint16_t get_max_basic_key_code(void)
 
 static uint16_t get_basic_key_from_name(const char* name)
 {
-	if(name == NULL)
+    if(name == NULL)
         return -1;
 
-	for(uint16_t i = 0; i < get_max_basic_key_code(); ++i){
-		if(basic_key_codes[i] && strcmp(name, basic_key_codes[i]) == 0)
+    for(uint16_t i = 0; i < get_max_basic_key_code(); ++i){
+        if(basic_key_codes[i] && strcmp(name, basic_key_codes[i]) == 0)
             return i;
-	}
+    }
 
-	return -1;
+    return -1;
 }
 
 int get_total_funct_num(void)
