@@ -288,7 +288,7 @@ function _get_button_str(state)
 function _render_status_line(status_json)
 {
     let status_div = document.getElementById("status_line");
-    status_div.append(_create_div("设备状态", {"class" : "title"}));
+    status_div.append(_create_div("Device States", {"class" : "title"}));
 
     for (let item in status_json) {
         status_div.append(_create_div(item + ":" + status_json[item], {"class" : "status-item"}));
