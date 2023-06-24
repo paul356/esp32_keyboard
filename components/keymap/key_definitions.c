@@ -31,8 +31,6 @@ typedef struct {
     const char* desc;
 } mod_bit_desc_t;
 
-typedef mod_bit_desc_t macro_desc_t;
-
 const char* basic_key_codes[] = {
     NULL,
     "____",
