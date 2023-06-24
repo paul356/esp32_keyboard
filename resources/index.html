@@ -6,27 +6,32 @@
     <link rel="stylesheet" href="style.css" />
     <script src="app.js"></script>
   </head>
-  <body onload="render_status_line(); render_layouts(); handle_blank_click()">
-    <div id="app">
-      <div class="banner" id="status_line"></div>
-      <div class="banner" id="switches_line"></div>
-      <div class="layouts" id="key_layouts"></div>
-      <div class="action">
+  <body onload="render_status_line(); render_layouts_and_macros(); handle_body_clicks(); document.getElementById('default_tab').click();">
+    <div class="tab">
+      <button class="tablinks" onclick="render_tabs(event, 'status_line')">Device Status</button>
+      <button class="tablinks" onclick="render_tabs(event, 'key_layouts')" id="default_tab">Keyboard Config</button>
+      <button class="tablinks" onclick="render_tabs(event, 'macros')">Define Macros</button>
+      <button class="tablinks" onclick="render_tabs(event, 'upgrade_form')">Upgrade</button>
+    </div>
+    <div class="tabcontent" id="status_line"></div>
+    <div class="tabcontent" id="key_layouts"></div>
+    <div class="tabcontent" id="macros"></div>
+    <!--<div class="action">
         <button class="btn" id="button_ok" onclick="update_keymap()">Update</button>
         <button class="btn" id="button_reset" onclick="restore_default_keymap()">Reset</button>
-      </div>
+    </div>-->
+    <div class="tabcontent" id="upgrade_form">
+      <form action="/upload/bin_file" method="post" enctype="multipart/form-data">
+        <div>
+          <label for="bin_file">Choose an OTA Package to Upgrade:</label>
+          <input type="file" id="bin_file" name="bin_file" accept=".bin" onchange="clear_label()"
+                 />
+        </div>
+        <div>
+          <button id="upload" type="button" onclick="upload_bin()">Submit</button>
+          <label id="upload_resp"></label>
+        </div>
+      </form>
     </div>
-    <br />
-    <form action="/upload/bin_file" method="post" enctype="multipart/form-data">
-      <div>
-        <label for="bin_file">Choose an OTA Package to Upgrade:</label>
-        <input type="file" id="bin_file" name="bin_file" accept=".bin" onchange="clear_label()"
-               />
-        <button id="upload" type="button" onclick="upload_bin()">Submit</button>
-      </div>
-      <div>
-        <label id="upload_resp"></label>
-      </div>
-    </form>
 </body>
 </html>

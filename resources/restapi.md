@@ -83,3 +83,23 @@
 }
 ```
 * Output: none
+
+7. 获取Macro字符串
+* Method: GET
+* URI: /api/macro/get/macro-name
+* Input: none
+* Output:
+{
+    "macro-name" : "macro-content"
+}
+
+8. 设置Macro字符串
+* Method: PUT
+* URI: /api/macro/set/macro-name
+* Input:
+```
+{
+    "macro-name" : "macro-content"
+}
+```
+* Output: none
