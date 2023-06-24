@@ -7,12 +7,14 @@
 #include "quantum_keycodes.h"
 #include "action_code.h"
 #include "key_definitions.h"
+#include "macros.h"
 
 #define MAX_TOKEN_LEN 12
 #define LAYER_MASK 0xf
 #define BASIC_CODE_MASK 0xff
 #define MOD_MASK 0x1f
 #define MOD_BIT_SEP '|'
+#define MACRO_NAME_PREFIX "MACRO"
 
 #define TAG "KEY_DEF"
 
@@ -28,6 +30,8 @@ typedef struct {
     uint16_t mod_bit;
     const char* desc;
 } mod_bit_desc_t;
+
+typedef mod_bit_desc_t macro_desc_t;
 
 const char* basic_key_codes[] = {
     NULL,
@@ -273,7 +277,8 @@ const quantum_funct_desc_t quantum_functs[] = {
     {QK_MOMENTARY,    QK_MOMENTARY_MAX,    "MO",      1,     {LAYER_NUM}},
     {QK_DEF_LAYER,    QK_DEF_LAYER_MAX,    "DF",      1,     {LAYER_NUM}},
     {QK_TOGGLE_LAYER, QK_TOGGLE_LAYER_MAX, "TG",      1,     {LAYER_NUM}},
-    {QK_MOD_TAP,      QK_MOD_TAP_MAX,      "MT",      2,     {MOD_BITS, BASIC_CODE}}
+    {QK_MOD_TAP,      QK_MOD_TAP_MAX,      "MT",      2,     {MOD_BITS, BASIC_CODE}},
+    {MACRO_CODE_MIN,  MACRO_CODE_MAX,      "MA",      1,     {MACRO_CODE}}
 };
 
 const mod_bit_desc_t mod_bit_name[] = {
@@ -462,6 +467,55 @@ static esp_err_t parse_mod_bit_name(const char* name, uint16_t* mod_bits)
     return ESP_OK;
 }
 
+int get_macro_num(void)
+{
+    return MACRO_CODE_NUM;
+}
+
+esp_err_t get_macro_name(int idx, char* buf, int buf_len)
+{
+    int required_size = snprintf(buf, buf_len, MACRO_NAME_PREFIX "%d", idx);
+    if (required_size + 1 > buf_len) {
+        return ESP_ERR_INVALID_SIZE;
+    } else {
+        return ESP_OK;
+    }
+}
+
+static inline int macro_idx(uint16_t keycode)
+{
+    return keycode - MACRO_CODE_MIN;
+}
+
+esp_err_t parse_macro_name(const char* macro_name, uint16_t* keycode)
+{
+    int name_len = strlen(macro_name);
+    int prefix_len = strlen(MACRO_NAME_PREFIX);
+    static int max_idx_len = 0;
+
+    if (max_idx_len == 0) {
+        char scratch[8];
+        max_idx_len = snprintf(scratch, sizeof(scratch), MACRO_NAME_PREFIX "%d", MACRO_CODE_NUM - 1);
+    }
+
+    if (name_len <= prefix_len ||
+        name_len > strlen(MACRO_NAME_PREFIX) + max_idx_len) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (strncmp(macro_name, MACRO_NAME_PREFIX, prefix_len) != 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    long idx = strtol(&macro_name[prefix_len], NULL, 10);
+    if (idx < 0 || idx >= MACRO_CODE_NUM) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    *keycode = (uint16_t)(idx + MACRO_CODE_MIN);
+    return ESP_OK;
+}
+
 /* full key name is in form "funct op1 ..." */
 esp_err_t get_full_key_name(uint16_t keycode, char* buf, int buf_len)
 {
@@ -478,6 +532,7 @@ esp_err_t get_full_key_name(uint16_t keycode, char* buf, int buf_len)
     int layer_index;
     uint16_t basic_code;
     uint16_t mod_code;
+    esp_err_t ret;
 
     int require_size = snprintf(output, buf_size, "%s", funct_name);
     if (require_size + 1 > buf_size) {
@@ -516,11 +571,24 @@ esp_err_t get_full_key_name(uint16_t keycode, char* buf, int buf_len)
             } else {
                 mod_code = (keycode >> 8) & MOD_MASK;
             }
-            esp_err_t ret = fill_mod_bit_name(mod_code, output, buf_size);
+            ret = fill_mod_bit_name(mod_code, output, buf_size);
             if (ret != ESP_OK) {
-                return ESP_ERR_INVALID_SIZE;
+                return ret;
             }
             require_size = strlen(output);
+            break;
+        case MACRO_CODE:
+            if (buf_size < 1)
+                return ESP_ERR_INVALID_SIZE;
+            output[0] = ' ';
+            output += 1;
+            buf_size -= 1;
+            ret = get_macro_name(macro_idx(keycode), output, buf_size);
+            if (ret != ESP_OK) {
+                return ret;
+            }
+            // Plus one byte for space
+            require_size = strlen(output) + 1;
             break;
         default:
             return ESP_FAIL;
@@ -608,7 +676,7 @@ esp_err_t parse_full_key_name(const char* full_name, uint16_t* keycode)
             err = parse_mod_bit_name(scratch, &mod_bits);
             if (err != ESP_OK) {
                 ESP_LOGE(TAG, "unkown mod bits %s", scratch);
-                return ESP_FAIL;
+                return err;
             }
             if (funct_desc->num_args == 1) {
                 *keycode |= mod_bits;
@@ -616,6 +684,13 @@ esp_err_t parse_full_key_name(const char* full_name, uint16_t* keycode)
                 *keycode |= (mod_bits & 0xf) << 4;
             } else {
                 *keycode |= (mod_bits & MOD_MASK) << 8;
+            }
+            break;
+        case MACRO_CODE:
+            err = parse_macro_name(scratch, keycode);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "unkown macro %s", scratch);
+                return err;
             }
             break;
         default:

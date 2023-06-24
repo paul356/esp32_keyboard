@@ -28,7 +28,7 @@ esp_err_t nvs_write_blob(const char* namespace, const char* key, const void* buf
 /*
  * @read a layout from nvs
  */
-void nvs_read_layout(const char* layout_name,uint16_t buffer[MATRIX_ROWS*MATRIX_COLS]);
+void nvs_read_layout(const char* layout_name, uint16_t buffer[MATRIX_ROWS*MATRIX_COLS]);
 
 /*
  * @add a layout to nvs or overwrite existing one

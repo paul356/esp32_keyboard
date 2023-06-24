@@ -4,6 +4,8 @@
 #include "key_definitions.h"
 #include "keyboard_config.h"
 #include "keymap.h"
+#include "macros.h"
+#include "quantum.h"
 
 // A bit different from QMK, default returns you to the first layer, LOWER and raise increase/lower layer by order.
 #define DEFAULT 0x100
@@ -18,7 +20,7 @@ enum custom_keycodes {
 
 // array to hold names of layouts for oled
 char default_layout_names[LAYERS][MAX_LAYOUT_NAME_LENGTH] = {
-    "QWERTY", "NUM", "Plugins",
+    "Layer 0", "Layer 1", "Layer 2",
 };
 
 //NOTE: For this keymap due to wiring constraints the the two last rows on the left are wired unconventionally
@@ -32,8 +34,8 @@ uint16_t _LAYERS[LAYERS][MATRIX_ROWS][MATRIX_COLS] = {
         {KC_LCTRL,      KC_LGUI,    KC_LALT,   KC_MINUS, LT(1, KC_PGUP),KC_SPC,     KC_SPC,LT(2, KC_PGDOWN),KC_LEFT,    KC_UP,      KC_DOWN,    KC_RIGHT}
     },
     {
-        {KC_GRAVE,      KC_F1,      KC_F2,      KC_F3,      KC_F4,      KC_F5,      KC_F6,      KC_F7,      KC_F8,      KC_F9,      KC_F10,     KC_DEL},
-        {_______,       KC_F11,     KC_F12,     _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    KC_RBRC},
+        {KC_GRAVE,      KC_F1,      KC_F2,      KC_F3,      KC_F4,      KC_F5,      KC_F6,      KC_F7,      KC_F8,      KC_F9,      KC_EQUAL,   KC_DEL},
+        {_______,       KC_F10,     KC_F11,     KC_F12,     _______,    _______,    _______,    _______,    _______,    _______,    _______,    KC_RBRC},
         {_______,       _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______},
         {_______,       _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    KC_BSLASH,  _______},
         {_______,       _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    KC_PGUP,    KC_PGDN,    _______}
@@ -46,6 +48,25 @@ uint16_t _LAYERS[LAYERS][MATRIX_ROWS][MATRIX_COLS] = {
         {_______,       _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______}
     }
 };
+
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (keycode >= MACRO_CODE_MIN && keycode <= MACRO_CODE_MAX && record->event.pressed) {
+        char* content = malloc(MACRO_STR_MAX_LEN);
+        if (!content) {
+            SEND_STRING("no memory!");
+        } else {
+            esp_err_t err = get_macro_str(keycode, content, MACRO_STR_MAX_LEN);
+            if (err != ESP_OK) {
+                SEND_STRING("Oops...");
+            } else {
+                SEND_STRING(content);
+            }
+            free(content);
+        }
+    }
+
+    return true;
+}
 
 #endif
 

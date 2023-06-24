@@ -11,6 +11,7 @@
 #include "keymap.h"
 #include "hal_ble.h"
 #include "function_control.h"
+#include "macros.h"
 
 #define TAG "[HTTPD]"
 #define ARRAY_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
@@ -133,7 +134,6 @@ static esp_err_t layouts_json(httpd_req_t* req)
 
 static void quantum_desc_json(httpd_req_t* req, funct_desc_t* desc)
 {
-    char scratch[8];
     httpd_resp_sendstr_chunk(req, "{\"desc\" : \"");
     httpd_resp_sendstr_chunk(req, desc->desc);
     httpd_resp_sendstr_chunk(req, "\", ");
@@ -156,6 +156,8 @@ static void quantum_desc_json(httpd_req_t* req, funct_desc_t* desc)
         case MOD_BITS:
             httpd_resp_sendstr_chunk(req, "\"mod_bits\"");
             break;
+        case MACRO_CODE:
+            httpd_resp_sendstr_chunk(req, "\"macro_code\"");
         }
     }
     httpd_resp_sendstr_chunk(req, "]}");
@@ -216,6 +218,24 @@ static esp_err_t keycodes_json(httpd_req_t* req)
     }
     httpd_resp_sendstr_chunk(req, "],\n");
 
+    httpd_resp_sendstr_chunk(req, "  \"macros\":[");
+    firstKey = true;
+    for (int i = 0; i < get_macro_num(); i++) {
+        if (firstKey) {
+            httpd_resp_sendstr_chunk(req, "\"");
+            firstKey = false;
+        } else {
+            httpd_resp_sendstr_chunk(req, ", \"");
+        }
+
+        char scratch[12];
+        (void)get_macro_name(i, scratch, sizeof(scratch));
+        httpd_resp_sendstr_chunk(req, scratch);
+
+        httpd_resp_sendstr_chunk(req, "\"");
+    }
+    httpd_resp_sendstr_chunk(req, "],\n");
+
     httpd_resp_sendstr_chunk(req, "  \"layer_num\":");
     char scratch[8];
     snprintf(scratch, sizeof(scratch), "%d", layers_num);
@@ -266,8 +286,8 @@ static esp_err_t update_keymap(httpd_req_t* req)
 
     const char* layer_name = layer->valuestring;    
     int layer_index = -1;
-    for(uint16_t i = 0; i < LAYERS; ++i){
-        if(strcmp(layer_name, default_layout_names[i]) == 0) layer_index = i;
+    for(uint16_t i = 0; i < layers_num; ++i){
+        if(strcmp(layer_name, layer_names_arr[i]) == 0) layer_index = i;
     }
     if(layer_index < 0){
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'layer' should be one of ['QWERTY', 'NUM', 'Plugins']");
@@ -561,6 +581,113 @@ err_out:
     return ret;
 }
 
+static void escape_string(char* content, int max_size)
+{
+    int len = strlen(content);
+
+    int i = 0;
+    while (content[i] != '\0') {
+        switch (content[i]) {
+        case '\n':
+            if (len + 1 >= max_size) {
+                return;
+            }
+            memmove(&content[i+2], &content[i+1], len - i);
+            len += 1;
+            content[i] = '\\';
+            content[i+1] = 'n';
+            i += 2;
+            break;
+        case '"':
+            if (len + 1 >= max_size) {
+                return;
+            }
+            memmove(&content[i+2], &content[i+1], len - i);
+            len += 1;
+            content[i] = '\\';
+            content[i+1] = '"';
+            i += 2;
+            break;
+        default:
+            i++;
+            break;
+        }
+    }
+}
+
+static esp_err_t get_macro_content(httpd_req_t* req)
+{
+    const char* prefix = "/api/macro/get/";
+    const char* last_token = &req->uri[strlen(prefix)];
+    char* content = NULL;
+    esp_err_t ret;
+
+    uint16_t keycode;
+    ESP_GOTO_ON_ERROR(parse_macro_name(last_token, &keycode), err_out, TAG, "error macro name %s", last_token);
+
+    content = malloc(MACRO_STR_MAX_LEN);
+    if (!content) {
+        ret = ESP_ERR_NO_MEM;
+        ESP_LOGE(TAG, "not enough memory to process request %s", req->uri);
+        goto err_out;
+    }   
+
+    ESP_GOTO_ON_ERROR(get_macro_str(keycode, content, MACRO_STR_MAX_LEN), err_out, TAG, "fail to get macro content %s", last_token);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_sendstr_chunk(req, "{\"");
+    httpd_resp_sendstr_chunk(req, last_token);
+    httpd_resp_sendstr_chunk(req, "\" : \"");
+    if (strlen(content) > 0) {
+        escape_string(content, MACRO_STR_MAX_LEN);
+        httpd_resp_sendstr_chunk(req, content);
+    }
+    httpd_resp_sendstr_chunk(req, "\"}");
+
+    free(content);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return ESP_OK;
+
+err_out:
+    if (content) free(content);
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Oops. Something is wrong.");
+    return ret;    
+}
+
+static esp_err_t set_macro_content(httpd_req_t* req)
+{
+    const char* prefix = "/api/macro/set/";
+    const char* last_token = &req->uri[strlen(prefix)];
+    esp_err_t ret;
+
+    cJSON* root = NULL;
+    ret = parse_http_req(req, &root);
+    if (ret != ESP_OK) {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "fail to parse http request");
+        return ret;
+    }
+
+    uint16_t keycode;
+    ESP_GOTO_ON_ERROR(parse_macro_name(last_token, &keycode), err_out, TAG, "error macro name %s", last_token);
+
+    cJSON* contentItem = cJSON_GetObjectItem(root, last_token);
+    if (!contentItem) {
+        ESP_LOGE(TAG, "There is no field %s in the input", last_token);
+        goto err_out;
+    }
+
+    ESP_GOTO_ON_ERROR(set_macro_str(keycode, contentItem->valuestring), err_out, TAG, "fail to set macro %s string", last_token);
+
+    cJSON_Delete(root);
+    httpd_resp_sendstr_chunk(req, NULL);    
+    return ESP_OK;
+
+err_out:
+    cJSON_Delete(root);
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Oops. Something is wrong.");
+    return ret;
+}
+
 static struct {
     const char*    uri;
     httpd_method_t method;
@@ -575,13 +702,17 @@ static struct {
     {"/api/device-status",     HTTP_GET,      get_device_status,      NULL},
     {"/upload/bin_file",       HTTP_POST,     upload_bin_file,        NULL},
     {"/api/switches/*",        HTTP_PUT,      modify_functions,       NULL},
-    {"/*",                     HTTP_GET,      serve_static_files,     NULL},
+    {"/api/macro/get/*",       HTTP_GET,      get_macro_content,      NULL},
+    {"/api/macro/set/*",       HTTP_PUT,      set_macro_content,      NULL},
+    {"/*",                     HTTP_GET,      serve_static_files,     NULL}
 };
 
 esp_err_t start_file_server()
 {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    // The default max handler number is 8
+    config.max_uri_handlers = ARRAY_LEN(handler_uris);
 
     s_init_version = esp_random();
 

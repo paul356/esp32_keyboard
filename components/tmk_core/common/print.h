@@ -31,6 +31,8 @@
 
 #if defined(PROTOCOL_CHIBIOS) || defined(PROTOCOL_ARM_ATSAM)
 #    define PSTR(x) x
+#elif defined(__ESP32S3__)
+#define PSTR(x) x
 #endif
 
 #ifndef NO_PRINT
