@@ -14,7 +14,6 @@
 #define BASIC_CODE_MASK 0xff
 #define MOD_MASK 0x1f
 #define MOD_BIT_SEP '|'
-#define MACRO_NAME_PREFIX "MACRO"
 
 #define TAG "KEY_DEF"
 

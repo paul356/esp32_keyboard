@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include "esp_err.h"
 #include "config.h"
 #include "keyboard_config.h"
 
