@@ -34,5 +34,15 @@ esp_err_t get_macro_str(uint16_t keycode, char* buf, int buf_len)
     }
 
     size_t buf_size = buf_len;
-    return nvs_read_blob(MACRO_NAMESPACE, scratch, buf, &buf_size);
+    esp_err_t err = nvs_read_blob(MACRO_NAMESPACE, scratch, buf, &buf_size);
+    if (err == ESP_ERR_NVS_NOT_FOUND) {
+        len = snprintf(buf, buf_len, "none");
+        if (len >= buf_len) {
+            return ESP_FAIL;
+        } else {
+            return ESP_OK;
+        }
+    }
+
+    return err;
 }

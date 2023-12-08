@@ -86,7 +86,7 @@
 
 7. 获取Macro字符串
 * Method: GET
-* URI: /api/macro/get/macro-name
+* URI: /api/macro/macro-name
 * Input: none
 * Output:
 {
@@ -95,7 +95,7 @@
 
 8. 设置Macro字符串
 * Method: PUT
-* URI: /api/macro/set/macro-name
+* URI: /api/macro/macro-name
 * Input:
 ```
 {
