@@ -14,9 +14,11 @@ esp_err_t set_macro_str(uint16_t keycode, char* buf)
         return ESP_FAIL;
     }
 
+    keycode -= MACRO_CODE_MIN;
+
     char scratch[8];
     int len = snprintf(scratch, sizeof(scratch), MACRO_NAME_PREFIX "%d", keycode);
-    if (len >= sizeof(scratch) && len < 0) {
+    if (len >= sizeof(scratch) || len < 0) {
         ESP_LOGE(TAG, "keycode is too large, keycode=%u ", keycode);
         return ESP_FAIL;
     }
@@ -26,9 +28,11 @@ esp_err_t set_macro_str(uint16_t keycode, char* buf)
 
 esp_err_t get_macro_str(uint16_t keycode, char* buf, int buf_len)
 {
+    keycode -= MACRO_CODE_MIN;
+
     char scratch[8];
     int len = snprintf(scratch, sizeof(scratch), MACRO_NAME_PREFIX "%d", keycode);
-    if (len >= sizeof(scratch) && len < 0) {
+    if (len >= sizeof(scratch) || len < 0) {
         ESP_LOGE(TAG, "keycode is too large, keycode=%u ", keycode);
         return ESP_FAIL;
     }
