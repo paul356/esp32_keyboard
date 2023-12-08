@@ -471,7 +471,7 @@ function _render_macros()
         macro_div.append(btn);
 
         btn.addEventListener("click", event => {
-            let request_path = "api/macro/set/" + macro_name;
+            let request_path = "api/macro/" + macro_name;
             let xhttp = new XMLHttpRequest();
             btn.disabled = true;
             xhttp.onreadystatechange = function() {
@@ -491,7 +491,7 @@ function _render_macros()
             xhttp.send(data);
         });
 
-        let request_path = "/api/macro/get/" + macro_name;
+        let request_path = "/api/macro/" + macro_name;
         let xhttp = new XMLHttpRequest();
         xhttp.onreadystatechange = function() {
             if (xhttp.readyState == 4) {
@@ -499,7 +499,7 @@ function _render_macros()
                     let ret_json = JSON.parse(xhttp.responseText);
                     content.value = ret_json[macro_name];
                 } else {
-                    _handle_server_error(xhttp);
+                    content.value = "fail to get this macro";
                 }
             }
         }

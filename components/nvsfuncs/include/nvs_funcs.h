@@ -9,6 +9,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "esp_err.h"
+#include "nvs.h"
 #include "config.h"
 #include "keyboard_config.h"
 

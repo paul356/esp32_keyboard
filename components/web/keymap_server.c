@@ -617,7 +617,7 @@ static void escape_string(char* content, int max_size)
 
 static esp_err_t get_macro_content(httpd_req_t* req)
 {
-    const char* prefix = "/api/macro/get/";
+    const char* prefix = "/api/macro/";
     const char* last_token = &req->uri[strlen(prefix)];
     char* content = NULL;
     esp_err_t ret;
@@ -656,7 +656,7 @@ err_out:
 
 static esp_err_t set_macro_content(httpd_req_t* req)
 {
-    const char* prefix = "/api/macro/set/";
+    const char* prefix = "/api/macro/";
     const char* last_token = &req->uri[strlen(prefix)];
     esp_err_t ret;
 
@@ -702,8 +702,8 @@ static struct {
     {"/api/device-status",     HTTP_GET,      get_device_status,      NULL},
     {"/upload/bin_file",       HTTP_POST,     upload_bin_file,        NULL},
     {"/api/switches/*",        HTTP_PUT,      modify_functions,       NULL},
-    {"/api/macro/get/*",       HTTP_GET,      get_macro_content,      NULL},
-    {"/api/macro/set/*",       HTTP_PUT,      set_macro_content,      NULL},
+    {"/api/macro/*",           HTTP_GET,      get_macro_content,      NULL},
+    {"/api/macro/*",           HTTP_PUT,      set_macro_content,      NULL},
     {"/*",                     HTTP_GET,      serve_static_files,     NULL}
 };
 
