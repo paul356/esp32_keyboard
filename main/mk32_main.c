@@ -92,7 +92,7 @@ static void send_keys(void *pParam)
         //if (tud_hid_ready())
         //    tud_hid_keyboard_report(1, 0, keycode);
 
-        ESP_LOGI (TAG, "send_keys func runs %u", xLastWakeTime);
+        ESP_LOGI (TAG, "send_keys func runs %lu", xLastWakeTime);
 
         report_keyboard_t report = {0};
         report.mods = 0;
@@ -192,8 +192,8 @@ void app_main()
 
     bool keyboard_inited = false;
     while (true) {
-        if (/*tud_ready() && */!keyboard_inited) {
-            vTaskDelay(500 / portTICK_PERIOD_MS);
+        if (tud_ready() && !keyboard_inited) {
+            //vTaskDelay(500 / portTICK_PERIOD_MS);
             matrix_setup();
             matrix_init();
             default_layer_set(0x1);

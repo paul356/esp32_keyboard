@@ -23,6 +23,7 @@
 #include "driver/rtc_io.h"
 #include "keyboard_config.h"
 #include "esp_sleep.h"
+#include "esp_rom_gpio.h"
 #include "esp_log.h"
 #include "config.h"
 
@@ -99,13 +100,13 @@ void rtc_matrix_setup(void) {
 void matrix_setup(void) {
 	// Initializing columns
 	for (uint8_t col = 0; col < MATRIX_COLS; col++) {
-        gpio_pad_select_gpio(cols[col]);
+        esp_rom_gpio_pad_select_gpio(cols[col]);
         gpio_reset_pin(cols[col]);
 	}
 
 	// Initializing rows
 	for (uint8_t row = 0; row < MATRIX_ROWS; row++) {
-        gpio_pad_select_gpio(rows[row]);
+        esp_rom_gpio_pad_select_gpio(rows[row]);
         gpio_reset_pin(rows[row]);
 	}
 }
