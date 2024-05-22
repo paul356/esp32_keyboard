@@ -38,13 +38,10 @@
 #include "esp_timer.h"
 #include "esp_sleep.h"
 #include "esp_pm.h"
-#if CONFIG_TINYUSB_CDC_ENABLED
-#include "tusb_cdc_acm.h"
-#endif
+#include "tusb.h"
 #include "port_mgmt.h"
 #include "function_control.h"
 #include "status_display.h"
-#include "debug.h"
 #include "hid.h"
 
 //HID Ble functions
