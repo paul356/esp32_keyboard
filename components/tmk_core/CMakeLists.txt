@@ -19,4 +19,4 @@ set(SRC_FILES
 
 idf_component_register(SRCS ${SRC_FILES}
                        INCLUDE_DIRS "common/"
-                       REQUIRES quantum ble tinyusb display)
+                       REQUIRES quantum ble esp_tinyusb display)
