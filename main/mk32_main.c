@@ -42,7 +42,7 @@
 #include "port_mgmt.h"
 #include "function_control.h"
 #include "status_display.h"
-#include "hid.h"
+#include "hid_desc.h"
 
 //HID Ble functions
 //#include "HID_kbdmousejoystick.h"
