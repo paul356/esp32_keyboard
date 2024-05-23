@@ -48,7 +48,8 @@ static char * const descriptor_str_default[] = {
 void enable_usb_hid(void)
 {
     tinyusb_config_t tusb_cfg = {
-        .descriptor = descriptor_hid_default,
+        .device_descriptor = NULL,
+        .configuration_descriptor = descriptor_hid_default,
         .string_descriptor = descriptor_str_default,
         .external_phy = false
     };

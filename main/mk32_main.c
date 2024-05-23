@@ -185,8 +185,6 @@ void app_main()
     (void)register_keyboard_reporter();
     enable_usb_hid();
 
-    esp_log_level_set("*", ESP_LOG_INFO);
-
     bool keyboard_inited = false;
     while (true) {
         if (tud_ready() && !keyboard_inited) {
