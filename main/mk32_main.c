@@ -187,8 +187,8 @@ void app_main()
 
     bool keyboard_inited = false;
     while (true) {
-        if (tud_ready() && !keyboard_inited) {
-            //vTaskDelay(500 / portTICK_PERIOD_MS);
+        if (/*tud_ready() && */!keyboard_inited) {
+            vTaskDelay(500 / portTICK_PERIOD_MS);
             matrix_setup();
             matrix_init();
             default_layer_set(0x1);

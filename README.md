@@ -35,7 +35,7 @@ Until now (2023/03/30) I have finished or barely finished these functionalities.
 - Support Wifi Configuration
 
 ### Build Process
-It build with esp-idf 5.3. It used to build with a customized esp-idf 4.4 except for version v0.0.1. After you have esp-idf [installed and configured](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#manual-installation), run following commands. Note `get_idf` is the bash alias for enter esp-idf environment.
+It build with esp-idf 5.3. It used to build with a customized esp-idf 4.4 for version v0.0.1. After you have esp-idf [installed and configured](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#manual-installation) installed, run following commands. Note `get_idf` is the bash alias for entering esp-idf environment.
 ```
 git clone https://github.com/paul356/esp32_keyboard.git
 get_idf
@@ -43,11 +43,11 @@ idf.py set-target esp32s3
 idf.py build
 idf.py flash
 ```
-In `build` directory you will find the bin file `esp32_keyboard.bin`. Flash this firmware to your esp32s3 development board assume you are connecting to your board with ESPLink.
+In `build` directory you will find the bin file `esp32_keyboard.bin`. Flash this firmware to your esp32s3 development board assuming you connect to your board with ESPLink.
 ```
 idf.py flash
 ```
-If you flash through a USB to UART adaptor, first put esp32s3 into download mode (hold BOOT then press reset), then use this command to flash the board.
+If you flash through an USB to UART adaptor, first put esp32s3 into download mode (hold BOOT then press reset), then use this command to flash the board.
 ```
 esptool.py -p $1 -b 115200 --chip esp32s3  write_flash --flash_mode dio --flash_size detect --flash_freq 40m 0x0 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0xd000 build/ota_data_initial.bin 0x10000 build/MK32.bin 0x190000 build/esp32_keyboard.bin
 ```
