@@ -488,7 +488,7 @@ static esp_err_t get_device_status(httpd_req_t* req)
     httpd_resp_sendstr_chunk(req, is_usb_enabled() ? "true,\n" : "false,\n");    
 
     char str_buf[25];
-    snprintf(str_buf, sizeof(str_buf), "%lu", s_init_version);
+    snprintf(str_buf, sizeof(str_buf), "%llu", s_init_version);
     // start_time
     httpd_resp_sendstr_chunk(req, "\"init_version\" : \"");
     httpd_resp_sendstr_chunk(req, str_buf);

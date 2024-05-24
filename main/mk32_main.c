@@ -38,14 +38,11 @@
 #include "esp_timer.h"
 #include "esp_sleep.h"
 #include "esp_pm.h"
-#include "tinyusb.h"
-#if CONFIG_TINYUSB_CDC_ENABLED
-#include "tusb_cdc_acm.h"
-#endif
+#include "tusb.h"
 #include "port_mgmt.h"
 #include "function_control.h"
 #include "status_display.h"
-#include "debug.h"
+#include "hid_desc.h"
 
 //HID Ble functions
 //#include "HID_kbdmousejoystick.h"
@@ -92,7 +89,7 @@ static void send_keys(void *pParam)
         //if (tud_hid_ready())
         //    tud_hid_keyboard_report(1, 0, keycode);
 
-        ESP_LOGI (TAG, "send_keys func runs %u", xLastWakeTime);
+        ESP_LOGI (TAG, "send_keys func runs %lu", xLastWakeTime);
 
         report_keyboard_t report = {0};
         report.mods = 0;
@@ -152,65 +149,6 @@ static void deep_sleep(void *pvParameters) {
 }
 #endif
 
-#if CONFIG_TINYUSB_CDC_ENABLED
-void tinyusb_cdc_rx_callback(int itf, cdcacm_event_t *event)
-{
-    /* initialization */
-    size_t rx_size = 0;
-    uint8_t buf[65];
-
-    tinyusb_cdcacm_itf_t cdc_acm_itf = TINYUSB_CDC_ACM_0;
-    /* read */
-    esp_err_t ret = tinyusb_cdcacm_read(cdc_acm_itf, buf, CONFIG_TINYUSB_CDC_RX_BUFSIZE, &rx_size);
-    if (ret == ESP_OK) {
-        buf[rx_size] = '\0';
-        ESP_LOGI(TAG, "Got data (%d bytes): %s", rx_size, buf);
-    } else {
-        ESP_LOGE(TAG, "Read error");
-    }
-
-    /* write back */
-    tinyusb_cdcacm_write_queue(cdc_acm_itf, buf, rx_size);
-    tinyusb_cdcacm_write_flush(cdc_acm_itf, 0);
-}
-
-void tinyusb_cdc_line_state_changed_callback(int itf, cdcacm_event_t *event)
-{
-    int dtr = event->line_state_changed_data.dtr;
-    int rst = event->line_state_changed_data.rts;
-    ESP_LOGI(TAG, "Line state changed! dtr:%d, rst:%d", dtr, rst);
-}
-#endif
-
-static void enable_usb_hid(void)
-{
-    tinyusb_config_t tusb_cfg = {
-        .descriptor = NULL,
-        .string_descriptor = NULL,
-        .external_phy = false
-    };
-
-    ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
-
-#if CONFIG_TINYUSB_CDC_ENABLED
-    tinyusb_config_cdcacm_t amc_cfg = {
-        .usb_dev = TINYUSB_USBDEV_0,
-        .cdc_port = TINYUSB_CDC_ACM_0,
-        .rx_unread_buf_sz = 64,
-        .callback_rx = &tinyusb_cdc_rx_callback, // the first way to register a callback
-        .callback_rx_wanted_char = NULL,
-        .callback_line_state_changed = &tinyusb_cdc_line_state_changed_callback,
-        .callback_line_coding_changed = NULL
-    };
-
-    ESP_ERROR_CHECK(tusb_cdc_acm_init(&amc_cfg));
-#endif
-
-    debug_enable = false;
-    debug_matrix = false;
-    debug_keyboard = false;
-}
-
 //How to handle key reports
 static void keyboard_timer_func(void *pvParameters)
 {
@@ -246,8 +184,6 @@ void app_main()
 
     (void)register_keyboard_reporter();
     enable_usb_hid();
-
-    esp_log_level_set("*", ESP_LOG_INFO);
 
     bool keyboard_inited = false;
     while (true) {
