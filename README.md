@@ -26,7 +26,9 @@ Until now (2023/03/30) I have finished or barely finished these functionalities.
   + Show Keyboard Status
   + Change Keymap Dynamicly
   + Support Dynamic Macros. Maros can be changed from the web interface.
+  ![img](https://paul356.github.io/images/esp_keyboard_macros.jpg)
   + OTA Update
+  ![img](https://paul356.github.io/images/esp_keyboard_ota.jpg)
 - I2C Display Support (LED controller 1306)
 
 ### Planned Features
