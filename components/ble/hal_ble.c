@@ -549,10 +549,10 @@ esp_err_t halBLEInit(const char* name)
 	TaskHandle_t xBLETask_keyboard;
 
 	xTaskCreatePinnedToCore(halBLETask_battery, "ble_task_battery",
-			TASK_BLE_STACKSIZE, NULL, configMAX_PRIORITIES, &xBLETask_battery,
+			TASK_BLE_STACKSIZE, NULL, configMAX_PRIORITIES - 1, &xBLETask_battery,
 			0);
 	xTaskCreatePinnedToCore(halBLETask_keyboard, "ble_task_keyboard",
-			TASK_BLE_STACKSIZE, NULL, configMAX_PRIORITIES, &xBLETask_keyboard,
+			TASK_BLE_STACKSIZE, NULL, configMAX_PRIORITIES - 1, &xBLETask_keyboard,
 			1);
 
 	//set log level according to define
