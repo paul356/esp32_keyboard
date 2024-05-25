@@ -3,8 +3,9 @@
 
 #include <stdbool.h>
 #include "esp_err.h"
+#include "esp_wifi.h"
 
-esp_err_t update_wifi_state(bool enabled, const char* ssid, const char* passwd);
+esp_err_t update_wifi_state(wifi_mode_t mode, const char* ssid, const char* passwd);
 bool is_wifi_enabled();
 
 esp_err_t update_ble_state(bool enabled, const char* name);

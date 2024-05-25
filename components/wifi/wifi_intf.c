@@ -18,10 +18,12 @@
 
 static const char *TAG = "SOFTAP";
 static bool netif_inited = false;
-static bool wifiap_started = false;
+static bool wifi_started = false;
 
-static void wifi_event_handler(void* arg, esp_event_base_t event_base,
-                                    int32_t event_id, void* event_data)
+static void wifi_event_handler(void* arg,
+                               esp_event_base_t event_base,
+                               int32_t event_id,
+                               void* event_data)
 {
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
         wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
@@ -31,7 +33,18 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
         wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
         ESP_LOGI(TAG, "station "MACSTR" leave, AID=%d",
                  MAC2STR(event->mac), event->aid);
+    } else if (event_id == WIFI_EVENT_STA_CONNECTED) {
+        wifi_event_sta_connected_t* event = (wifi_event_sta_connected_t*)event_data;
+        ESP_LOGI(TAG, "station is connected to %s", event->ssid);
+    } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
+        wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*)event_data;
+        ESP_LOGI(TAG, "station is disconnected from %s", event->ssid);
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
+        ESP_LOGI(TAG, "station get ip:" IPSTR, IP2STR(&event->ip_info.ip));
     }
+
+
 }
 
 static esp_err_t start_softap(const char* ssid, const char* passwd)
@@ -71,14 +84,56 @@ static esp_err_t start_softap(const char* ssid, const char* passwd)
         return ret;
     }
 
-    wifiap_started = true;
+    wifi_started = true;
     ESP_LOGI(TAG, "wifi_init_softap finished. SSID:%s password:%s channel:%d",
              ssid, passwd, EXAMPLE_ESP_WIFI_CHANNEL);
 
     return ESP_OK;
 }
 
-esp_err_t wifi_stop_softap(void)
+static esp_err_t start_station(const char* ssid, const char* passwd)
+{
+    esp_err_t ret = ESP_OK;
+    wifi_config_t wifi_config = {
+        .sta = {
+            .ssid = "",
+            .password = "",
+            .threshold.authmode = WIFI_AUTH_WPA_WPA2_PSK,
+            .sae_pwe_h2e = WPA3_SAE_PWE_HUNT_AND_PECK,
+            .sae_h2e_identifier = "",
+        },
+    };
+
+    snprintf((char *)wifi_config.ap.ssid, sizeof(wifi_config.ap.ssid), "%s", ssid);
+    snprintf((char *)wifi_config.ap.password, sizeof(wifi_config.ap.password), "%s", passwd);
+
+    if (strlen(passwd) == 0) {
+        wifi_config.sta.threshold.authmode = WIFI_AUTH_OPEN;
+    }
+
+    ret = esp_wifi_set_mode(WIFI_MODE_STA);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    ret = esp_wifi_set_config(WIFI_IF_STA, &wifi_config);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    ret = esp_wifi_start();
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    wifi_started = true;
+    ESP_LOGI(TAG, "wifi_init_sta finished. SSID:%s password:%s",
+             ssid, passwd);
+
+    return ESP_OK;
+}
+
+esp_err_t wifi_stop(void)
 {
     // stop softap first
     esp_err_t ret = esp_wifi_stop();
@@ -86,24 +141,36 @@ esp_err_t wifi_stop_softap(void)
         return ret;
     }
 
-    wifiap_started = false;
+    wifi_started = false;
     return ESP_OK;
 }
 
-esp_err_t wifi_update_softap(const char* new_ssid, const char* new_passwd)
+static esp_err_t start_wifi(wifi_mode_t mode, const char* ssid, const char* passwd)
 {
-    if (wifiap_started) {
+    switch (mode) {
+    case WIFI_MODE_NULL:
+        return ESP_OK;
+    case WIFI_MODE_STA:
+        return start_station(ssid, passwd);
+    default:
+        return start_softap(ssid, passwd);
+    }
+}
+
+esp_err_t wifi_update(wifi_mode_t mode, const char* new_ssid, const char* new_passwd)
+{
+    if (wifi_started) {
         // stop softap first
-        esp_err_t ret = wifi_stop_softap();
+        esp_err_t ret = wifi_stop();
         if (ret != ESP_OK) {
             ESP_LOGW(TAG, "stop wifi failed");
         }
     }
 
-    return start_softap(new_ssid, new_passwd);
+    return start_wifi(mode, new_ssid, new_passwd);
 }
 
-esp_err_t wifi_init_softap(const char* ssid, const char* passwd)
+esp_err_t wifi_init(wifi_mode_t mode, const char* ssid, const char* passwd)
 {
     esp_err_t ret;
 
@@ -118,7 +185,9 @@ esp_err_t wifi_init_softap(const char* ssid, const char* passwd)
             return ret;
         }
 
+        // create drivers for AP+STA
         esp_netif_create_default_wifi_ap();
+        esp_netif_create_default_wifi_sta();
 
         wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
         ret = esp_wifi_init(&cfg);
@@ -135,9 +204,18 @@ esp_err_t wifi_init_softap(const char* ssid, const char* passwd)
             return ret;
         }
 
+        ret = esp_event_handler_instance_register(IP_EVENT,
+                                                  IP_EVENT_STA_GOT_IP,
+                                                  &wifi_event_handler,
+                                                  NULL,
+                                                  NULL);
+        if (ret != ESP_OK) {
+            return ret;
+        }
+
         // mark flag
         netif_inited = true;
     }
 
-    return start_softap(ssid, passwd);
+    return start_wifi(mode, ssid, passwd);
 }
