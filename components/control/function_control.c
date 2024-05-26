@@ -39,7 +39,7 @@ typedef enum _function_control_e {
     FUNCTION_BUTT
 } function_control_e;
 
-typedef union _control_state_t {
+typedef struct _control_state_t {
     struct {
         wifi_mode_t mode;
         char ssid[MAX_CONFIG_VALUE_LEN];
@@ -196,7 +196,7 @@ static esp_err_t update_persisted_config(function_control_e func)
 
     for (int i = 0; i < function_config_entries[func].config_num; i++) {
         const config_item_t* item = &(function_config_entries[func].config_items[i]);
-        err = item->write_func(i, item->item_name, &function_state);
+        err = item->write_func(func, item->item_name, &function_state);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "fail to persist %s, err=%d", item->item_name, err);
         }
@@ -205,7 +205,7 @@ static esp_err_t update_persisted_config(function_control_e func)
     return err;
 }
 
-esp_err_t restore_saved_state()
+esp_err_t restore_saved_state(void)
 {
     esp_err_t ret = recover_persisted_config();
     if (ret != ESP_OK) {
@@ -236,7 +236,7 @@ esp_err_t update_wifi_state(wifi_mode_t mode, const char* ssid, const char* pass
         snprintf(function_state.wifi.ssid, sizeof(function_state.wifi.ssid), "%s", ssid);
     }
 
-    if (passwd && strlen(passwd) > 0) {
+    if (passwd) {
         snprintf(function_state.wifi.passwd, sizeof(function_state.wifi.passwd), "%s", passwd);
     }
 
@@ -266,9 +266,9 @@ esp_err_t update_usb_state(bool enabled)
     return update_persisted_config(USB);
 }
 
-bool is_wifi_enabled(void)
+wifi_mode_t get_wifi_mode(void)
 {
-    return function_state.wifi.mode != WIFI_MODE_NULL;
+    return function_state.wifi.mode;
 }
 
 bool is_ble_enabled(void)

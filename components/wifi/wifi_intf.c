@@ -1,8 +1,11 @@
 #include <string.h>
 #include <stdbool.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/event_groups.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "wifi_intf.h"
 
 #define EXAMPLE_ESP_WIFI_CHANNEL   1
 #define EXAMPLE_MAX_STA_CONN       2
@@ -16,27 +19,33 @@
 #define MACSTR "%02x:%02x:%02x:%02x:%02x:%02x"
 #endif
 
+#define WIFI_STATION_CONNECTED 0x1
+#define WIFI_HOTSPOT_ENABLED   0x2
+
 static const char *TAG = "SOFTAP";
 static bool netif_inited = false;
-static bool wifi_started = false;
+static uint8_t wifi_state_bits  = 0;
 
 static void wifi_event_handler(void* arg,
                                esp_event_base_t event_base,
                                int32_t event_id,
                                void* event_data)
 {
-    if (event_id == WIFI_EVENT_AP_STACONNECTED) {
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STACONNECTED) {
         wifi_event_ap_staconnected_t* event = (wifi_event_ap_staconnected_t*) event_data;
         ESP_LOGI(TAG, "station "MACSTR" join, AID=%d",
                  MAC2STR(event->mac), event->aid);
-    } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_STADISCONNECTED) {
         wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
         ESP_LOGI(TAG, "station "MACSTR" leave, AID=%d",
                  MAC2STR(event->mac), event->aid);
-    } else if (event_id == WIFI_EVENT_STA_CONNECTED) {
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_CONNECTED) {
         wifi_event_sta_connected_t* event = (wifi_event_sta_connected_t*)event_data;
         ESP_LOGI(TAG, "station is connected to %s", event->ssid);
-    } else if (event_id == WIFI_EVENT_STA_DISCONNECTED) {
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        esp_wifi_connect();
+        ESP_LOGI(TAG, "station connects to ssid");
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         wifi_event_sta_disconnected_t* event = (wifi_event_sta_disconnected_t*)event_data;
         ESP_LOGI(TAG, "station is disconnected from %s", event->ssid);
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
@@ -84,9 +93,9 @@ static esp_err_t start_softap(const char* ssid, const char* passwd)
         return ret;
     }
 
-    wifi_started = true;
-    ESP_LOGI(TAG, "wifi_init_softap finished. SSID:%s password:%s channel:%d",
-             ssid, passwd, EXAMPLE_ESP_WIFI_CHANNEL);
+    wifi_state_bits |= WIFI_STATION_CONNECTED;
+    ESP_LOGI(TAG, "wifi_init_softap finished. SSID:%s password:XXX channel:%d",
+             ssid, EXAMPLE_ESP_WIFI_CHANNEL);
 
     return ESP_OK;
 }
@@ -98,14 +107,14 @@ static esp_err_t start_station(const char* ssid, const char* passwd)
         .sta = {
             .ssid = "",
             .password = "",
-            .threshold.authmode = WIFI_AUTH_WPA_WPA2_PSK,
-            .sae_pwe_h2e = WPA3_SAE_PWE_HUNT_AND_PECK,
-            .sae_h2e_identifier = "",
+            .scan_method = WIFI_ALL_CHANNEL_SCAN,
+            .threshold.authmode = WIFI_AUTH_WPA2_PSK,
+            .sae_pwe_h2e = WPA3_SAE_PWE_BOTH
         },
     };
 
-    snprintf((char *)wifi_config.ap.ssid, sizeof(wifi_config.ap.ssid), "%s", ssid);
-    snprintf((char *)wifi_config.ap.password, sizeof(wifi_config.ap.password), "%s", passwd);
+    snprintf((char *)wifi_config.sta.ssid, sizeof(wifi_config.sta.ssid), "%s", ssid);
+    snprintf((char *)wifi_config.sta.password, sizeof(wifi_config.sta.password), "%s", passwd);
 
     if (strlen(passwd) == 0) {
         wifi_config.sta.threshold.authmode = WIFI_AUTH_OPEN;
@@ -126,22 +135,32 @@ static esp_err_t start_station(const char* ssid, const char* passwd)
         return ret;
     }
 
-    wifi_started = true;
-    ESP_LOGI(TAG, "wifi_init_sta finished. SSID:%s password:%s",
-             ssid, passwd);
+    wifi_state_bits |= WIFI_STATION_CONNECTED;
+    ESP_LOGI(TAG, "wifi_init_sta finished. SSID:%s password:XXX", ssid);
 
     return ESP_OK;
 }
 
 esp_err_t wifi_stop(void)
 {
-    // stop softap first
-    esp_err_t ret = esp_wifi_stop();
-    if (ret != ESP_OK) {
-        return ret;
+    if (wifi_state_bits & WIFI_STATION_CONNECTED) {
+        esp_wifi_disconnect();
     }
 
-    wifi_started = false;
+    if (wifi_state_bits != 0) {
+        // stop softap first
+        esp_err_t ret = esp_wifi_stop();
+        if (ret != ESP_OK) {
+            return ret;
+        }
+    }
+
+    if (wifi_state_bits & WIFI_STATION_CONNECTED) {
+        wifi_state_bits ^= WIFI_STATION_CONNECTED;
+    } else if (wifi_state_bits & WIFI_HOTSPOT_ENABLED) {
+        wifi_state_bits ^= WIFI_HOTSPOT_ENABLED;
+    }
+
     return ESP_OK;
 }
 
@@ -159,12 +178,9 @@ static esp_err_t start_wifi(wifi_mode_t mode, const char* ssid, const char* pass
 
 esp_err_t wifi_update(wifi_mode_t mode, const char* new_ssid, const char* new_passwd)
 {
-    if (wifi_started) {
-        // stop softap first
-        esp_err_t ret = wifi_stop();
-        if (ret != ESP_OK) {
-            ESP_LOGW(TAG, "stop wifi failed");
-        }
+    esp_err_t ret = wifi_stop();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "stop wifi failed");
     }
 
     return start_wifi(mode, new_ssid, new_passwd);

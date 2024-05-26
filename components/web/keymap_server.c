@@ -468,6 +468,29 @@ static esp_err_t upload_bin_file(httpd_req_t* req)
     return ESP_OK;
 }
 
+static const char* wifi_mode_to_str(void)
+{
+    switch (get_wifi_mode()) {
+    case WIFI_MODE_NULL:
+        return "closed";
+    case WIFI_MODE_STA:
+        return "client";
+    default:
+        return "hotspot";
+    }
+}
+
+static wifi_mode_t str_to_wifi_mode(const char* str)
+{
+    if (strcmp(str, "closed") == 0) {
+        return WIFI_MODE_NULL;
+    } else if (strcmp(str, "client") == 0) {
+        return WIFI_MODE_STA;
+    } else {
+        return WIFI_MODE_AP;
+    }
+}
+
 static esp_err_t get_device_status(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "application/json");
@@ -477,6 +500,10 @@ static esp_err_t get_device_status(httpd_req_t* req)
     const esp_partition_t* curr_part = esp_ota_get_running_partition();
     httpd_resp_sendstr_chunk(req, "\"boot_partition\" : \"");
     httpd_resp_sendstr_chunk(req, curr_part->label);
+    httpd_resp_sendstr_chunk(req, "\",\n");
+
+    httpd_resp_sendstr_chunk(req, "\"wifi_state\" : \"");
+    httpd_resp_sendstr_chunk(req, wifi_mode_to_str());
     httpd_resp_sendstr_chunk(req, "\",\n");
 
     // ble_state
@@ -505,6 +532,7 @@ static esp_err_t modify_functions(httpd_req_t* req)
     const char* prefix = "/api/switches/";
     const char* last_token = &req->uri[strlen(prefix)];
     esp_err_t ret;
+    const char* err_str = "Oops. Something is wrong.";
 
     cJSON* root = NULL;
     esp_err_t err = parse_http_req(req, &root);
@@ -514,30 +542,34 @@ static esp_err_t modify_functions(httpd_req_t* req)
     }
 
     if (strcmp(last_token, "WiFi") == 0) {
-        cJSON_bool enabled = false;
+        const char* mode = NULL;
         const char* ssid = NULL;
         const char* passwd = NULL;
 
-        cJSON* enabledItem = cJSON_GetObjectItem(root, "enabled");
-        if (enabledItem) {
-            enabled = cJSON_IsTrue(enabledItem);
+        cJSON* modeItem = cJSON_GetObjectItem(root, "mode");
+        if (modeItem) {
+            mode = cJSON_GetStringValue(modeItem);
         }
 
         cJSON* ssidItem = cJSON_GetObjectItem(root, "ssid");
         if (ssidItem) {
-            if (!enabledItem) enabled = true;
             ssid = cJSON_GetStringValue(ssidItem);
         }
 
         cJSON* passwdItem = cJSON_GetObjectItem(root, "passwd");
         if (passwdItem) {
-            if (!enabledItem) enabled = true;
             passwd = cJSON_GetStringValue(passwdItem);
         }
 
-        if (enabledItem || ssidItem || passwdItem) {
-            ESP_GOTO_ON_ERROR(update_wifi_state(enabled, ssid, passwd), err_out, TAG, "fail to update wifi state");
+        if (mode == NULL ||
+            ((strcmp(mode, "closed") != 0) &&
+             (ssidItem == NULL || passwdItem == NULL))) {
+            err_str = "incomplete parameters";
+            ret = ESP_ERR_INVALID_ARG;
+            goto err_out;
         }
+
+        ESP_GOTO_ON_ERROR(update_wifi_state(str_to_wifi_mode(mode), ssid, passwd), err_out, TAG, "fail to update wifi state");
     } else if (strcmp(last_token, "BLE") == 0) {
         cJSON_bool enabled = false;
         const char* name = NULL;
@@ -577,7 +609,7 @@ static esp_err_t modify_functions(httpd_req_t* req)
 
 err_out:
     cJSON_Delete(root);
-    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Oops. Something is wrong.");
+    httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, err_str);
     return ret;
 }
 

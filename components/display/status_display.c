@@ -197,7 +197,7 @@ static void create_objects(void)
         s_objects[ICON_BLE] = ble_img;
     }
 
-    if (is_wifi_enabled()) {
+    if (get_wifi_mode() != WIFI_MODE_NULL) {
         lv_obj_t* wifi_img = lv_img_create(scr);
         LV_IMG_DECLARE(wifi_icon);
         lv_img_set_src(wifi_img, &wifi_icon);
