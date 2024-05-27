@@ -353,20 +353,77 @@ function _button_clicked(event)
     xhttp.send(data);
 }
 
+function _update_wifi(event)
+{
+    let action_path = "/api/switches/WiFi"
+    let button = event.currentTarget
+
+    let wifi_select = document.getElementById("wifi_mode")
+    let ssid   = document.getElementById("wifi_ssid").value
+    let passwd = document.getElementById("wifi_password").value
+
+    let mode = wifi_select.selectedOptions.item(0).label
+    if (ssid.length == 0) {
+        alert("ssid can't be empty")
+        return
+    }
+
+    button.disabled = true
+
+    let xhttp = new XMLHttpRequest()
+    xhttp.onreadystatechange = function() {
+        if (xhttp.readyState == 4) {
+            if (xhttp.status == 200) {
+                button.disabled = false;
+            } else {
+                _handle_server_error(xhttp);
+            }
+        }
+    }
+
+    xhttp.open("PUT", action_path, true)
+
+    xhttp.setRequestHeader("Content-Type", "application/json")
+    let data = JSON.stringify({"mode" : mode, "ssid" : ssid, "passwd" : passwd})
+    xhttp.send(data)
+}
+
 function _render_switches_line(status_json)
 {
-    let switches_div = _create_div(null, {});
-    let status_div = document.getElementById("status_line");
+    let status_div = document.getElementById("status_line")
 
-    let ble_switch = _create_element("button", _get_button_str(status_json["ble_state"]) + " BLE", {"curr_state" : status_json["ble_state"], "kb_function" : "BLE"});
-    let usb_switch = _create_element("button", _get_button_str(status_json["usb_state"]) + " USB", {"curr_state" : status_json["usb_state"], "kb_function" : "USB"});
+    let wifi_div = _create_element("div", null, {})
+    let wifi_select = _create_element("select", null, {"id" : "wifi_mode"})
+    let modes = Array.of("client", "hotspot")
+    modes.forEach((element, idx, arr) => {
+        wifi_select.append(_create_element("option", element, {}))
+        if (element == status_json["wifi_state"]) {
+            wifi_select.selectedIndex = idx
+        }
+    })
+    wifi_div.append(_create_element("label", "WiFi Mode:", {}))
+    wifi_div.append(wifi_select)
+    wifi_div.append(_create_element("label", "SSID:", {}))
+    wifi_div.append(_create_element("input", null, {"type" : "text", "id" : "wifi_ssid", "size" : "12"}))
+    wifi_div.append(_create_element("label", "Password:", {}))
+    wifi_div.append(_create_element("input", null, {"type" : "text", "id" : "wifi_password", "size" : "12"}))
+    let wifi_btn = _create_element("button", "Change WiFi Mode", {})
+    wifi_btn.addEventListener("click", _update_wifi)
+    wifi_div.append(wifi_btn)
 
-    ble_switch.addEventListener("click", _button_clicked);
-    usb_switch.addEventListener("click", _button_clicked);
+    status_div.append(wifi_div)
 
-    switches_div.append(ble_switch);
-    switches_div.append(usb_switch);
-    status_div.append(switches_div);
+    let switch_div = _create_element("div", null, {})
+
+    let ble_switch = _create_element("button", _get_button_str(status_json["ble_state"]) + " BLE", {"curr_state" : status_json["ble_state"], "kb_function" : "BLE"})
+    ble_switch.addEventListener("click", _button_clicked)
+    switch_div.append(ble_switch)
+
+    let usb_switch = _create_element("button", _get_button_str(status_json["usb_state"]) + " USB", {"curr_state" : status_json["usb_state"], "kb_function" : "USB"})
+    usb_switch.addEventListener("click", _button_clicked)
+    switch_div.append(usb_switch)
+
+    status_div.append(switch_div)
 }
 
 function render_status_line()

@@ -37,7 +37,7 @@ Until now (2023/03/30) I have finished or barely finished these functionalities.
 - Support Wifi Configuration
 
 ### Build Process
-It build with esp-idf 5.3. It used to build with a customized esp-idf 4.4 for version v0.0.1. After you have esp-idf [installed and configured](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#manual-installation) installed, run following commands. Note `get_idf` is the bash alias for entering esp-idf environment.
+It builds with esp-idf 5.3. It used to build with a customized esp-idf 4.4 for version v0.0.1. After you have esp-idf [installed and configured](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#manual-installation) installed, run following commands. Note `get_idf` is the bash alias for entering esp-idf environment.
 ```
 git clone https://github.com/paul356/esp32_keyboard.git
 get_idf

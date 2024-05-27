@@ -5,7 +5,7 @@
 #include "esp_log.h"
 #include "esp_random.h"
 #include "hal_ble.h"
-#include "wifi_ap.h"
+#include "wifi_intf.h"
 
 #define TAG "FUNC_CTRL"
 #define FUNCTION_CTRL_NAMESPACE "FUNC_CTRL"
@@ -39,9 +39,9 @@ typedef enum _function_control_e {
     FUNCTION_BUTT
 } function_control_e;
 
-typedef union _control_state_t {
+typedef struct _control_state_t {
     struct {
-        bool enabled;
+        wifi_mode_t mode;
         char ssid[MAX_CONFIG_VALUE_LEN];
         char passwd[MAX_CONFIG_VALUE_LEN];
     } wifi;
@@ -70,7 +70,7 @@ typedef struct _function_config_t {
     const config_item_t* config_items;
 } function_config_t;
 
-static void set_default_wifi_enabled(control_state_t* config);
+static void set_default_wifi_mode(control_state_t* config);
 static void set_default_wifi_ssid(control_state_t* config);
 static void set_default_wifi_passwd(control_state_t* config);
 static void set_default_ble_enabled(control_state_t* config);
@@ -80,7 +80,7 @@ static void set_default_usb_values(control_state_t* config);
 static esp_err_t load_config_value(function_control_e function, const char* item_name, void* config_value, size_t* len);
 static esp_err_t save_config_value(function_control_e function, const char* item_name, const void* config_value, size_t len);
 
-CONFIG_VALUE_GETTER_SETTER(wifi, enabled)
+CONFIG_VALUE_GETTER_SETTER(wifi, mode)
 CONFIG_VALUE_GETTER_SETTER(wifi, ssid)
 CONFIG_VALUE_GETTER_SETTER(wifi, passwd)
 CONFIG_VALUE_GETTER_SETTER(ble, enabled)
@@ -88,7 +88,7 @@ CONFIG_VALUE_GETTER_SETTER(ble, name)
 CONFIG_VALUE_GETTER_SETTER(usb, enabled)
 
 static config_item_t wifi_config[] = {
-    {"enabled", &load_wifi_enabled, &save_wifi_enabled, set_default_wifi_enabled},
+    {"mode",    &load_wifi_mode,    &save_wifi_mode,    set_default_wifi_mode},
     {"ssid",    &load_wifi_ssid,    &save_wifi_ssid,    set_default_wifi_ssid},
     {"passwd",  &load_wifi_passwd,  &save_wifi_passwd,  set_default_wifi_passwd}
 };
@@ -144,9 +144,9 @@ esp_err_t save_config_value(
     return nvs_write_blob(FUNCTION_CTRL_NAMESPACE, key, config_value, len);
 }
 
-void set_default_wifi_enabled(control_state_t* state)
+void set_default_wifi_mode(control_state_t* state)
 {
-    state->wifi.enabled = true;
+    state->wifi.mode = WIFI_MODE_AP;
 }
 void set_default_wifi_ssid(control_state_t* state)
 {
@@ -196,7 +196,7 @@ static esp_err_t update_persisted_config(function_control_e func)
 
     for (int i = 0; i < function_config_entries[func].config_num; i++) {
         const config_item_t* item = &(function_config_entries[func].config_items[i]);
-        err = item->write_func(i, item->item_name, &function_state);
+        err = item->write_func(func, item->item_name, &function_state);
         if (err != ESP_OK) {
             ESP_LOGE(TAG, "fail to persist %s, err=%d", item->item_name, err);
         }
@@ -205,18 +205,16 @@ static esp_err_t update_persisted_config(function_control_e func)
     return err;
 }
 
-esp_err_t restore_saved_state()
+esp_err_t restore_saved_state(void)
 {
     esp_err_t ret = recover_persisted_config();
     if (ret != ESP_OK) {
         return ret;
     }
 
-    if (function_state.wifi.enabled) {
-        ret = wifi_init_softap(function_state.wifi.ssid, function_state.wifi.passwd);
-        if (ret != ESP_OK) {
-            return ret;
-        }
+    ret = wifi_init(function_state.wifi.mode, function_state.wifi.ssid, function_state.wifi.passwd);
+    if (ret != ESP_OK) {
+        return ret;
     }
 
     if (function_state.ble.enabled) {
@@ -229,26 +227,32 @@ esp_err_t restore_saved_state()
     return ESP_OK;
 }
 
-esp_err_t update_wifi_state(bool enabled, const char* ssid, const char* passwd)
+esp_err_t update_wifi_state(wifi_mode_t mode, const char* ssid, const char* passwd)
 {
     esp_err_t err;
-    function_state.wifi.enabled = enabled;
+    function_state.wifi.mode = mode;
 
     if (ssid && strlen(ssid) > 0) {
         snprintf(function_state.wifi.ssid, sizeof(function_state.wifi.ssid), "%s", ssid);
-    }
-
-    if (passwd && strlen(passwd) > 0) {
-        snprintf(function_state.wifi.passwd, sizeof(function_state.wifi.passwd), "%s", passwd);
-    }
-
-    if (enabled) {
-        err = wifi_update_softap(function_state.wifi.ssid, function_state.wifi.passwd);
     } else {
-        err = wifi_stop_softap();
+        ESP_LOGE(TAG, "ssid can't be null");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (passwd) {
+        snprintf(function_state.wifi.passwd, sizeof(function_state.wifi.passwd), "%s", passwd);
+    } else {
+        ESP_LOGE(TAG, "passwd can't be null");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (mode != WIFI_MODE_NULL) {
+        err = wifi_update(mode, function_state.wifi.ssid, function_state.wifi.passwd);
+    } else {
+        err = wifi_stop();
     }
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "fail to %s wifi state, err=%d", enabled?"enable":"disable", err);
+        ESP_LOGE(TAG, "fail to update wifi state, mode=%d err=%d", mode, err);
         return err;
     }
 
@@ -268,9 +272,9 @@ esp_err_t update_usb_state(bool enabled)
     return update_persisted_config(USB);
 }
 
-bool is_wifi_enabled(void)
+wifi_mode_t get_wifi_mode(void)
 {
-    return function_state.wifi.enabled;
+    return function_state.wifi.mode;
 }
 
 bool is_ble_enabled(void)
