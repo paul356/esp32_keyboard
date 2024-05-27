@@ -234,10 +234,16 @@ esp_err_t update_wifi_state(wifi_mode_t mode, const char* ssid, const char* pass
 
     if (ssid && strlen(ssid) > 0) {
         snprintf(function_state.wifi.ssid, sizeof(function_state.wifi.ssid), "%s", ssid);
+    } else {
+        ESP_LOGE(TAG, "ssid can't be null");
+        return ESP_ERR_INVALID_ARG;
     }
 
     if (passwd) {
         snprintf(function_state.wifi.passwd, sizeof(function_state.wifi.passwd), "%s", passwd);
+    } else {
+        ESP_LOGE(TAG, "passwd can't be null");
+        return ESP_ERR_INVALID_ARG;
     }
 
     if (mode != WIFI_MODE_NULL) {

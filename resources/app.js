@@ -319,7 +319,7 @@ function _render_status_line(status_json)
     let status_div = document.getElementById("status_line");
 
     for (let item in status_json) {
-        status_div.append(_create_div(item + ":" + status_json[item], {"class" : "status-item", "id" : item}));
+        status_div.append(_create_div(item + ":" + status_json[item], {"class" : "status-item"}));
     }
 }
 
