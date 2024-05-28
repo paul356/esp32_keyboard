@@ -51,7 +51,7 @@ idf.py flash
 ```
 If you flash through an USB to UART adaptor, first put esp32s3 into download mode (hold BOOT then press reset), then use this command to flash the board.
 ```
-esptool.py -p $1 -b 115200 --chip esp32s3  write_flash --flash_mode dio --flash_size detect --flash_freq 40m 0x0 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0xd000 build/ota_data_initial.bin 0x10000 build/MK32.bin 0x190000 build/esp32_keyboard.bin
+esptool.py -p $1 -b 115200 --chip esp32s3  write_flash --flash_mode dio --flash_size detect --flash_freq 40m 0x0 build/bootloader/bootloader.bin 0x8000 build/partition_table/partition-table.bin 0xd000 build/ota_data_initial.bin 0x10000 build/esp32_keyboard.bin 0x1a0000 build/esp32_keyboard.bin
 ```
 
 ### Code Structure
