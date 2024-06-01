@@ -277,9 +277,42 @@ wifi_mode_t get_wifi_mode(void)
     return function_state.wifi.mode;
 }
 
+const char* get_wifi_ssid(void)
+{
+    return function_state.wifi.ssid;
+}
+
+const char* wifi_mode_to_str(wifi_mode_t mode)
+{
+    switch (mode) {
+    case WIFI_MODE_NULL:
+        return "closed";
+    case WIFI_MODE_STA:
+        return "client";
+    default:
+        return "hotspot";
+    }
+}
+
+wifi_mode_t str_to_wifi_mode(const char* str)
+{
+    if (strcmp(str, "closed") == 0) {
+        return WIFI_MODE_NULL;
+    } else if (strcmp(str, "client") == 0) {
+        return WIFI_MODE_STA;
+    } else {
+        return WIFI_MODE_AP;
+    }
+}
+
 bool is_ble_enabled(void)
 {
     return function_state.ble.enabled;
+}
+
+const char* get_ble_name(void)
+{
+    return function_state.ble.name;
 }
 
 bool is_usb_enabled(void)

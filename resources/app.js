@@ -4,6 +4,7 @@ var basic_key_codes = null;
 var quantum_funct_descs = null;
 var mod_bit_names = null;
 var macro_names = null;
+var function_keys = null;
 var max_layer_num = 0;
 var selected_key = null;
 
@@ -91,23 +92,23 @@ function _funct_select(funct_name)
     return funct_select;
 }
 
-function _basic_code_select(basic_code)
+function _generic_code_select(generic_code, code_arr)
 {
     var selected_index = -1;
-    let bs_select = _create_element("select", null, {});
+    let gc_select = _create_element("select", null, {});
 
     let add_option = function(opt, index, arr) {
-        if (opt === basic_code) {
+        if (opt === generic_code) {
             selected_index = index;
         }
         let option = _create_element("option", opt, {});
-        bs_select.append(option);
+        gc_select.append(option);
     }
-    basic_key_codes.forEach(add_option);
+    code_arr.forEach(add_option);
 
-    bs_select.selectedIndex = selected_index;
+    gc_select.selectedIndex = selected_index;
 
-    return bs_select;
+    return gc_select;
 }
 
 function _layer_select(layer_idx)
@@ -149,26 +150,6 @@ function _mod_bit_select(mod_bits)
     mod_bit_names.forEach(add_option);
 
     return mod_bit_select;
-}
-
-function _macro_code_select(macro_name)
-{
-    var selected_index = -1;
-    let macro_select = _create_element("select", null, {});
-
-    let add_option = function(opt, index, arr) {
-        if (opt === macro_name) {
-            selected_index = index;
-        }
-        let option = _create_element("option", opt, {});
-        macro_select.append(option);
-    }
-
-    macro_names.forEach(add_option);
-
-    macro_select.selectedIndex = selected_index;
-
-    return macro_select;
 }
 
 function _get_funct_desc(funct_name)
@@ -221,13 +202,16 @@ function _keystroke_clicked(event)
             new_div.append(_layer_select(toks[index + 1]));
             break;
         case "basic_code":
-            new_div.append(_basic_code_select(toks[index + 1]));
+            new_div.append(_generic_code_select(toks[index + 1], basic_key_codes));
             break;
         case "mod_bits":
             new_div.append(_mod_bit_select(toks[index + 1]));
             break;
         case "macro_code":
-            new_div.append(_macro_code_select(toks[index + 1]));
+            new_div.append(_generic_code_select(toks[index + 1], macro_names));
+            break;
+        case "function_key_code":
+            new_div.append(_generic_code_select(toks[index + 1], function_keys));
             break;
         }
     }
@@ -252,13 +236,16 @@ function _keystroke_clicked(event)
                 new_div.append(_layer_select("0"));
                 break;
             case "basic_code":
-                new_div.append(_basic_code_select(basic_key_codes[0]));
+                new_div.append(_generic_code_select(basic_key_codes[0], basic_key_codes));
                 break;
             case "mod_bits":
                 new_div.append(_mod_bit_select(mod_bit_names[0]));
                 break;
             case "macro_code":
-                new_div.append(_macro_code_select(macro_names[0]));
+                new_div.append(_generic_code_select(macro_names[0], macro_names));
+                break;
+            case "function_key_code":
+                new_div.append(_generic_code_select(function_keys[0], function_keys));
                 break;
             }
         });
@@ -460,6 +447,7 @@ function _get_keycodes(callback)
                 quantum_funct_descs = keycode_json["quantum_functs"];
                 mod_bit_names = keycode_json["mod_bits"];
                 macro_names = keycode_json["macros"];
+                function_keys = keycode_json["function_keys"];
                 max_layer_num = keycode_json["layer_num"];
 
                 callback();

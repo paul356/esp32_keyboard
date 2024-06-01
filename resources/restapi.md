@@ -28,7 +28,9 @@
     "keycodes" : [keycode1, keycode2, keycode3], // keycodex is keycode string
     "mod_bits" : [],
     "quantum_functs" : [],
-    "layer_num" : 3
+    "layer_num" : 3,
+    "macros" : [],
+    "function_keys" : []
 }
 ```
 
@@ -76,7 +78,8 @@
 * Input:
 ```
 {
-    "enabled" : true|false,
+    "mode" : "hotspot"|"client", // for WiFi
+    "enabled" : true|false, // for BLE and USB
     "ssid" : "ssid id",
     "passwd" : "passwd",
     "name" : "ble name"

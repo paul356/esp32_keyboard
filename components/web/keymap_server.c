@@ -12,6 +12,7 @@
 #include "hal_ble.h"
 #include "function_control.h"
 #include "macros.h"
+#include "function_key.h"
 
 #define TAG "[HTTPD]"
 #define ARRAY_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
@@ -158,6 +159,10 @@ static void quantum_desc_json(httpd_req_t* req, funct_desc_t* desc)
             break;
         case MACRO_CODE:
             httpd_resp_sendstr_chunk(req, "\"macro_code\"");
+            break;
+        case FUNCTION_KEY_CODE:
+            httpd_resp_sendstr_chunk(req, "\"function_key_code\"");
+            break;
         }
     }
     httpd_resp_sendstr_chunk(req, "]}");
@@ -220,7 +225,7 @@ static esp_err_t keycodes_json(httpd_req_t* req)
 
     httpd_resp_sendstr_chunk(req, "  \"macros\":[");
     firstKey = true;
-    for (int i = 0; i < get_macro_num(); i++) {
+    for (uint16_t code = MACRO_CODE_MIN; code <= MACRO_CODE_MAX; code++) {
         if (firstKey) {
             httpd_resp_sendstr_chunk(req, "\"");
             firstKey = false;
@@ -229,7 +234,7 @@ static esp_err_t keycodes_json(httpd_req_t* req)
         }
 
         char scratch[12];
-        (void)get_macro_name(i, scratch, sizeof(scratch));
+        (void)get_macro_name(code, scratch, sizeof(scratch));
         httpd_resp_sendstr_chunk(req, scratch);
 
         httpd_resp_sendstr_chunk(req, "\"");
@@ -240,7 +245,23 @@ static esp_err_t keycodes_json(httpd_req_t* req)
     char scratch[8];
     snprintf(scratch, sizeof(scratch), "%d", layers_num);
     httpd_resp_sendstr_chunk(req, scratch);    
-    httpd_resp_sendstr_chunk(req, "\n}");
+    httpd_resp_sendstr_chunk(req, ",\n");
+
+    httpd_resp_sendstr_chunk(req, "  \"function_keys\":[");
+    firstKey = true;
+    for (uint16_t code = FUNCTION_KEY_MIN; code <= FUNCTION_KEY_MAX; code++) {
+        if (firstKey) {
+            httpd_resp_sendstr_chunk(req, "\"");
+            firstKey = false;
+        } else {
+            httpd_resp_sendstr_chunk(req, ", \"");
+        }
+
+        httpd_resp_sendstr_chunk(req, get_function_key_str(code));
+
+        httpd_resp_sendstr_chunk(req, "\"");
+    }
+    httpd_resp_sendstr_chunk(req, "]\n}");
 
     httpd_resp_sendstr_chunk(req, NULL);
 
@@ -468,29 +489,6 @@ static esp_err_t upload_bin_file(httpd_req_t* req)
     return ESP_OK;
 }
 
-static const char* wifi_mode_to_str(void)
-{
-    switch (get_wifi_mode()) {
-    case WIFI_MODE_NULL:
-        return "closed";
-    case WIFI_MODE_STA:
-        return "client";
-    default:
-        return "hotspot";
-    }
-}
-
-static wifi_mode_t str_to_wifi_mode(const char* str)
-{
-    if (strcmp(str, "closed") == 0) {
-        return WIFI_MODE_NULL;
-    } else if (strcmp(str, "client") == 0) {
-        return WIFI_MODE_STA;
-    } else {
-        return WIFI_MODE_AP;
-    }
-}
-
 static esp_err_t get_device_status(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "application/json");
@@ -503,7 +501,7 @@ static esp_err_t get_device_status(httpd_req_t* req)
     httpd_resp_sendstr_chunk(req, "\",\n");
 
     httpd_resp_sendstr_chunk(req, "\"wifi_state\" : \"");
-    httpd_resp_sendstr_chunk(req, wifi_mode_to_str());
+    httpd_resp_sendstr_chunk(req, wifi_mode_to_str(get_wifi_mode()));
     httpd_resp_sendstr_chunk(req, "\",\n");
 
     // ble_state

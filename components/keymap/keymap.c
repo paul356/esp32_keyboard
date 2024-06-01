@@ -5,6 +5,7 @@
 #include "keyboard_config.h"
 #include "keymap.h"
 #include "macros.h"
+#include "function_key.h"
 #include "quantum.h"
 
 // A bit different from QMK, default returns you to the first layer, LOWER and raise increase/lower layer by order.
@@ -41,7 +42,7 @@ uint16_t _LAYERS[LAYERS][MATRIX_ROWS][MATRIX_COLS] = {
         {_______,       _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    KC_PGUP,    KC_PGDN,    _______}
     },
     {
-        {_______,       _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    KC_MINUS,   KC_EQUAL},
+        {FUNCTION_KEY_INTRO,  FUNCTION_KEY_DEVICE_INFO,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    KC_MINUS,   KC_EQUAL},
         {_______,       _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______},
         {_______,       _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______},
         {_______,       _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______,    _______},
@@ -51,18 +52,9 @@ uint16_t _LAYERS[LAYERS][MATRIX_ROWS][MATRIX_COLS] = {
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (keycode >= MACRO_CODE_MIN && keycode <= MACRO_CODE_MAX && record->event.pressed) {
-        char* content = malloc(MACRO_STR_MAX_LEN);
-        if (!content) {
-            SEND_STRING("no memory!");
-        } else {
-            esp_err_t err = get_macro_str(keycode, content, MACRO_STR_MAX_LEN);
-            if (err != ESP_OK) {
-                SEND_STRING("Oops...");
-            } else {
-                SEND_STRING(content);
-            }
-            free(content);
-        }
+        process_macro_code(keycode);
+    } else if (keycode >= FUNCTION_KEY_MIN && keycode <= FUNCTION_KEY_MAX && record->event.pressed) {
+        process_function_key(keycode);
     }
 
     return true;

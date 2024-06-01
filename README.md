@@ -30,6 +30,9 @@ Until now (2023/03/30) I have finished or barely finished these functionalities.
   + OTA Update
   ![img](https://paul356.github.io/images/esp_keyboard_ota.jpg)
 - I2C Display Support (LED controller 1306)
+- Function Keys
+  + Print Device Info
+  + Print Welcome Introduction
 
 ### Planned Features
 - Beautify Web GUI (use [numl.design](https://numl.design/))
