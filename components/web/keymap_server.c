@@ -12,6 +12,7 @@
 #include "hal_ble.h"
 #include "function_control.h"
 #include "macros.h"
+#include "function_key.h"
 
 #define TAG "[HTTPD]"
 #define ARRAY_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
@@ -158,6 +159,10 @@ static void quantum_desc_json(httpd_req_t* req, funct_desc_t* desc)
             break;
         case MACRO_CODE:
             httpd_resp_sendstr_chunk(req, "\"macro_code\"");
+            break;
+        case FUNCTION_KEY_CODE:
+            httpd_resp_sendstr_chunk(req, "\"function_key_code\"");
+            break;
         }
     }
     httpd_resp_sendstr_chunk(req, "]}");
@@ -220,7 +225,7 @@ static esp_err_t keycodes_json(httpd_req_t* req)
 
     httpd_resp_sendstr_chunk(req, "  \"macros\":[");
     firstKey = true;
-    for (int i = 0; i < get_macro_num(); i++) {
+    for (uint16_t code = MACRO_CODE_MIN; code <= MACRO_CODE_MAX; code++) {
         if (firstKey) {
             httpd_resp_sendstr_chunk(req, "\"");
             firstKey = false;
@@ -229,7 +234,7 @@ static esp_err_t keycodes_json(httpd_req_t* req)
         }
 
         char scratch[12];
-        (void)get_macro_name(i, scratch, sizeof(scratch));
+        (void)get_macro_name(code, scratch, sizeof(scratch));
         httpd_resp_sendstr_chunk(req, scratch);
 
         httpd_resp_sendstr_chunk(req, "\"");
@@ -240,7 +245,23 @@ static esp_err_t keycodes_json(httpd_req_t* req)
     char scratch[8];
     snprintf(scratch, sizeof(scratch), "%d", layers_num);
     httpd_resp_sendstr_chunk(req, scratch);    
-    httpd_resp_sendstr_chunk(req, "\n}");
+    httpd_resp_sendstr_chunk(req, ",\n");
+
+    httpd_resp_sendstr_chunk(req, "  \"function_keys\":[");
+    firstKey = true;
+    for (uint16_t code = FUNCTION_KEY_MIN; code <= FUNCTION_KEY_MAX; code++) {
+        if (firstKey) {
+            httpd_resp_sendstr_chunk(req, "\"");
+            firstKey = false;
+        } else {
+            httpd_resp_sendstr_chunk(req, ", \"");
+        }
+
+        httpd_resp_sendstr_chunk(req, get_function_key_str(code));
+
+        httpd_resp_sendstr_chunk(req, "\"");
+    }
+    httpd_resp_sendstr_chunk(req, "]\n}");
 
     httpd_resp_sendstr_chunk(req, NULL);
 

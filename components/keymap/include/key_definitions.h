@@ -10,7 +10,8 @@ typedef enum {
     LAYER_NUM,
     BASIC_CODE,
     MOD_BITS,
-    MACRO_CODE
+    MACRO_CODE,
+    FUNCTION_KEY_CODE
 } argument_type_e;
 
 typedef struct {
@@ -27,10 +28,6 @@ esp_err_t get_funct_desc(int idx, funct_desc_t* desc);
 
 int get_mod_bit_num(void);
 const char* get_mod_bit_name(int idx);
-
-int get_macro_num(void);
-esp_err_t get_macro_name(int idx, char* buf, int buf_len);
-esp_err_t parse_macro_name(const char* macro_name, uint16_t* keycode);
 
 esp_err_t get_full_key_name(uint16_t keycode, char* buf, int buf_len);
 
