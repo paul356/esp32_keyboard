@@ -662,6 +662,10 @@ esp_err_t parse_full_key_name(const char* full_name, uint16_t* keycode)
             break;
         case FUNCTION_KEY_CODE:
             err = parse_function_key_str(scratch, keycode);
+            if (err != ESP_OK) {
+                ESP_LOGE(TAG, "unkown function key %s", scratch);
+                return err;
+            }
             break;
         default:
             ESP_LOGE(TAG, "unkown token %s or wrong position", scratch);

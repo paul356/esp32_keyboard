@@ -489,29 +489,6 @@ static esp_err_t upload_bin_file(httpd_req_t* req)
     return ESP_OK;
 }
 
-static const char* wifi_mode_to_str(void)
-{
-    switch (get_wifi_mode()) {
-    case WIFI_MODE_NULL:
-        return "closed";
-    case WIFI_MODE_STA:
-        return "client";
-    default:
-        return "hotspot";
-    }
-}
-
-static wifi_mode_t str_to_wifi_mode(const char* str)
-{
-    if (strcmp(str, "closed") == 0) {
-        return WIFI_MODE_NULL;
-    } else if (strcmp(str, "client") == 0) {
-        return WIFI_MODE_STA;
-    } else {
-        return WIFI_MODE_AP;
-    }
-}
-
 static esp_err_t get_device_status(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "application/json");
@@ -524,7 +501,7 @@ static esp_err_t get_device_status(httpd_req_t* req)
     httpd_resp_sendstr_chunk(req, "\",\n");
 
     httpd_resp_sendstr_chunk(req, "\"wifi_state\" : \"");
-    httpd_resp_sendstr_chunk(req, wifi_mode_to_str());
+    httpd_resp_sendstr_chunk(req, wifi_mode_to_str(get_wifi_mode()));
     httpd_resp_sendstr_chunk(req, "\",\n");
 
     // ble_state

@@ -2,6 +2,7 @@
 #include "function_key.h"
 #include "quantum.h"
 #include "wifi_intf.h"
+#include "function_control.h"
 
 // need a string for each function key code
 const char* function_key_strs[FUNCTION_KEY_NUM] = {
@@ -31,18 +32,64 @@ esp_err_t parse_function_key_str(const char* str, uint16_t *keycode)
     return ESP_FAIL;
 }
 
+const int title_length = 20;
+const int value_length = 20;
+static void print_hori_line(void)
+{
+    SEND_STRING("+");
+    for (int i = 0; i < title_length; i++) {
+        SEND_STRING("-");
+    }
+    SEND_STRING("+");
+    for (int i = 0; i < value_length; i++) {
+        SEND_STRING("-");
+    }
+    SEND_STRING("+\\n");
+}
+
+static void print_title(const char* title)
+{
+    int len = strlen(title);
+    SEND_STRING("| ");
+    SEND_STRING(title);
+    for (int i = 0; i < title_length - len - 1; i++) {
+        SEND_STRING(" ");
+    }
+}
+
+static void print_value(const char* value)
+{
+    int len = strlen(value);
+    SEND_STRING("| ");
+    SEND_STRING(value);
+    for (int i = 0; i < title_length - len - 1; i++) {
+        SEND_STRING(" ");
+    }
+    SEND_STRING("|\\n");
+}
+
+static void print_line(const char* title, const char* value)
+{
+    print_title(title);
+    print_value(title);
+}
+
 static esp_err_t print_device_info()
 {
-    esp_err_t err = ESP_OK;
-    
-    SEND_STRING("IP address: ");
-
-    err = get_ip_addr(ip_str, sizeof(ip_str));
+    esp_err_t err = get_ip_addr(ip_str, sizeof(ip_str));
     if (err != ESP_OK) {
         return err;
     }
 
-    SEND_STRING(ip_str);
+    print_hori_line();
+    print_line("WiFi Mode:", wifi_mode_to_str(get_wifi_mode()));
+    print_hori_line();
+    print_line("WiFi SSID:", get_wifi_ssid());
+    print_hori_line();
+    print_line("IP Address:", ip_str);
+    print_hori_line();
+    print_line("BLE Name:", get_ble_name());
+    print_hori_line();
     
     return ESP_OK;
 }
