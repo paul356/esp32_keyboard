@@ -44,7 +44,7 @@ static void print_hori_line(void)
     for (int i = 0; i < value_length; i++) {
         SEND_STRING("-");
     }
-    SEND_STRING("+\\n");
+    SEND_STRING("+\n");
 }
 
 static void print_title(const char* title)
@@ -65,13 +65,13 @@ static void print_value(const char* value)
     for (int i = 0; i < title_length - len - 1; i++) {
         SEND_STRING(" ");
     }
-    SEND_STRING("|\\n");
+    SEND_STRING("|\n");
 }
 
 static void print_line(const char* title, const char* value)
 {
     print_title(title);
-    print_value(title);
+    print_value(value);
 }
 
 static esp_err_t print_device_info()
@@ -98,7 +98,7 @@ static esp_err_t print_help_info()
 {
     esp_err_t err = ESP_OK;
 
-    SEND_STRING("Dear User,\\n  Hope you enjoy using this smart keyboard. You can visit http://");
+    SEND_STRING("Dear User,\n  Hope you enjoy using this smart keyboard. You can visit http://");
 
     err = get_ip_addr(ip_str, sizeof(ip_str));
     if (err != ESP_OK) {
@@ -106,11 +106,11 @@ static esp_err_t print_help_info()
     }
 
     SEND_STRING(ip_str);
-    SEND_STRING("/ to explore the features. You can\\n");
-    SEND_STRING("  1. Customize the keyboard layout.\\n");
-    SEND_STRING("  2. Define your own key combination as macros.\\n");
-    SEND_STRING("  3. Set up WiFi configuration.\\n");
-    SEND_STRING("  4. Upgrade your keyboard by uploading a new firmware.\\n");
+    SEND_STRING("/ to explore the features. You can\n");
+    SEND_STRING("  1. Customize the keyboard layout.\n");
+    SEND_STRING("  2. Define your own key combination as macros.\n");
+    SEND_STRING("  3. Set up WiFi configuration.\n");
+    SEND_STRING("  4. Upgrade your keyboard by uploading a new firmware.\n");
     SEND_STRING("  By default this keyboard is in HotSpot mode. You can also connect your keyboard to your home AP by switching the WiFi mode and providing ssid and password on the Status tab.");
     return ESP_OK;
 }
