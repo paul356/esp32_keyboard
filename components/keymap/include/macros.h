@@ -9,7 +9,6 @@
 #define MACRO_CODE_MAX (MACRO_CODE_MIN + MACRO_CODE_NUM - 1)
 #define MACRO_RESERVED_MAX (SAFE_RANGE + 256) // MACRO_CODE_NUM is not larger than 256
 
-#define MACRO_NAME_PREFIX "MACRO"
 #define MACRO_STR_MAX_LEN 1024
 
 esp_err_t set_macro_str(uint16_t keycode, char* buf);
