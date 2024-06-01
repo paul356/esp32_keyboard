@@ -111,7 +111,7 @@ static esp_err_t print_help_info()
     SEND_STRING("  2. Define your own key combination as macros.\n");
     SEND_STRING("  3. Set up WiFi configuration.\n");
     SEND_STRING("  4. Upgrade your keyboard by uploading a new firmware.\n");
-    SEND_STRING("  By default this keyboard is in HotSpot mode. You can also connect your keyboard to your home AP by switching the WiFi mode and providing ssid and password on the Status tab.");
+    SEND_STRING("  By default this keyboard is in HotSpot mode. You can also connect your keyboard to your home AP by switching the WiFi mode and providing ssid and password on the Status tab.\n");
     return ESP_OK;
 }
 

@@ -28,7 +28,9 @@
     "keycodes" : [keycode1, keycode2, keycode3], // keycodex is keycode string
     "mod_bits" : [],
     "quantum_functs" : [],
-    "layer_num" : 3
+    "layer_num" : 3,
+    "macros" : [],
+    "function_keys" : []
 }
 ```
 
