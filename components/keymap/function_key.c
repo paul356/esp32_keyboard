@@ -7,7 +7,8 @@
 // need a string for each function key code
 const char* function_key_strs[FUNCTION_KEY_NUM] = {
     "info",
-    "intro"
+    "intro",
+    "hotspot"
 };
 
 static char ip_str[20];
@@ -115,6 +116,11 @@ static esp_err_t print_help_info()
     return ESP_OK;
 }
 
+static esp_err_t turn_on_hotspot(void)
+{
+    return update_wifi_state(WIFI_MODE_AP, "esp32_keyboard", "1234567890");
+}
+
 esp_err_t process_function_key(uint16_t keycode)
 {
     switch (keycode) {
@@ -123,6 +129,9 @@ esp_err_t process_function_key(uint16_t keycode)
         break;
     case FUNCTION_KEY_INTRO:
         print_help_info();
+        break;
+    case FUNCTION_KEY_HOTSPOT:
+        turn_on_hotspot();
         break;
     default:
         SEND_STRING("Unkonwn function key!");
