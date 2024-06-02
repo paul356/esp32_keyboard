@@ -36,7 +36,7 @@ function upload_bin()
     } else {
         document.getElementById("bin_file").disabled = true;
         document.getElementById("upload").disabled = true;
-        document.getElementById("upload_resp").innerHTML = "Please wait... Don't unplug USB cable.";
+        document.getElementById("upload_resp").innerHTML = "<p style=\"color:Red\">Please wait... Don't unplug USB cable.</p>";
 
         let file = fileInput[0];
         let xhttp = new XMLHttpRequest();

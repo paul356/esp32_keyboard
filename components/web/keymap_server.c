@@ -483,8 +483,11 @@ static esp_err_t upload_bin_file(httpd_req_t* req)
     httpd_resp_set_type(req, "text/plain");
     snprintf(str_buf, sizeof(str_buf), "File size is %d. ", accumu_len);
     httpd_resp_sendstr_chunk(req, str_buf);
-    httpd_resp_sendstr_chunk(req, "Please reboot keyboard ...");
+    httpd_resp_sendstr_chunk(req, "<p style=\"color:Red\">Will reboot keyboard ...</p>");
     httpd_resp_sendstr_chunk(req, NULL);
+
+    vTaskDelay(1500 / portTICK_PERIOD_MS);
+    esp_restart();
 
     return ESP_OK;
 }

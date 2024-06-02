@@ -24,6 +24,7 @@ Until now (2023/03/30) I have finished or barely finished these functionalities.
 - WiFi Hotspot
 - A Web Server
   + Show Keyboard Status
+  ![img](https://paul356.github.io/images/esp_keyboard_status.jpg)
   + Change Keymap Dynamicly
   + Support Dynamic Macros. Maros can be changed from the web interface.
   ![img](https://paul356.github.io/images/esp_keyboard_macros.jpg)
