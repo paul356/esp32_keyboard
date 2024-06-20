@@ -22,7 +22,7 @@
 #define WIFI_STATION_CONNECTED 0x1
 #define WIFI_HOTSPOT_ENABLED   0x2
 
-static const char *TAG = "SOFTAP";
+static const char *TAG = "WiFi";
 static bool netif_inited = false;
 static uint8_t wifi_state_bits  = 0;
 static esp_ip4_addr_t ip_addr;
