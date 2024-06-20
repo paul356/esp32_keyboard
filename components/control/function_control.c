@@ -144,13 +144,22 @@ esp_err_t save_config_value(
     return nvs_write_blob(FUNCTION_CTRL_NAMESPACE, key, config_value, len);
 }
 
+static unsigned long random_id = 0;
+static unsigned long get_default_device_id(void)
+{
+    if (random_id == 0) {
+        random_id = esp_random() % WIFI_SSID_ID_MOD;
+    }
+    return random_id;
+}
+
 void set_default_wifi_mode(control_state_t* state)
 {
     state->wifi.mode = WIFI_MODE_AP;
 }
 void set_default_wifi_ssid(control_state_t* state)
 {
-    snprintf(state->wifi.ssid, sizeof(state->wifi.ssid), WIFI_SSID_INIT_TEMPLATE, esp_random() % WIFI_SSID_ID_MOD);
+    snprintf(state->wifi.ssid, sizeof(state->wifi.ssid), WIFI_SSID_INIT_TEMPLATE, get_default_device_id());
 }
 void set_default_wifi_passwd(control_state_t* state)
 {
@@ -163,7 +172,7 @@ void set_default_ble_enabled(control_state_t* state)
 }
 void set_default_ble_name(control_state_t* state)
 {
-    snprintf(state->ble.name, sizeof(state->ble.name), BLE_NAME_INIT_TEMPLATE, esp_random() % BLE_NAME_ID_MOD);
+    snprintf(state->ble.name, sizeof(state->ble.name), BLE_NAME_INIT_TEMPLATE, get_default_device_id());
 }
 
 void set_default_usb_values(control_state_t* state)
