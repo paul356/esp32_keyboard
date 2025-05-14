@@ -440,7 +440,7 @@ static esp_err_t upload_bin_file(httpd_req_t* req)
 {
     int file_len = req->content_len;
     int accumu_len = 0;
-    char str_buf[25];
+    char str_buf[26];
 
     ESP_LOGI(TAG, "Starting OTA ...");
 
@@ -501,7 +501,7 @@ static esp_err_t upload_bin_file(httpd_req_t* req)
     }
 
     httpd_resp_set_type(req, "text/plain");
-    snprintf(str_buf, sizeof(str_buf), "File size is %d. ", accumu_len);
+    snprintf(str_buf, sizeof(str_buf), "File size is %d.", accumu_len);
     httpd_resp_sendstr_chunk(req, str_buf);
     httpd_resp_sendstr_chunk(req, "<p style=\"color:Red\">Will reboot keyboard ...</p>");
     httpd_resp_sendstr_chunk(req, NULL);

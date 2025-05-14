@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /* key matrix size */
 #define MATRIX_ROWS 5
-#define MATRIX_COLS 12
+#define MATRIX_COLS 14
 
 #define LAYER_STATE_8BIT
 
@@ -42,12 +42,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *                  ROW2COL = ROW = Anode (+), COL = Cathode (-, marked on diode)
  *
  */
-#define MATRIX_ROW_PINS { GPIO_NUM_13, GPIO_NUM_14, GPIO_NUM_21, \
-                          GPIO_NUM_47, GPIO_NUM_48 }
-#define MATRIX_COL_PINS { GPIO_NUM_5,  GPIO_NUM_6,  GPIO_NUM_7, \
-                          GPIO_NUM_15, GPIO_NUM_16, GPIO_NUM_17, \
-                          GPIO_NUM_18, GPIO_NUM_8,  GPIO_NUM_9, \
-                          GPIO_NUM_10, GPIO_NUM_11, GPIO_NUM_12}
+#define MATRIX_ROW_PINS { GPIO_NUM_37, GPIO_NUM_36, GPIO_NUM_35, \
+                          GPIO_NUM_0, GPIO_NUM_48 }
+#define MATRIX_COL_PINS { GPIO_NUM_1,  GPIO_NUM_2,  GPIO_NUM_42, \
+                          GPIO_NUM_41, GPIO_NUM_40, GPIO_NUM_39, \
+                          GPIO_NUM_38, GPIO_NUM_46,  GPIO_NUM_3, \
+                          GPIO_NUM_8, GPIO_NUM_18, GPIO_NUM_17, \
+                          GPIO_NUM_16, GPIO_NUM_15 }
 #define UNUSED_PINS
 
 /* COL2ROW, ROW2COL */

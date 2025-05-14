@@ -41,7 +41,7 @@
 #include "tusb.h"
 #include "port_mgmt.h"
 #include "function_control.h"
-#include "status_display.h"
+//#include "status_display.h"
 #include "hid_desc.h"
 
 //HID Ble functions
@@ -210,9 +210,9 @@ void app_main()
 
             ESP_ERROR_CHECK(start_file_server());
 
-            (void)init_display();
+            //(void)init_display();
 
-            (void)update_display(0);
+            //(void)update_display(0);
             
             //xTaskCreatePinnedToCore(send_keys, "period send key", 4096, NULL, configMAX_PRIORITIES, NULL, 1);
             keyboard_inited = true;

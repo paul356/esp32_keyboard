@@ -56,7 +56,7 @@ static uint8_t const descriptor_hid_default[] = {
     TUD_HID_DESCRIPTOR(ITF_NUM_HID, STRID_HID, 0, sizeof(desc_hid_report), 0x80 | EPNUM_HID, 16, 10)
 };
 
-static char * const descriptor_str_default[] = {
+static const char * descriptor_str_default[] = {
     // array of pointer to string descriptors
     (char[]){0x09, 0x04},                // 0: is supported language is English (0x0409)
     CONFIG_TINYUSB_DESC_MANUFACTURER_STRING, // 1: Manufacturer
