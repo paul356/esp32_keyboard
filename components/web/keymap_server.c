@@ -55,7 +55,7 @@ static esp_err_t parse_http_req(httpd_req_t* req, cJSON** root)
 
     *root = cJSON_ParseWithLength(body, buf_len);
     free(body);
-    if (!root) {
+    if (*root == NULL) {
         return ESP_ERR_NO_MEM;
     }
 
@@ -293,6 +293,8 @@ static char recv_buf[MAX_BUF_SIZE];
 static esp_err_t update_keymap(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "text/plain");
+    esp_err_t ret = ESP_OK;
+    cJSON* root = NULL;
 
     int total_len = req->content_len;
     if(total_len >= MAX_BUF_SIZE){
@@ -313,16 +315,17 @@ static esp_err_t update_keymap(httpd_req_t* req)
     }
     recv_buf[total_len] = '\0';
 
-    cJSON *root = cJSON_Parse(recv_buf);
+    root = cJSON_Parse(recv_buf);
     if(root == NULL){
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid json");
         return ESP_FAIL;
     }
 
-    cJSON *layer = cJSON_GetObjectItem(root, "layer");
+    cJSON* layer = cJSON_GetObjectItem(root, "layer");
     if(layer == NULL){
+        ret = ESP_FAIL;
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'layer' is invalid");
-        return ESP_FAIL;
+        goto cleanup;
     }
 
     const char* layer_name = layer->valuestring;    
@@ -331,25 +334,29 @@ static esp_err_t update_keymap(httpd_req_t* req)
         if(strcmp(layer_name, layer_names_arr[i]) == 0) layer_index = i;
     }
     if(layer_index < 0){
+        ret = ESP_FAIL;
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'layer' should be one of ['QWERTY', 'NUM', 'Plugins']");
-        return ESP_FAIL;
+        goto cleanup;
     }
 
-    cJSON *positions = cJSON_GetObjectItem(root, "positions");
+    cJSON* positions = cJSON_GetObjectItem(root, "positions");
     if((positions == NULL) || (cJSON_GetArraySize(positions) == 0)){
+        ret = ESP_FAIL;
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'positions' is invalid");
-        return ESP_FAIL;
+        goto cleanup;
     }
 
-    cJSON *keycodes = cJSON_GetObjectItem(root, "keycodes");
+    cJSON* keycodes = cJSON_GetObjectItem(root, "keycodes");
     if((keycodes == NULL) || (cJSON_GetArraySize(keycodes) == 0)){
+        ret = ESP_FAIL;
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'keycodes' is invalid");
-        return ESP_FAIL;
+        goto cleanup;
     }
 
     if(cJSON_GetArraySize(positions) != cJSON_GetArraySize(keycodes)){
+        ret = ESP_FAIL;
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "length of 'positions' not match with 'keycodes'");
-        return ESP_FAIL;
+        goto cleanup;
     }
 
     uint16_t temp_layer[MATRIX_ROWS * MATRIX_COLS];
@@ -379,10 +386,13 @@ static esp_err_t update_keymap(httpd_req_t* req)
     memcpy((void*)(&keymaps[layer_index][0][0]), temp_layer, sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
     nvs_write_layout(layer_name, temp_layer);
 
-    cJSON_Delete(root);
+cleanup:
+    if (root) {
+        cJSON_Delete(root);
+    }
 
     httpd_resp_sendstr_chunk(req, NULL);
-    return ESP_OK;
+    return ret;
 }
 
 static esp_err_t reset_keymap(httpd_req_t* req)
