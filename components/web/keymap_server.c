@@ -25,10 +25,8 @@
 #include "esp_check.h"
 #include "keyboard_config.h"
 #include "key_definitions.h"
-#include "nvs_keymaps.h"
 #include "nvs_funcs.h"
 #include "cJSON.h"
-#include "keymap.h"
 #include "hal_ble.h"
 #include "function_control.h"
 #include "macros.h"
@@ -72,9 +70,9 @@ static esp_err_t serve_static_files(httpd_req_t* req)
 
     extern const unsigned char style_css_start[] asm("_binary_style_css_start");
     extern const unsigned char style_css_end[] asm("_binary_style_css_end");
-    
+
     const char* uri = req->uri;
-    
+
     if (strcmp(uri, "/index.html") == 0 ||
         strcmp(uri, "/") == 0) {
         const size_t chunk_size = index_html_end - index_html_start;
@@ -85,7 +83,7 @@ static esp_err_t serve_static_files(httpd_req_t* req)
         const size_t chunk_size = app_js_end - app_js_start;
         httpd_resp_set_type(req, "text/javascript");
         httpd_resp_send_chunk(req, (const char*)app_js_start, chunk_size);
-        httpd_resp_sendstr_chunk(req, NULL);        
+        httpd_resp_sendstr_chunk(req, NULL);
     } else if (strcmp(uri, "/style.css") == 0) {
         const size_t chunk_size = style_css_end - style_css_start;
         httpd_resp_set_type(req, "text/css");
@@ -104,44 +102,59 @@ static esp_err_t layouts_json(httpd_req_t* req)
 {
     esp_err_t err;
 
+    uint8_t layers;
+    uint32_t rows, cols;
+    nvs_get_keymap_info(&layers, &rows, &cols);
+
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr_chunk(req, "{\"layouts\":{\n");
-    for (int i = 0; i < layers_num; i ++) {
+
+    for (int i = 0; i < layers; i++) {
         httpd_resp_sendstr_chunk(req, "\"");
-        httpd_resp_sendstr_chunk(req, layer_names_arr[i]);
+        httpd_resp_sendstr_chunk(req, nvs_get_layer_name(i));
         httpd_resp_sendstr_chunk(req, "\":[");
 
-        for (int j = 0; j < MATRIX_ROWS; j++) {
+        for (int j = 0; j < rows; j++) {
             httpd_resp_sendstr_chunk(req, "\n  [");
-            for (int k = 0; k < MATRIX_COLS; k++) {
+            for (int k = 0; k < cols; k++) {
                 httpd_resp_sendstr_chunk(req, "\"");
 
+                // Use existing keymap functions
                 char scratch_buf[64];
-                err = get_full_key_name(keymaps[i][j][k], scratch_buf, sizeof(scratch_buf));
+                uint16_t keycode;
+
+                // Use direct function parameters instead of keymap_position_t
+                err = nvs_get_keycode(i, j, k, &keycode);
                 if (err == ESP_OK) {
-                    err = httpd_resp_sendstr_chunk(req, scratch_buf);
+                    err = get_full_key_name(keycode, scratch_buf, sizeof(scratch_buf));
+                    if (err == ESP_OK) {
+                        err = httpd_resp_sendstr_chunk(req, scratch_buf);
+                    } else {
+                        ESP_LOGE(TAG, "invalid key code 0x%x @[%d, %d, %d]", keycode, i, j, k);
+                    }
                 } else {
-                    ESP_LOGE(TAG, "invalid key code 0x%x @[%d, %d, %d]", keymaps[i][j][k], i, j, k);
-                    err = httpd_resp_sendstr_chunk(req, "ERR");
-                }
-                if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "send error, keyName is 0x%x", keymaps[i][j][k]);
+                    ESP_LOGE(TAG, "error getting keycode at [%d, %d, %d]: %s", i, j, k, esp_err_to_name(err));
                 }
 
-                if (k != MATRIX_COLS - 1) {
+                if (err != ESP_OK) {
+                    // Send default code
+                    httpd_resp_sendstr_chunk(req, "____");
+                }
+
+                if (k != cols - 1) {
                     httpd_resp_sendstr_chunk(req, "\", ");
                 } else {
                     httpd_resp_sendstr_chunk(req, "\"");
                 }
             }
-            if (j != MATRIX_ROWS - 1) {
+            if (j != rows - 1) {
                 httpd_resp_sendstr_chunk(req, "],\n");
             } else {
                 httpd_resp_sendstr_chunk(req, "]");
             }
         }
 
-        if (i != layers_num - 1) {
+        if (i != layers - 1) {
             httpd_resp_sendstr_chunk(req, "\n],\n");
         } else {
             httpd_resp_sendstr_chunk(req, "\n]\n");
@@ -206,7 +219,7 @@ static esp_err_t keycodes_json(httpd_req_t* req)
             }
 
             httpd_resp_sendstr_chunk(req, keyName);
- 
+
             httpd_resp_sendstr_chunk(req, "\"");
         }
     }
@@ -223,11 +236,11 @@ static esp_err_t keycodes_json(httpd_req_t* req)
         }
 
         httpd_resp_sendstr_chunk(req, get_mod_bit_name(i));
- 
-        httpd_resp_sendstr_chunk(req, "\"");        
+
+        httpd_resp_sendstr_chunk(req, "\"");
     }
     httpd_resp_sendstr_chunk(req, "],\n");
-                             
+
     httpd_resp_sendstr_chunk(req, "  \"quantum_functs\":[");
     firstKey = true;
     for (int i = 0; i < get_total_funct_num(); i++) {
@@ -263,8 +276,12 @@ static esp_err_t keycodes_json(httpd_req_t* req)
 
     httpd_resp_sendstr_chunk(req, "  \"layer_num\":");
     char scratch[8];
-    snprintf(scratch, sizeof(scratch), "%d", layers_num);
-    httpd_resp_sendstr_chunk(req, scratch);    
+    // Get the number of layers from the NVS function
+    uint8_t layers;
+    uint32_t rows, cols;
+    nvs_get_keymap_info(&layers, &rows, &cols);
+    snprintf(scratch, sizeof(scratch), "%d", layers);
+    httpd_resp_sendstr_chunk(req, scratch);
     httpd_resp_sendstr_chunk(req, ",\n");
 
     httpd_resp_sendstr_chunk(req, "  \"function_keys\":[");
@@ -328,16 +345,7 @@ static esp_err_t update_keymap(httpd_req_t* req)
         goto cleanup;
     }
 
-    const char* layer_name = layer->valuestring;    
-    int layer_index = -1;
-    for(uint16_t i = 0; i < layers_num; ++i){
-        if(strcmp(layer_name, layer_names_arr[i]) == 0) layer_index = i;
-    }
-    if(layer_index < 0){
-        ret = ESP_FAIL;
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'layer' should be one of ['QWERTY', 'NUM', 'Plugins']");
-        goto cleanup;
-    }
+    const char* layer_name = layer->valuestring;
 
     cJSON* positions = cJSON_GetObjectItem(root, "positions");
     if((positions == NULL) || (cJSON_GetArraySize(positions) == 0)){
@@ -359,32 +367,49 @@ static esp_err_t update_keymap(httpd_req_t* req)
         goto cleanup;
     }
 
+    uint8_t layers_count;
+    uint32_t rows, cols;
+    nvs_get_keymap_info(&layers_count, &rows, &cols);
+    uint32_t layout_len = rows * cols;
+
+    // Use a temporary buffer to hold the modified layer data
     uint16_t temp_layer[MATRIX_ROWS * MATRIX_COLS];
-    memcpy(temp_layer, keymaps[layer_index], sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
-    for(uint16_t i = 0; i < cJSON_GetArraySize(positions); ++i){
+    ret = nvs_get_layer(layer_name, temp_layer, (uint16_t)layout_len);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get layer %s, err=%d", layer_name, ret);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to get layer");
+        goto cleanup;
+    }
+
+    // Process all the position/keycode pairs
+    for (uint16_t i = 0; i < cJSON_GetArraySize(positions); ++i)
+    {
         uint16_t pos = (uint16_t)cJSON_GetArrayItem(positions, i)->valueint;
         const char* keyname = cJSON_GetArrayItem(keycodes, i)->valuestring;
         ESP_LOGI(TAG, "%s: pos = '%hu', keycode = '%s'", __FUNCTION__, pos, keyname);
 
-        if (pos >= MATRIX_ROWS * MATRIX_COLS) {
+        if (pos >= layout_len) {
             ESP_LOGE(TAG, "%s: invalid position %hu", __FUNCTION__, pos);
             continue;
         }
 
         uint16_t keycode;
+        // Parse the keycode name
         esp_err_t err = parse_full_key_name(keyname, &keycode);
         if (err != ESP_OK) {
-            ESP_LOGE(TAG, "cann't parse %s, err=%d", keyname, err);
+            ESP_LOGE(TAG, "Can't parse %s, err=%d", keyname, err);
             continue;
         }
 
-        ESP_LOGI(TAG, "%s: keycode = '%hu' -> '%hu'", __FUNCTION__, temp_layer[pos], keycode);
         temp_layer[pos] = keycode;
     }
 
-    // save layout
-    memcpy((void*)(&keymaps[layer_index][0][0]), temp_layer, sizeof(uint16_t) * MATRIX_ROWS * MATRIX_COLS);
-    nvs_write_layout(layer_name, temp_layer);
+    // Save the keymap to NVS
+    ret = nvs_save_layer(layer_name, temp_layer, layout_len);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to save layer %s, err=%d", layer_name, ret);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to save layer");
+    }
 
 cleanup:
     if (root) {
@@ -436,10 +461,11 @@ static esp_err_t reset_keymap(httpd_req_t* req)
 
     cJSON_Delete(root);
 
+    // Use the common API to reset the keymap
     esp_err_t err = nvs_reset_layouts();
     if (err != ESP_OK) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "reset fail");
-        return ESP_FAIL;        
+        return ESP_FAIL;
     }
 
     httpd_resp_sendstr_chunk(req, NULL);
@@ -543,7 +569,7 @@ static esp_err_t get_device_status(httpd_req_t* req)
 
     // usb_state
     httpd_resp_sendstr_chunk(req, "\"usb_state\" : ");
-    httpd_resp_sendstr_chunk(req, is_usb_enabled() ? "true,\n" : "false,\n");    
+    httpd_resp_sendstr_chunk(req, is_usb_enabled() ? "true,\n" : "false,\n");
 
     char str_buf[25];
     snprintf(str_buf, sizeof(str_buf), "%llu", s_init_version);
@@ -635,7 +661,7 @@ static esp_err_t modify_functions(httpd_req_t* req)
     }
 
     cJSON_Delete(root);
-    httpd_resp_sendstr_chunk(req, NULL);    
+    httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
 
 err_out:
@@ -693,7 +719,7 @@ static esp_err_t get_macro_content(httpd_req_t* req)
         ret = ESP_ERR_NO_MEM;
         ESP_LOGE(TAG, "not enough memory to process request %s", req->uri);
         goto err_out;
-    }   
+    }
 
     ESP_GOTO_ON_ERROR(get_macro_str(keycode, content, MACRO_STR_MAX_LEN), err_out, TAG, "fail to get macro content %s", last_token);
 
@@ -714,7 +740,7 @@ static esp_err_t get_macro_content(httpd_req_t* req)
 err_out:
     if (content) free(content);
     httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Oops. Something is wrong.");
-    return ret;    
+    return ret;
 }
 
 static esp_err_t set_macro_content(httpd_req_t* req)
@@ -742,7 +768,7 @@ static esp_err_t set_macro_content(httpd_req_t* req)
     ESP_GOTO_ON_ERROR(set_macro_str(keycode, contentItem->valuestring), err_out, TAG, "fail to set macro %s string", last_token);
 
     cJSON_Delete(root);
-    httpd_resp_sendstr_chunk(req, NULL);    
+    httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
 
 err_out:

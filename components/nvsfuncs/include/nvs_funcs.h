@@ -19,41 +19,63 @@
 #define NVS_CONFIG_OK 1
 #define NVS_CONFIG_ERR 0
 
-// array to hold names of layouts for oled
-extern char default_layout_names[LAYERS][MAX_LAYOUT_NAME_LENGTH];
-extern const uint16_t _LAYERS[LAYERS][MATRIX_ROWS][MATRIX_COLS];
-
+/**
+ * @brief Read data blob from NVS
+ */
 esp_err_t nvs_read_blob(const char* namespace, const char* key, void* buffer, size_t* buf_size);
 
+/**
+ * @brief Write data blob to NVS
+ */
 esp_err_t nvs_write_blob(const char* namespace, const char* key, const void* buffer, size_t buf_size);
 
-/*
- * @read a layout from nvs
+/**
+ * @brief Reset layouts to default values
  */
-void nvs_read_layout(const char* layout_name, uint16_t buffer[MATRIX_ROWS*MATRIX_COLS]);
-
-/*
- * @add a layout to nvs or overwrite existing one
- */
-void nvs_write_layout(const char* layout_name, uint16_t layout[MATRIX_ROWS*MATRIX_COLS]);
-
-/*
- * @brief read keyboard configuration from nvs
- */
-void nvs_read_keymap_cfg(void);
-
-/*
- * @brief write keyboard configuration to nvs (without keymaps)
- */
-void nvs_write_keymap_cfg(uint8_t layers, char **layer_names);
-
 esp_err_t nvs_reset_layouts(void);
 
-/*
- * @load the layouts from nvs
+/**
+ * @brief Load layouts from NVS
  */
 void nvs_load_layouts(void);
 
-void nvs_save_layouts(void);
+/**
+ * @brief Get a layer from in-memory keymap
+ */
+esp_err_t nvs_get_layer(const char* layer_name, uint16_t* layout, uint16_t layout_len);
+
+/**
+ * @brief Save one layer to NVS. This function will update both in-memory keymap and nvs store.
+ */
+esp_err_t nvs_save_layer(const char* layer_name, const uint16_t* layout, uint16_t layout_len);
+
+/**
+ * @brief Get keymap information (layers, rows, cols)
+ *
+ * @param layers Pointer to store the number of layers
+ * @param rows Pointer to store the number of rows
+ * @param cols Pointer to store the number of columns
+ * @return esp_err_t ESP_OK on success, appropriate error code otherwise
+ */
+esp_err_t nvs_get_keymap_info(uint8_t *layers, uint32_t *rows, uint32_t *cols);
+
+/**
+ * @brief Get the name of a layer
+ *
+ * @param layer Layer index
+ * @return const char* Pointer to the layer name string
+ */
+const char* nvs_get_layer_name(uint8_t layer);
+
+/**
+ * @brief Get keycode at the specified position
+ *
+ * @param layer Layer index
+ * @param row Row index
+ * @param col Column index
+ * @param keycode Pointer to store the keycode value
+ * @return esp_err_t ESP_OK on success, appropriate error code otherwise
+ */
+esp_err_t nvs_get_keycode(uint8_t layer, uint8_t row, uint8_t col, uint16_t *keycode);
 
 #endif /* NVS_FUNCS_H_ */
