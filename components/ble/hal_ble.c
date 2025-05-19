@@ -204,7 +204,7 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
     switch (event) {
     case ESP_HIDD_START_EVENT: {
         ESP_LOGI(TAG, "START");
-        esp_hid_ble_gap_adv_start();
+        ble_gap_adv_start();
         break;
     }
     case ESP_HIDD_CONNECT_EVENT: {
@@ -231,7 +231,7 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
     }
     case ESP_HIDD_DISCONNECT_EVENT: {
         ESP_LOGI(TAG, "DISCONNECT: %s", esp_hid_disconnect_reason_str(esp_hidd_dev_transport_get(param->disconnect.dev), param->disconnect.reason));
-        esp_hid_ble_gap_adv_start();
+        ble_gap_adv_start();
         break;
     }
     case ESP_HIDD_STOP_EVENT: {
@@ -314,14 +314,14 @@ esp_err_t halBLEInit(const char* name)
 	keyboard_q = xQueueCreate(32, REPORT_LEN * sizeof(uint8_t));
 
     ESP_LOGI(TAG, "setting hid gap, mode:%d", ESP_BT_MODE_BLE);
-    esp_err_t ret = esp_hid_gap_init(ESP_BT_MODE_BLE);
+    esp_err_t ret = ble_gap_init(ESP_BT_MODE_BLE);
     ESP_ERROR_CHECK( ret );
 
     const char* dup_name = strdup(name);
     ESP_RETURN_ON_FALSE(dup_name, ESP_ERR_NO_MEM, TAG, "no memory");
 
     ble_hid_config.device_name = dup_name;
-    ret = esp_hid_ble_gap_adv_init(ESP_HID_APPEARANCE_KEYBOARD, ble_hid_config.device_name);
+    ret = ble_gap_adv_init(ESP_HID_APPEARANCE_KEYBOARD, ble_hid_config.device_name);
     ESP_ERROR_CHECK( ret );
 
     if ((ret = esp_ble_gatts_register_callback(esp_hidd_gatts_event_handler)) != ESP_OK) {

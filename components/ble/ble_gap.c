@@ -16,7 +16,7 @@
 
 #include "esp_bt_device.h"
 
-static const char *TAG = "ESP_HID_GAP";
+static const char *TAG = "BLE_GAP";
 
 // uncomment to print all devices that were seen during a scan
 #define GAP_DBG_PRINTF(...) //printf(__VA_ARGS__)
@@ -55,7 +55,7 @@ const char *bt_gap_evt_str(uint8_t event)
     return bt_gap_evt_names[event];
 }
 
-const char *esp_ble_key_type_str(esp_ble_key_type_t key_type)
+static const char *esp_ble_key_type_str(esp_ble_key_type_t key_type)
 {
     const char *key_str = NULL;
     switch (key_type) {
@@ -94,56 +94,12 @@ const char *esp_ble_key_type_str(esp_ble_key_type_t key_type)
     return key_str;
 }
 
-void print_uuid(esp_bt_uuid_t *uuid)
-{
-    if (uuid->len == ESP_UUID_LEN_16) {
-        GAP_DBG_PRINTF("UUID16: 0x%04x", uuid->uuid.uuid16);
-    } else if (uuid->len == ESP_UUID_LEN_32) {
-        GAP_DBG_PRINTF("UUID32: 0x%08x", uuid->uuid.uuid32);
-    } else if (uuid->len == ESP_UUID_LEN_128) {
-        GAP_DBG_PRINTF("UUID128: %02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x,%02x", uuid->uuid.uuid128[0],
-                       uuid->uuid.uuid128[1], uuid->uuid.uuid128[2], uuid->uuid.uuid128[3],
-                       uuid->uuid.uuid128[4], uuid->uuid.uuid128[5], uuid->uuid.uuid128[6],
-                       uuid->uuid.uuid128[7], uuid->uuid.uuid128[8], uuid->uuid.uuid128[9],
-                       uuid->uuid.uuid128[10], uuid->uuid.uuid128[11], uuid->uuid.uuid128[12],
-                       uuid->uuid.uuid128[13], uuid->uuid.uuid128[14], uuid->uuid.uuid128[15]);
-    }
-}
-
 /*
  * BLE GAP
  * */
 static void ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param)
 {
     switch (event) {
-    /*
-     * SCAN
-     * */
-    case ESP_GAP_BLE_SCAN_PARAM_SET_COMPLETE_EVT: {
-        ESP_LOGV(TAG, "BLE GAP EVENT SCAN_PARAM_SET_COMPLETE");
-        SEND_BLE_CB();
-        break;
-    }
-    case ESP_GAP_BLE_SCAN_RESULT_EVT: {
-        esp_ble_gap_cb_param_t *scan_result = (esp_ble_gap_cb_param_t *)param;
-        switch (scan_result->scan_rst.search_evt) {
-        case ESP_GAP_SEARCH_INQ_RES_EVT: {
-            break;
-        }
-        case ESP_GAP_SEARCH_INQ_CMPL_EVT:
-            ESP_LOGV(TAG, "BLE GAP EVENT SCAN DONE: %d", scan_result->scan_rst.num_resps);
-            SEND_BLE_CB();
-            break;
-        default:
-            break;
-        }
-        break;
-    }
-    case ESP_GAP_BLE_SCAN_STOP_COMPLETE_EVT: {
-        ESP_LOGV(TAG, "BLE GAP EVENT SCAN CANCELED");
-        break;
-    }
-
     /*
      * ADVERTISEMENT
      * */
@@ -204,18 +160,7 @@ static void ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_p
     }
 }
 
-static esp_err_t init_ble_gap(void)
-{
-    esp_err_t ret;
-
-    if ((ret = esp_ble_gap_register_callback(ble_gap_event_handler)) != ESP_OK) {
-        ESP_LOGE(TAG, "esp_ble_gap_register_callback failed: %d", ret);
-        return ret;
-    }
-    return ret;
-}
-
-esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
+esp_err_t ble_gap_adv_init(uint16_t appearance, const char *device_name)
 {
 
     esp_err_t ret;
@@ -293,7 +238,7 @@ esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name)
     return ret;
 }
 
-esp_err_t esp_hid_ble_gap_adv_start(void)
+esp_err_t ble_gap_adv_start(void)
 {
     static esp_ble_adv_params_t hidd_adv_params = {
         .adv_int_min        = 0x20,
@@ -310,7 +255,7 @@ esp_err_t esp_hid_ble_gap_adv_start(void)
  * CONTROLLER INIT
  * */
 
-static esp_err_t init_low_level(uint8_t mode)
+static esp_err_t init_bt_controller(uint8_t mode)
 {
     esp_err_t ret;
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
@@ -353,8 +298,8 @@ static esp_err_t init_low_level(uint8_t mode)
     }
 
     if (mode & ESP_BT_MODE_BLE) {
-        ret = init_ble_gap();
-        if (ret) {
+        if ((ret = esp_ble_gap_register_callback(ble_gap_event_handler)) != ESP_OK) {
+            ESP_LOGE(TAG, "esp_ble_gap_register_callback failed: %d", ret);
             return ret;
         }
     }
@@ -362,7 +307,7 @@ static esp_err_t init_low_level(uint8_t mode)
     return ret;
 }
 
-esp_err_t esp_hid_gap_init(uint8_t mode)
+esp_err_t ble_gap_init(uint8_t mode)
 {
     esp_err_t ret;
     if (!mode || mode > ESP_BT_MODE_BTDM) {
@@ -376,7 +321,7 @@ esp_err_t esp_hid_gap_init(uint8_t mode)
         return ESP_FAIL;
     }
 
-    ret = init_low_level(mode);
+    ret = init_bt_controller(mode);
     if (ret != ESP_OK) {
         vSemaphoreDelete(ble_hidh_cb_semaphore);
         ble_hidh_cb_semaphore = NULL;

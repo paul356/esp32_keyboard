@@ -28,35 +28,10 @@
 extern "C" {
 #endif
 
-typedef struct esp_hidh_scan_result_s {
-    struct esp_hidh_scan_result_s *next;
+esp_err_t ble_gap_init(uint8_t mode);
 
-    esp_bd_addr_t bda;
-    const char *name;
-    int8_t rssi;
-    esp_hid_usage_t usage;
-    esp_hid_transport_t transport; //BT, BLE or USB
-    union {
-        struct {
-            esp_bt_cod_t cod;
-            esp_bt_uuid_t uuid;
-        } bt;
-        struct {
-            esp_ble_addr_type_t addr_type;
-            uint16_t appearance;
-        } ble;
-    };
-} esp_hid_scan_result_t;
-
-esp_err_t esp_hid_scan(uint32_t seconds, size_t *num_results, esp_hid_scan_result_t **results);
-void esp_hid_scan_results_free(esp_hid_scan_result_t *results);
-const char *ble_addr_type_str(esp_ble_addr_type_t ble_addr_type);
-void print_uuid(esp_bt_uuid_t *uuid);
-
-esp_err_t esp_hid_gap_init(uint8_t mode);
-
-esp_err_t esp_hid_ble_gap_adv_init(uint16_t appearance, const char *device_name);
-esp_err_t esp_hid_ble_gap_adv_start(void);
+esp_err_t ble_gap_adv_init(uint16_t appearance, const char *device_name);
+esp_err_t ble_gap_adv_start(void);
 
 #ifdef __cplusplus
 }
