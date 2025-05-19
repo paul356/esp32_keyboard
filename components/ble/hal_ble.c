@@ -24,7 +24,7 @@
 #include "hal_ble.h"
 #include "esp_hidd.h"
 #include "esp_check.h"
-#include "esp_hid_gap.h"
+#include "ble_gap.h"
 
 #define TAG "hal_ble"
 #define MAX_MTU 517 // Max possible mtu size

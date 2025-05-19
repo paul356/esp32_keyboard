@@ -1,11 +1,11 @@
 /*
- * SPDX-FileCopyrightText: 2021-2023 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2021-2024 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Unlicense OR CC0-1.0
  */
 
-#ifndef _ESP_HID_GAP_H_
-#define _ESP_HID_GAP_H_
+#ifndef _BLE_GAP_H_
+#define _BLE_GAP_H_
 
 #define HIDD_IDLE_MODE 0x00
 #define HIDD_BLE_MODE 0x01
@@ -62,4 +62,4 @@ esp_err_t esp_hid_ble_gap_adv_start(void);
 }
 #endif
 
-#endif /* _ESP_HIDH_GAP_H_ */
+#endif /* _BLE_GAP_H_ */

@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Unlicense OR CC0-1.0
  */
 
-
 #include <string.h>
 #include <stdbool.h>
 #include <inttypes.h>
@@ -13,7 +12,7 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 
-#include "esp_hid_gap.h"
+#include "ble_gap.h"
 
 #include "esp_bt_device.h"
 
@@ -21,10 +20,6 @@ static const char *TAG = "ESP_HID_GAP";
 
 // uncomment to print all devices that were seen during a scan
 #define GAP_DBG_PRINTF(...) //printf(__VA_ARGS__)
-//static const char * gap_bt_prop_type_names[5] = {"","BDNAME","COD","RSSI","EIR"};
-
-static esp_hid_scan_result_t *ble_scan_results = NULL;
-static size_t num_ble_scan_results = 0;
 
 static SemaphoreHandle_t ble_hidh_cb_semaphore = NULL;
 #define WAIT_BLE_CB() xSemaphoreTake(ble_hidh_cb_semaphore, portMAX_DELAY)
@@ -99,65 +94,6 @@ const char *esp_ble_key_type_str(esp_ble_key_type_t key_type)
     return key_str;
 }
 
-void esp_hid_scan_results_free(esp_hid_scan_result_t *results)
-{
-    esp_hid_scan_result_t *r = NULL;
-    while (results) {
-        r = results;
-        results = results->next;
-        if (r->name != NULL) {
-            free((char *)r->name);
-        }
-        free(r);
-    }
-}
-
-static esp_hid_scan_result_t *find_scan_result(esp_bd_addr_t bda, esp_hid_scan_result_t *results)
-{
-    esp_hid_scan_result_t *r = results;
-    while (r) {
-        if (memcmp(bda, r->bda, sizeof(esp_bd_addr_t)) == 0) {
-            return r;
-        }
-        r = r->next;
-    }
-    return NULL;
-}
-
-static void add_ble_scan_result(esp_bd_addr_t bda, esp_ble_addr_type_t addr_type, uint16_t appearance, uint8_t *name, uint8_t name_len, int rssi)
-{
-    if (find_scan_result(bda, ble_scan_results)) {
-        ESP_LOGW(TAG, "Result already exists!");
-        return;
-    }
-    esp_hid_scan_result_t *r = (esp_hid_scan_result_t *)malloc(sizeof(esp_hid_scan_result_t));
-    if (r == NULL) {
-        ESP_LOGE(TAG, "Malloc ble_hidh_scan_result_t failed!");
-        return;
-    }
-    r->transport = ESP_HID_TRANSPORT_BLE;
-    memcpy(r->bda, bda, sizeof(esp_bd_addr_t));
-    r->ble.appearance = appearance;
-    r->ble.addr_type = addr_type;
-    r->usage = esp_hid_usage_from_appearance(appearance);
-    r->rssi = rssi;
-    r->name = NULL;
-    if (name_len && name) {
-        char *name_s = (char *)malloc(name_len + 1);
-        if (name_s == NULL) {
-            free(r);
-            ESP_LOGE(TAG, "Malloc result name failed!");
-            return;
-        }
-        memcpy(name_s, name, name_len);
-        name_s[name_len] = 0;
-        r->name = (const char *)name_s;
-    }
-    r->next = ble_scan_results;
-    ble_scan_results = r;
-    num_ble_scan_results++;
-}
-
 void print_uuid(esp_bt_uuid_t *uuid)
 {
     if (uuid->len == ESP_UUID_LEN_16) {
@@ -171,52 +107,6 @@ void print_uuid(esp_bt_uuid_t *uuid)
                        uuid->uuid.uuid128[7], uuid->uuid.uuid128[8], uuid->uuid.uuid128[9],
                        uuid->uuid.uuid128[10], uuid->uuid.uuid128[11], uuid->uuid.uuid128[12],
                        uuid->uuid.uuid128[13], uuid->uuid.uuid128[14], uuid->uuid.uuid128[15]);
-    }
-}
-
-static void handle_ble_device_result(struct ble_scan_result_evt_param *scan_rst)
-{
-
-    uint16_t uuid = 0;
-    uint16_t appearance = 0;
-    char name[64] = {0};
-
-    uint8_t uuid_len = 0;
-    uint8_t *uuid_d = esp_ble_resolve_adv_data(scan_rst->ble_adv, ESP_BLE_AD_TYPE_16SRV_CMPL, &uuid_len);
-    if (uuid_d != NULL && uuid_len) {
-        uuid = uuid_d[0] + (uuid_d[1] << 8);
-    }
-
-    uint8_t appearance_len = 0;
-    uint8_t *appearance_d = esp_ble_resolve_adv_data(scan_rst->ble_adv, ESP_BLE_AD_TYPE_APPEARANCE, &appearance_len);
-    if (appearance_d != NULL && appearance_len) {
-        appearance = appearance_d[0] + (appearance_d[1] << 8);
-    }
-
-    uint8_t adv_name_len = 0;
-    uint8_t *adv_name = esp_ble_resolve_adv_data(scan_rst->ble_adv, ESP_BLE_AD_TYPE_NAME_CMPL, &adv_name_len);
-
-    if (adv_name == NULL) {
-        adv_name = esp_ble_resolve_adv_data(scan_rst->ble_adv, ESP_BLE_AD_TYPE_NAME_SHORT, &adv_name_len);
-    }
-
-    if (adv_name != NULL && adv_name_len) {
-        memcpy(name, adv_name, adv_name_len);
-        name[adv_name_len] = 0;
-    }
-
-    GAP_DBG_PRINTF("BLE: " ESP_BD_ADDR_STR ", ", ESP_BD_ADDR_HEX(scan_rst->bda));
-    GAP_DBG_PRINTF("RSSI: %d, ", scan_rst->rssi);
-    GAP_DBG_PRINTF("UUID: 0x%04x, ", uuid);
-    GAP_DBG_PRINTF("APPEARANCE: 0x%04x, ", appearance);
-    GAP_DBG_PRINTF("ADDR_TYPE: '%s'", ble_addr_type_str(scan_rst->ble_addr_type));
-    if (adv_name_len) {
-        GAP_DBG_PRINTF(", NAME: '%s'", name);
-    }
-    GAP_DBG_PRINTF("\n");
-
-    if (uuid == ESP_GATT_UUID_HID_SVC) {
-        add_ble_scan_result(scan_rst->bda, scan_rst->ble_addr_type, appearance, adv_name, adv_name_len, scan_rst->rssi);
     }
 }
 
@@ -238,7 +128,6 @@ static void ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_p
         esp_ble_gap_cb_param_t *scan_result = (esp_ble_gap_cb_param_t *)param;
         switch (scan_result->scan_rst.search_evt) {
         case ESP_GAP_SEARCH_INQ_RES_EVT: {
-            handle_ble_device_result(&scan_result->scan_rst);
             break;
         }
         case ESP_GAP_SEARCH_INQ_CMPL_EVT:
@@ -321,31 +210,6 @@ static esp_err_t init_ble_gap(void)
 
     if ((ret = esp_ble_gap_register_callback(ble_gap_event_handler)) != ESP_OK) {
         ESP_LOGE(TAG, "esp_ble_gap_register_callback failed: %d", ret);
-        return ret;
-    }
-    return ret;
-}
-
-static esp_ble_scan_params_t hid_scan_params = {
-    .scan_type              = BLE_SCAN_TYPE_ACTIVE,
-    .own_addr_type          = BLE_ADDR_TYPE_PUBLIC,
-    .scan_filter_policy     = BLE_SCAN_FILTER_ALLOW_ALL,
-    .scan_interval          = 0x50,
-    .scan_window            = 0x30,
-    .scan_duplicate         = BLE_SCAN_DUPLICATE_ENABLE,
-};
-
-static esp_err_t start_ble_scan(uint32_t seconds)
-{
-    esp_err_t ret = ESP_OK;
-    if ((ret = esp_ble_gap_set_scan_params(&hid_scan_params)) != ESP_OK) {
-        ESP_LOGE(TAG, "esp_ble_gap_set_scan_params failed: %d", ret);
-        return ret;
-    }
-    WAIT_BLE_CB();
-
-    if ((ret = esp_ble_gap_start_scanning(seconds)) != ESP_OK) {
-        ESP_LOGE(TAG, "esp_ble_gap_start_scanning failed: %d", ret);
         return ret;
     }
     return ret;
@@ -519,26 +383,5 @@ esp_err_t esp_hid_gap_init(uint8_t mode)
         return ret;
     }
 
-    return ESP_OK;
-}
-
-esp_err_t esp_hid_scan(uint32_t seconds, size_t *num_results, esp_hid_scan_result_t **results)
-{
-    if (num_ble_scan_results || ble_scan_results) {
-        ESP_LOGE(TAG, "There are old scan results. Free them first!");
-        return ESP_FAIL;
-    }
-
-    if (start_ble_scan(seconds) == ESP_OK) {
-        WAIT_BLE_CB();
-    } else {
-        return ESP_FAIL;
-    }
-
-    *num_results = num_ble_scan_results;
-    *results = ble_scan_results;
-
-    num_ble_scan_results = 0;
-    ble_scan_results = NULL;
     return ESP_OK;
 }
