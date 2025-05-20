@@ -131,6 +131,7 @@ static void ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_p
         // The app will receive this evt when the IO has Output capability and the peer device IO has Input capability.
         // Show the passkey number to the user to input it in the peer device.
         ESP_LOGI(TAG, "BLE GAP PASSKEY_NOTIF passkey:%"PRIu32, param->ble_security.key_notif.passkey);
+        //esp_ble_passkey_reply(param->ble_security.ble_notif.bda, true, 123456);
         break;
 
     case ESP_GAP_BLE_NC_REQ_EVT: // ESP_IO_CAP_IO
@@ -144,7 +145,7 @@ static void ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_p
         // The app will receive this evt when the IO has Input capability and the peer device IO has Output capability.
         // See the passkey number on the peer device and send it back.
         ESP_LOGI(TAG, "BLE GAP PASSKEY_REQ");
-        //esp_ble_passkey_reply(param->ble_security.ble_req.bd_addr, true, 1234);
+        //esp_ble_passkey_reply(param->ble_security.ble_req.bd_addr, true, 123456);
         break;
 
     case ESP_GAP_BLE_SEC_REQ_EVT:
@@ -193,7 +194,7 @@ esp_err_t ble_gap_adv_init(uint16_t appearance, const char *device_name)
     uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
     uint8_t rsp_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
     uint8_t key_size = 16; //the key size should be 7~16 bytes
-    uint32_t passkey = 1234;//ESP_IO_CAP_OUT
+    //uint32_t passkey = 27784280; //ESP_IO_CAP_OUT
 
     if ((ret = esp_ble_gap_set_security_param(ESP_BLE_SM_AUTHEN_REQ_MODE, &auth_req, 1)) != ESP_OK) {
         ESP_LOGE(TAG, "GAP set_security_param AUTHEN_REQ_MODE failed: %d", ret);
@@ -220,10 +221,10 @@ esp_err_t ble_gap_adv_init(uint16_t appearance, const char *device_name)
         return ret;
     }
 
-    if ((ret = esp_ble_gap_set_security_param(ESP_BLE_SM_SET_STATIC_PASSKEY, &passkey, sizeof(uint32_t))) != ESP_OK) {
+    /*if ((ret = esp_ble_gap_set_security_param(ESP_BLE_SM_SET_STATIC_PASSKEY, &passkey, sizeof(uint32_t))) != ESP_OK) {
         ESP_LOGE(TAG, "GAP set_security_param SET_STATIC_PASSKEY failed: %d", ret);
         return ret;
-    }
+    }*/
 
     if ((ret = esp_ble_gap_set_device_name(device_name)) != ESP_OK) {
         ESP_LOGE(TAG, "GAP set_device_name failed: %d", ret);

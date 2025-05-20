@@ -14,7 +14,8 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301, USA.
  *
- * Copyright 2019 Benjamin Aigner <beni@asterics-foundation.org>
+ * Original Work: Copyright 2019 Benjamin Aigner <beni@asterics-foundation.org>
+ * Modified by: github.com/paul356
  */
 
 /** @file
@@ -202,13 +203,9 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
 
     switch (event) {
     case ESP_HIDD_START_EVENT: {
-        ESP_LOGI(TAG, "START");
-        ble_gap_adv_start();
         break;
     }
     case ESP_HIDD_CONNECT_EVENT: {
-        ESP_LOGI(TAG, "CONNECT");
-        ble_gap_adv_start();
         break;
     }
     case ESP_HIDD_PROTOCOL_MODE_EVENT: {
@@ -304,6 +301,29 @@ bool isBLERunning()
     return keyboard_q != NULL && hid_dev != NULL;
 }
 
+/**
+ * @brief Intermediary GATTS event handler
+ * Routes events between ESP-IDF HID and our custom layout service
+ */
+void top_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
+{
+    // Check if this is a registration event for our custom service
+    if ((event == ESP_GATTS_REG_EVT && param->reg.app_id == LAYOUT_SERVICE_UUID) ||
+        (event != ESP_GATTS_REG_EVT && gatts_if != ESP_GATT_IF_NONE && gatts_if == layout_service_get_gatts_if()))
+    {
+        // Pass to our layout service handler
+        ESP_LOGI(TAG, "GATTS event: %d, GATTS interface: %d, to custom", event, gatts_if);
+        layout_service_event_handler(event, gatts_if, param);
+        return;
+    }
+
+    
+
+    ESP_LOGI(TAG, "GATTS event: %d, GATTS interface: %d, to keyboard", event, gatts_if);
+    // For all other events, pass to ESP-IDF HID handler
+    esp_hidd_gatts_event_handler(event, gatts_if, param);
+}
+
 /** @brief Main init function to start HID interface (C interface)
  * @see hid_ble */
 esp_err_t halBLEInit(const char* name)
@@ -324,8 +344,7 @@ esp_err_t halBLEInit(const char* name)
     ESP_ERROR_CHECK( ret );
 
     // Register our intermediary GATTS event handler instead of ESP-IDF's handler directly
-    extern void mk32_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
-    if ((ret = esp_ble_gatts_register_callback(mk32_gatts_event_handler)) != ESP_OK) {
+    if ((ret = esp_ble_gatts_register_callback(top_gatts_event_handler)) != ESP_OK) {
         ESP_LOGE(TAG, "GATTS register callback failed: %d", ret);
         return ret;
     }
