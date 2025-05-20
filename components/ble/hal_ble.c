@@ -3,17 +3,17 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301, USA.
- * 
+ *
  * Copyright 2019 Benjamin Aigner <beni@asterics-foundation.org>
  */
 
@@ -25,10 +25,9 @@
 #include "esp_hidd.h"
 #include "esp_check.h"
 #include "ble_gap.h"
+#include "layout_service.h"  // Include the layout service header
 
 #define TAG "hal_ble"
-#define MAX_MTU 517 // Max possible mtu size
-/** @brief Set a global log limit for this file */
 
 /// @brief Battery level monitor queue
 QueueHandle_t battery_q;
@@ -86,7 +85,7 @@ const unsigned char hidapiReportMap[] = { //8 bytes input, 8 bytes feature
     0x81, 0x00,  //   Input: (Data, Array)
     //
     0xC0,        // End Collection
-    
+
     /*
     0x05, 0x01,  // Usage Page (Generic Desktop)
     0x09, 0x02,  // Usage (Mouse)
@@ -190,7 +189,7 @@ static esp_hid_device_config_t ble_hid_config = {
     .product_id         = 0x05DF,
     .version            = 0x0100,
     .device_name        = "ESP BLE HID3",
-    .manufacturer_name  = "Espressif",
+    .manufacturer_name  = "Paradise Lab",
     .serial_number      = "1234567890",
     .report_maps        = ble_report_maps,
     .report_maps_len    = 1
@@ -209,6 +208,7 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
     }
     case ESP_HIDD_CONNECT_EVENT: {
         ESP_LOGI(TAG, "CONNECT");
+        ble_gap_adv_start();
         break;
     }
     case ESP_HIDD_PROTOCOL_MODE_EVENT: {
@@ -231,7 +231,6 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
     }
     case ESP_HIDD_DISCONNECT_EVENT: {
         ESP_LOGI(TAG, "DISCONNECT: %s", esp_hid_disconnect_reason_str(esp_hidd_dev_transport_get(param->disconnect.dev), param->disconnect.reason));
-        ble_gap_adv_start();
         break;
     }
     case ESP_HIDD_STOP_EVENT: {
@@ -265,10 +264,10 @@ void halBLETask_battery(void * params) {
             }
         }
     }
-		
+
 }
 /** @brief CONTINOUS TASK - sending HID commands via BLE
- * 
+ *
  * This task is used to wait for HID commands, sent to the hid_ble
  * queue. If one command is received, it will be sent to a (possibly)
  * connected BLE device.
@@ -324,13 +323,20 @@ esp_err_t halBLEInit(const char* name)
     ret = ble_gap_adv_init(ESP_HID_APPEARANCE_KEYBOARD, ble_hid_config.device_name);
     ESP_ERROR_CHECK( ret );
 
-    if ((ret = esp_ble_gatts_register_callback(esp_hidd_gatts_event_handler)) != ESP_OK) {
+    // Register our intermediary GATTS event handler instead of ESP-IDF's handler directly
+    extern void mk32_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
+    if ((ret = esp_ble_gatts_register_callback(mk32_gatts_event_handler)) != ESP_OK) {
         ESP_LOGE(TAG, "GATTS register callback failed: %d", ret);
         return ret;
     }
-    ESP_LOGI(TAG, "setting ble device");
+
+    ESP_LOGI(TAG, "setting hid service");
     ESP_ERROR_CHECK(
         esp_hidd_dev_init(&ble_hid_config, ESP_HID_TRANSPORT_BLE, ble_hidd_event_callback, &hid_dev));
+
+    // Initialize the custom layout service
+    ESP_LOGI(TAG, "setting custom service");
+    layout_service_init();
 
 	//create BLE task
 	TaskHandle_t xBLETask_battery;

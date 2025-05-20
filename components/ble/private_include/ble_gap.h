@@ -29,7 +29,6 @@ extern "C" {
 #endif
 
 esp_err_t ble_gap_init(uint8_t mode);
-
 esp_err_t ble_gap_adv_init(uint16_t appearance, const char *device_name);
 esp_err_t ble_gap_adv_start(void);
 
