@@ -307,6 +307,10 @@ bool isBLERunning()
  */
 void top_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
+    if (event == ESP_GATTS_CONNECT_EVT) {
+        ble_gap_adv_start();
+    }
+
     // Check if this is a registration event for our custom service
     if ((event == ESP_GATTS_REG_EVT && param->reg.app_id == LAYOUT_SERVICE_UUID) ||
         (event != ESP_GATTS_REG_EVT && gatts_if != ESP_GATT_IF_NONE && gatts_if == layout_service_get_gatts_if()))
@@ -316,8 +320,6 @@ void top_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
         layout_service_event_handler(event, gatts_if, param);
         return;
     }
-
-    
 
     ESP_LOGI(TAG, "GATTS event: %d, GATTS interface: %d, to keyboard", event, gatts_if);
     // For all other events, pass to ESP-IDF HID handler
@@ -356,6 +358,11 @@ esp_err_t halBLEInit(const char* name)
     // Initialize the custom layout service
     ESP_LOGI(TAG, "setting custom service");
     layout_service_init();
+
+    ret = ble_gap_adv_start();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "BLE adv start failed: %d", ret);
+    }
 
 	//create BLE task
 	TaskHandle_t xBLETask_battery;

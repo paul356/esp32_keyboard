@@ -31,11 +31,14 @@
 #include "function_control.h"
 #include "macros.h"
 #include "function_key.h"
+#include "keymap_json.h"
 
 #define TAG "[HTTPD]"
 #define ARRAY_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
+#define MAX_BUF_SIZE 2048
 
 static time_t s_init_version;
+static char recv_buf[MAX_BUF_SIZE];
 
 static esp_err_t parse_http_req(httpd_req_t* req, cJSON** root)
 {
@@ -98,215 +101,29 @@ static esp_err_t serve_static_files(httpd_req_t* req)
     return ESP_OK;
 }
 
-static esp_err_t layouts_json(httpd_req_t* req)
+// Helper function for appending strings to HTTP response
+static void httpd_append_str(void* target, const char* str)
 {
-    esp_err_t err;
-
-    uint8_t layers;
-    uint32_t rows, cols;
-    nvs_get_keymap_info(&layers, &rows, &cols);
-
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr_chunk(req, "{\"layouts\":{\n");
-
-    for (int i = 0; i < layers; i++) {
-        httpd_resp_sendstr_chunk(req, "\"");
-        httpd_resp_sendstr_chunk(req, nvs_get_layer_name(i));
-        httpd_resp_sendstr_chunk(req, "\":[");
-
-        for (int j = 0; j < rows; j++) {
-            httpd_resp_sendstr_chunk(req, "\n  [");
-            for (int k = 0; k < cols; k++) {
-                httpd_resp_sendstr_chunk(req, "\"");
-
-                // Use existing keymap functions
-                char scratch_buf[64];
-                uint16_t keycode;
-
-                // Use direct function parameters instead of keymap_position_t
-                err = nvs_get_keycode(i, j, k, &keycode);
-                if (err == ESP_OK) {
-                    err = get_full_key_name(keycode, scratch_buf, sizeof(scratch_buf));
-                    if (err == ESP_OK) {
-                        err = httpd_resp_sendstr_chunk(req, scratch_buf);
-                    } else {
-                        ESP_LOGE(TAG, "invalid key code 0x%x @[%d, %d, %d]", keycode, i, j, k);
-                    }
-                } else {
-                    ESP_LOGE(TAG, "error getting keycode at [%d, %d, %d]: %s", i, j, k, esp_err_to_name(err));
-                }
-
-                if (err != ESP_OK) {
-                    // Send default code
-                    httpd_resp_sendstr_chunk(req, "____");
-                }
-
-                if (k != cols - 1) {
-                    httpd_resp_sendstr_chunk(req, "\", ");
-                } else {
-                    httpd_resp_sendstr_chunk(req, "\"");
-                }
-            }
-            if (j != rows - 1) {
-                httpd_resp_sendstr_chunk(req, "],\n");
-            } else {
-                httpd_resp_sendstr_chunk(req, "]");
-            }
-        }
-
-        if (i != layers - 1) {
-            httpd_resp_sendstr_chunk(req, "\n],\n");
-        } else {
-            httpd_resp_sendstr_chunk(req, "\n]\n");
-        }
-    }
-    httpd_resp_sendstr_chunk(req, "}}");
-    httpd_resp_sendstr_chunk(req, NULL);
-
-    return ESP_OK;
+    httpd_req_t* req = (httpd_req_t*)target;
+    httpd_resp_sendstr_chunk(req, str);
 }
 
-static void quantum_desc_json(httpd_req_t* req, funct_desc_t* desc)
+static esp_err_t layouts_json(httpd_req_t* req)
 {
-    httpd_resp_sendstr_chunk(req, "{\"desc\" : \"");
-    httpd_resp_sendstr_chunk(req, desc->desc);
-    httpd_resp_sendstr_chunk(req, "\", ");
-    httpd_resp_sendstr_chunk(req, "\"arg_types\" : [");
-    bool first_key = true;
-    for (int i = 0; i < desc->num_args; i++) {
-        if (first_key) {
-            first_key = false;
-        } else {
-            httpd_resp_sendstr_chunk(req, ", ");
-        }
-
-        switch (desc->arg_types[i]) {
-        case LAYER_NUM:
-            httpd_resp_sendstr_chunk(req, "\"layer_num\"");
-            break;
-        case BASIC_CODE:
-            httpd_resp_sendstr_chunk(req, "\"basic_code\"");
-            break;
-        case MOD_BITS:
-            httpd_resp_sendstr_chunk(req, "\"mod_bits\"");
-            break;
-        case MACRO_CODE:
-            httpd_resp_sendstr_chunk(req, "\"macro_code\"");
-            break;
-        case FUNCTION_KEY_CODE:
-            httpd_resp_sendstr_chunk(req, "\"function_key_code\"");
-            break;
-        }
-    }
-    httpd_resp_sendstr_chunk(req, "]}");
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t err = generate_layouts_json(httpd_append_str, req);
+    httpd_resp_sendstr_chunk(req, NULL);
+    return err;
 }
 
 static esp_err_t keycodes_json(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr_chunk(req, "{\n  \"keycodes\":[");
-    uint16_t keyCodeNum = get_max_basic_key_code();
-    bool firstKey = true;
-    for (uint16_t kc = 0; kc < keyCodeNum; kc++) {
-        const char* keyName = get_basic_key_name(kc);
-
-        if (keyName) {
-            if (firstKey) {
-                httpd_resp_sendstr_chunk(req, "\"");
-                firstKey = false;
-            } else {
-                httpd_resp_sendstr_chunk(req, ", \"");
-            }
-
-            httpd_resp_sendstr_chunk(req, keyName);
-
-            httpd_resp_sendstr_chunk(req, "\"");
-        }
-    }
-    httpd_resp_sendstr_chunk(req, "],\n");
-
-    httpd_resp_sendstr_chunk(req, "  \"mod_bits\":[");
-    firstKey = true;
-    for (int i = 0; i < get_mod_bit_num(); i++) {
-        if (firstKey) {
-            httpd_resp_sendstr_chunk(req, "\"");
-            firstKey = false;
-        } else {
-            httpd_resp_sendstr_chunk(req, ", \"");
-        }
-
-        httpd_resp_sendstr_chunk(req, get_mod_bit_name(i));
-
-        httpd_resp_sendstr_chunk(req, "\"");
-    }
-    httpd_resp_sendstr_chunk(req, "],\n");
-
-    httpd_resp_sendstr_chunk(req, "  \"quantum_functs\":[");
-    firstKey = true;
-    for (int i = 0; i < get_total_funct_num(); i++) {
-        if (firstKey) {
-            firstKey = false;
-        } else {
-            httpd_resp_sendstr_chunk(req, ", ");
-        }
-
-        funct_desc_t desc;
-        get_funct_desc(i, &desc);
-        quantum_desc_json(req, &desc);
-    }
-    httpd_resp_sendstr_chunk(req, "],\n");
-
-    httpd_resp_sendstr_chunk(req, "  \"macros\":[");
-    firstKey = true;
-    for (uint16_t code = MACRO_CODE_MIN; code <= MACRO_CODE_MAX; code++) {
-        if (firstKey) {
-            httpd_resp_sendstr_chunk(req, "\"");
-            firstKey = false;
-        } else {
-            httpd_resp_sendstr_chunk(req, ", \"");
-        }
-
-        char scratch[12];
-        (void)get_macro_name(code, scratch, sizeof(scratch));
-        httpd_resp_sendstr_chunk(req, scratch);
-
-        httpd_resp_sendstr_chunk(req, "\"");
-    }
-    httpd_resp_sendstr_chunk(req, "],\n");
-
-    httpd_resp_sendstr_chunk(req, "  \"layer_num\":");
-    char scratch[8];
-    // Get the number of layers from the NVS function
-    uint8_t layers;
-    uint32_t rows, cols;
-    nvs_get_keymap_info(&layers, &rows, &cols);
-    snprintf(scratch, sizeof(scratch), "%d", layers);
-    httpd_resp_sendstr_chunk(req, scratch);
-    httpd_resp_sendstr_chunk(req, ",\n");
-
-    httpd_resp_sendstr_chunk(req, "  \"function_keys\":[");
-    firstKey = true;
-    for (uint16_t code = FUNCTION_KEY_MIN; code <= FUNCTION_KEY_MAX; code++) {
-        if (firstKey) {
-            httpd_resp_sendstr_chunk(req, "\"");
-            firstKey = false;
-        } else {
-            httpd_resp_sendstr_chunk(req, ", \"");
-        }
-
-        httpd_resp_sendstr_chunk(req, get_function_key_str(code));
-
-        httpd_resp_sendstr_chunk(req, "\"");
-    }
-    httpd_resp_sendstr_chunk(req, "]\n}");
-
+    esp_err_t err = generate_keycodes_json(httpd_append_str, req);
     httpd_resp_sendstr_chunk(req, NULL);
-
-    return ESP_OK;
+    return err;
 }
 
-#define MAX_BUF_SIZE 1024
-static char recv_buf[MAX_BUF_SIZE];
 static esp_err_t update_keymap(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "text/plain");

@@ -48,7 +48,9 @@ extern "C" {
 // UUIDs for the custom service and characteristics
 #define LAYOUT_SERVICE_UUID      0x181C  // Custom service UUID
 #define LAYOUT_CHAR_UUID         0xDEF1  // Layout characteristic UUID
-#define KEYCODE_CHAR_UUID        0xDEF2  // Keycode characteristic UUID
+#define LAYOUT_OFFSET_CHAR_UUID  0xDEF2  // Layout offset characteristic UUID
+#define KEYCODE_CHAR_UUID        0xDEF3  // Keycode characteristic UUID
+#define KEYCODE_OFFSET_CHAR_UUID 0xDEF4  // Keycode offset characteristic UUID
 
 /**
  * @brief Data structure for storing JSON layout/keycode data
@@ -59,6 +61,7 @@ typedef struct {
     uint16_t max_len;       // Maximum allocation size
     bool is_prepared;       // Flag for prepared writes
     uint16_t prepared_len;  // Length of prepared data
+    uint16_t offset;        // Current offset for read operations
 } layout_json_data_t;
 
 /**
@@ -104,6 +107,36 @@ esp_err_t layout_service_set_layout_json(const char* json_data);
  * @return ESP_OK if successful
  */
 esp_err_t layout_service_set_keycode_json(const char* json_data);
+
+/**
+ * @brief Set the offset for layout characteristic reads
+ * 
+ * @param offset Offset value (must be less than layout data length)
+ * @return ESP_OK if successful, ESP_ERR_INVALID_ARG if offset is invalid
+ */
+esp_err_t layout_service_set_layout_offset(uint16_t offset);
+
+/**
+ * @brief Get the current layout offset
+ * 
+ * @return Current layout offset value
+ */
+uint16_t layout_service_get_layout_offset(void);
+
+/**
+ * @brief Set the offset for keycode characteristic reads
+ * 
+ * @param offset Offset value (must be less than keycode data length)
+ * @return ESP_OK if successful, ESP_ERR_INVALID_ARG if offset is invalid
+ */
+esp_err_t layout_service_set_keycode_offset(uint16_t offset);
+
+/**
+ * @brief Get the current keycode offset
+ * 
+ * @return Current keycode offset value
+ */
+uint16_t layout_service_get_keycode_offset(void);
 
 /** @brief Get the GATTS interface for the layout service
  * @return GATTS interface handle
