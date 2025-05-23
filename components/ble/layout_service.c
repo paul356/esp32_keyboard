@@ -244,6 +244,11 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                                       ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE, 
                                       NULL, NULL);
             }
+            else if (param->add_char.char_uuid.uuid.uuid16 == KEYCODE_OFFSET_CHAR_UUID)
+            {
+                keycode_offset_char_handle = param->add_char.attr_handle;
+                ESP_LOGI(TAG, "Keycode offset characteristic added, handle: %d", keycode_offset_char_handle);
+            }
         }
         else
         {
@@ -269,6 +274,14 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
     case ESP_GATTS_READ_EVT:
         if (param->read.handle == layout_char_handle)
         {
+            esp_gatt_rsp_t rsp = {0};
+            if (param->read.offset != 0) {
+                rsp.attr_value.len = 0;
+                rsp.attr_value.handle = param->read.handle;
+                rsp.attr_value.offset = param->read.offset;
+                esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id, ESP_GATT_OK, &rsp);
+                break;
+            }
             // Generate fresh layout JSON content using our utility function
             if (layout_data.data)
             {
@@ -284,14 +297,11 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
             // Generate the JSON using our utility function
             generate_layouts_json(ble_append_str, &layout_data);
 
-            // Handle layout read request
-            esp_gatt_rsp_t rsp = {0};
-
             // Use the negotiated MTU or default if not set yet
             uint16_t mtu = layout_service_mtu > 0 ? layout_service_mtu : BLE_DEFAULT_MTU_SIZE;
             
-            // Add the stored offset to the packet offset for reading
-            uint16_t effective_offset = param->read.offset + layout_offset;
+            // Use the offset from the characteristic
+            uint16_t effective_offset = layout_offset;
             uint16_t available_len = 0;
             
             if (effective_offset < layout_data.data_len) {
@@ -306,12 +316,12 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                 send_len = 0;
             }
 
-            ESP_LOGI(TAG, "Layout read request, packet offset: %d, stored offset: %d, effective: %d, available: %d, sending: %d", 
-                     param->read.offset, layout_offset, effective_offset, available_len, send_len);
+            ESP_LOGI(TAG, "Layout read request, stored offset: %d, request offset: %d, effective offset: %d, available: %d, sending: %d", 
+                     layout_offset, param->read.offset, effective_offset, available_len, send_len);
 
             rsp.attr_value.len = send_len;
             rsp.attr_value.handle = param->read.handle;
-            rsp.attr_value.offset = param->read.offset;
+            rsp.attr_value.offset = 0;
 
             if (send_len > 0)
             {
@@ -329,6 +339,14 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
         }
         else if (param->read.handle == keycode_char_handle)
         {
+            esp_gatt_rsp_t rsp = {0};
+            if (param->read.offset != 0) {
+                rsp.attr_value.len = 0;
+                rsp.attr_value.handle = param->read.handle;
+                rsp.attr_value.offset = param->read.offset;
+                esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id, ESP_GATT_OK, &rsp);
+                break;
+            }
             // Generate fresh keycode JSON content using our utility function
             if (keycode_data.data)
             {
@@ -344,14 +362,11 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
             // Generate the JSON using our utility function
             generate_keycodes_json(ble_append_str, &keycode_data);
 
-            // Handle keycode read request
-            esp_gatt_rsp_t rsp = {0};
-
             // Use the negotiated MTU or default if not set yet
             uint16_t mtu = layout_service_mtu > 0 ? layout_service_mtu : BLE_DEFAULT_MTU_SIZE;
             
-            // Add the stored offset to the packet offset for reading
-            uint16_t effective_offset = param->read.offset + keycode_offset;
+            // Use the offset from the characteristic
+            uint16_t effective_offset = keycode_offset;
             uint16_t available_len = 0;
             
             if (effective_offset < keycode_data.data_len) {
@@ -366,15 +381,16 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                 send_len = 0;
             }
 
-            ESP_LOGI(TAG, "Keycode read request, packet offset: %d, stored offset: %d, effective: %d, available: %d, sending: %d", 
-                     param->read.offset, keycode_offset, effective_offset, available_len, send_len);
+            ESP_LOGI(TAG, "Keycode read request, stored offset: %d, request offset: %d, effective offset: %d, available: %d, sending: %d", 
+                     keycode_offset, param->read.offset, effective_offset, available_len, send_len);
 
             rsp.attr_value.len = send_len;
             rsp.attr_value.handle = param->read.handle;
-            rsp.attr_value.offset = param->read.offset;
+            rsp.attr_value.offset = 0;
 
             if (send_len > 0)
             {
+                ESP_LOGI(TAG, "Keycode JSON copied: len=%d %s", send_len, (char *)layout_data.data + effective_offset);
                 memcpy(rsp.attr_value.value, keycode_data.data + effective_offset, send_len);
             }
 
@@ -436,18 +452,11 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                     // Extract 16-bit offset value (little-endian)
                     uint16_t new_offset = param->write.value[0] | (param->write.value[1] << 8);
                     
-                    // Validate and set the offset
-                    if (layout_data.data && new_offset < layout_data.data_len)
-                    {
-                        layout_offset = new_offset;
-                        layout_data.offset = new_offset;
-                        ESP_LOGI(TAG, "Layout offset set to: %d", layout_offset);
-                    }
-                    else
-                    {
-                        ESP_LOGW(TAG, "Invalid layout offset: %d, max: %d", 
-                                new_offset, layout_data.data ? layout_data.data_len - 1 : 0);
-                    }
+                    // Always allow setting the offset - even if it's beyond the data length
+                    layout_offset = new_offset;
+                    layout_data.offset = new_offset;
+                    ESP_LOGI(TAG, "Layout offset set to: %d (data length: %d)", 
+                             layout_offset, layout_data.data ? layout_data.data_len : 0);
                 }
             }
             else if (param->write.handle == keycode_offset_char_handle)
@@ -458,18 +467,11 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                     // Extract 16-bit offset value (little-endian)
                     uint16_t new_offset = param->write.value[0] | (param->write.value[1] << 8);
                     
-                    // Validate and set the offset
-                    if (keycode_data.data && new_offset < keycode_data.data_len)
-                    {
-                        keycode_offset = new_offset;
-                        keycode_data.offset = new_offset;
-                        ESP_LOGI(TAG, "Keycode offset set to: %d", keycode_offset);
-                    }
-                    else
-                    {
-                        ESP_LOGW(TAG, "Invalid keycode offset: %d, max: %d", 
-                                new_offset, keycode_data.data ? keycode_data.data_len - 1 : 0);
-                    }
+                    // Always allow setting the offset - even if it's beyond the data length
+                    keycode_offset = new_offset;
+                    keycode_data.offset = new_offset;
+                    ESP_LOGI(TAG, "Keycode offset set to: %d (data length: %d)", 
+                             keycode_offset, keycode_data.data ? keycode_data.data_len : 0);
                 }
             }
             // If an attempt is made to write to read-only characteristics,
@@ -724,16 +726,12 @@ esp_err_t layout_service_set_keycode_json(const char *json_data)
 /**
  * @brief Set the offset for layout characteristic reads
  * 
- * @param offset Offset value (must be less than layout data length)
- * @return ESP_OK if successful, ESP_ERR_INVALID_ARG if offset is invalid
+ * @param offset Offset value (can be any value, even beyond the data length)
+ * @return ESP_OK always successful
  */
 esp_err_t layout_service_set_layout_offset(uint16_t offset)
 {
-    // Check if layout data is initialized
-    if (!layout_data.data || offset >= layout_data.data_len) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    
+    // Allow any offset value, even beyond the data length
     layout_offset = offset;
     layout_data.offset = offset;
     return ESP_OK;
@@ -752,16 +750,12 @@ uint16_t layout_service_get_layout_offset(void)
 /**
  * @brief Set the offset for keycode characteristic reads
  * 
- * @param offset Offset value (must be less than keycode data length)
- * @return ESP_OK if successful, ESP_ERR_INVALID_ARG if offset is invalid
+ * @param offset Offset value (can be any value, even beyond the data length)
+ * @return ESP_OK always successful
  */
 esp_err_t layout_service_set_keycode_offset(uint16_t offset)
 {
-    // Check if keycode data is initialized
-    if (!keycode_data.data || offset >= keycode_data.data_len) {
-        return ESP_ERR_INVALID_ARG;
-    }
-    
+    // Allow any offset value, even beyond the data length
     keycode_offset = offset;
     keycode_data.offset = offset;
     return ESP_OK;
