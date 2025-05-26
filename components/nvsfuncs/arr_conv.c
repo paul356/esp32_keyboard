@@ -22,10 +22,23 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
-#include <arr_conv.h>
-#include "nvs_funcs.h"
+#include "keyboard_config.h"
+#include "arr_conv.h"
 
-void free_layer_names(char*** layer_names, uint32_t layers);
+
+void free_layer_names(char*** layer_names, uint32_t layers)
+{
+    for (uint32_t i = 0; i < layers; i++) {
+        if (*layer_names && (*layer_names)[i]) {
+            free((*layer_names)[i]);
+            (*layer_names)[i] = NULL;
+        }
+    }
+    if (*layer_names) {
+        free(*layer_names);
+        *layer_names = NULL;
+    }
+}
 
 //convert string array to a single string
 void str_arr_to_str(char **layer_names, uint8_t layers, char **buffer){

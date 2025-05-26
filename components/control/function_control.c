@@ -19,8 +19,9 @@
  */
 
 #include <stddef.h>
+#include <string.h>
 #include "function_control.h"
-#include "nvs_funcs.h"
+#include "nvs_io.h"
 #include "nvs.h"
 #include "esp_log.h"
 #include "esp_random.h"

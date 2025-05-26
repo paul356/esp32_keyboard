@@ -51,7 +51,7 @@
 //MK32 functions
 #include "matrix.h"
 #include "keyboard_config.h"
-#include "nvs_funcs.h"
+#include "layout_store.h"
 #include "esp32s3/keyboard_report.h"
 #include "action_layer.h"
 #include "wait.h"

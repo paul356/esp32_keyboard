@@ -22,7 +22,7 @@
 #include "esp_check.h"
 #include "key_definitions.h"
 #include "function_key.h"
-#include "nvs_funcs.h"
+#include "layout_store.h"
 #include "macros.h"
 #include "keymap_json.h"
 

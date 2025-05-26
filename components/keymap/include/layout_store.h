@@ -16,19 +16,6 @@
 #ifndef NVS_FUNCS_H_
 #define NVS_FUNCS_H_
 
-#define NVS_CONFIG_OK 1
-#define NVS_CONFIG_ERR 0
-
-/**
- * @brief Read data blob from NVS
- */
-esp_err_t nvs_read_blob(const char* namespace, const char* key, void* buffer, size_t* buf_size);
-
-/**
- * @brief Write data blob to NVS
- */
-esp_err_t nvs_write_blob(const char* namespace, const char* key, const void* buffer, size_t buf_size);
-
 /**
  * @brief Reset layouts to default values
  */

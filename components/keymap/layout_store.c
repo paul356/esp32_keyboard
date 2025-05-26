@@ -28,7 +28,8 @@
 #include "esp_system.h"
 #include "nvs_flash.h"
 #include "nvs.h"
-#include "nvs_funcs.h"
+#include "nvs_io.h"
+#include "layout_store.h"
 #include "keymap.h"
 #include <arr_conv.h>
 
@@ -53,57 +54,6 @@ uint16_t keymaps[LAYERS][MATRIX_ROWS][MATRIX_COLS];
 
 static esp_err_t nvs_write_keymap_cfg(uint8_t layers, char **layer_names_arr);
 
-esp_err_t nvs_read_blob(const char* namespace, const char* key, void* buffer, size_t* buf_size)
-{
-	ESP_LOGI(NVS_TAG,"Opening NVS handle for %s", namespace);
-    nvs_handle handle;
-	esp_err_t err = nvs_open(namespace, NVS_READWRITE, &handle);
-	if (err != ESP_OK) {
-		ESP_LOGE(NVS_TAG,"Error (%s) opening NVS handle!\n", esp_err_to_name(err));
-        return err;
-	}
-
-    ESP_LOGI(NVS_TAG,"NVS Handle for %s opened successfully", namespace);
-
-	//get blob array size
-	err = nvs_get_blob(handle, key, buffer, buf_size);
-	if (err != ESP_OK) {
-		ESP_LOGE(NVS_TAG, "Error get key %s: %s", key, esp_err_to_name(err));
-        nvs_close(handle);
-        return err;
-	}
-
-	ESP_LOGI(NVS_TAG, "ns:%s key:%s copied to buffer", namespace, key);
-	nvs_close(handle);
-    return ESP_OK;
-}
-
-esp_err_t nvs_write_blob(const char* namespace, const char* key, const void* buffer, size_t buf_size)
-{
-	ESP_LOGI(NVS_TAG,"Opening NVS handle");
-    nvs_handle handle;
-	esp_err_t err = nvs_open(namespace, NVS_READWRITE, &handle);
-	if (err != ESP_OK) {
-		ESP_LOGE(NVS_TAG,"Error (%s) opening NVS handle for %s!\n", esp_err_to_name(err), namespace);
-        return err;
-    }
-
-    ESP_LOGI(NVS_TAG,"NVS Handle opened successfully");
-
-    err = nvs_set_blob(handle, key, buffer, buf_size);
-	if (err != ESP_OK) {
-		ESP_LOGE(NVS_TAG, "Error writing ns:%s key:%s layout: %s", namespace, key, esp_err_to_name(err));
-        nvs_close(handle);
-        return err;
-	}
-
-    ESP_LOGI(NVS_TAG, "Success writing layout");
-
-    nvs_commit(handle);
-	nvs_close(handle);
-    return ESP_OK;
-}
-
 //add or overwrite a keymap to the nvs - now static
 static esp_err_t nvs_write_layout_matrix(const uint16_t layout[MATRIX_ROWS * MATRIX_COLS], const char* layout_name)
 {
@@ -112,20 +62,6 @@ static esp_err_t nvs_write_layout_matrix(const uint16_t layout[MATRIX_ROWS * MAT
 		ESP_LOGE(NVS_TAG,"write ns:%s key:%s fail reason(%s)!\n", KEYMAP_NAMESPACE, layout_name, esp_err_to_name(err));
     }
     return err;
-}
-
-void free_layer_names(char*** layer_names, uint32_t layers)
-{
-    for (uint32_t i = 0; i < layers; i++) {
-        if (*layer_names && (*layer_names)[i]) {
-            free((*layer_names)[i]);
-            (*layer_names)[i] = NULL;
-        }
-    }
-    if (*layer_names) {
-        free(*layer_names);
-        *layer_names = NULL;
-    }
 }
 
 //read the what layouts are in the nvs - now static

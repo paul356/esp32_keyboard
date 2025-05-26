@@ -25,7 +25,7 @@
 #include "esp_check.h"
 #include "keyboard_config.h"
 #include "key_definitions.h"
-#include "nvs_funcs.h"
+#include "layout_store.h"
 #include "cJSON.h"
 #include "hal_ble.h"
 #include "function_control.h"

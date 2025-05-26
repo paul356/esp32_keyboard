@@ -18,8 +18,11 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+#include <string.h>
 #include "esp_log.h"
-#include "nvs_funcs.h"
+#include "esp_err.h"
+#include "nvs.h"
+#include "nvs_io.h"
 #include "macros.h"
 #include "quantum.h"
 

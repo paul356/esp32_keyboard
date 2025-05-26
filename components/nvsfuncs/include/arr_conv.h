@@ -39,6 +39,8 @@ void str_arr_to_str(char **layer_names, uint8_t layers, char **buffer);
  */
 void str_to_str_arr(char *str, uint8_t layers,char ***buffer);
 
+void free_layer_names(char*** layer_names, uint32_t layers);
+
 #ifdef __cplusplus
 }
 #endif
