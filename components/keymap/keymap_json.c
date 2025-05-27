@@ -33,10 +33,23 @@ esp_err_t generate_layouts_json(append_str_fn_t append_str, void* target)
     esp_err_t err;
     uint8_t layers;
     uint32_t rows, cols;
-    
+    uint64_t version;
+    char version_str[32];
+
     nvs_get_keymap_info(&layers, &rows, &cols);
 
-    append_str(target, "{\"layouts\":{\n");
+    // Get layout version
+    err = nvs_get_layout_version(&version);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get layout version: %s", esp_err_to_name(err));
+        return err;
+    }
+
+    snprintf(version_str, sizeof(version_str), "%llu", (unsigned long long)version);
+
+    append_str(target, "{\"version\":");
+    append_str(target, version_str);
+    append_str(target, ",\"layouts\":{\n");
 
     for (int i = 0; i < layers; i++) {
         append_str(target, "\"");
@@ -204,7 +217,7 @@ esp_err_t generate_keycodes_json(append_str_fn_t append_str, void* target)
     append_str(target, "],\n");
 
     append_str(target, "  \"layer_num\":");
-    
+
     // Get the number of layers from the NVS function
     uint8_t layers;
     uint32_t rows, cols;

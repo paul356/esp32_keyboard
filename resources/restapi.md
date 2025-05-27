@@ -8,13 +8,14 @@
 ```
 {
     "layouts" : {
-                "QWERTY" :  [[code00, code01, code02, ...],
+                "layer 0" :  [[code00, code01, code02, ...],
                              [code10, code11, code12, ...],
                              ...
                             ],
-                "NUM" :     [...],
-                "Plugins" : [...]
+                "layer 1" :     [...],
+                "layer 2" : [...]
                }
+    "version" : <layout-version>,
 }
 ```
 
@@ -40,9 +41,14 @@
 * Input(json):
 ```
 {
-    "layer" : "QWERTY", // QWERTY, NUM, Plugins
-    "positions" : [pos1, pos2, pos3, pos4, ...], // posx is an integer = row-index * MATRIX_COLS + col-index
-    "keycodes" : [keycode1, keycode2, keycode3, keycode4, ...] // keycode's are strings
+    "changes": {
+        "layer <i>" : {
+            "positions" : [pos1, pos2, pos3, pos4, ...], // posx is an integer = row-index * MATRIX_COLS + col-index
+            "keycodes" : [keycode1, keycode2, keycode3, keycode4, ...] // keycode's are strings
+        },
+        ...
+    },
+    "version" : <new-version>,
 }
 ```
 * Output: none

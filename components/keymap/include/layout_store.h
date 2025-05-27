@@ -32,9 +32,12 @@ void nvs_load_layouts(void);
 esp_err_t nvs_get_layer(const char* layer_name, uint16_t* layout, uint16_t layout_len);
 
 /**
- * @brief Save one layer to NVS. This function will update both in-memory keymap and nvs store.
+ * @brief Get the current layout version
+ *
+ * @param version Pointer to store the version
+ * @return esp_err_t ESP_OK on success, appropriate error code otherwise
  */
-esp_err_t nvs_save_layer(const char* layer_name, const uint16_t* layout, uint16_t layout_len);
+esp_err_t nvs_get_layout_version(uint64_t* version);
 
 /**
  * @brief Get keymap information (layers, rows, cols)
@@ -64,5 +67,25 @@ const char* nvs_get_layer_name(uint8_t layer);
  * @return esp_err_t ESP_OK on success, appropriate error code otherwise
  */
 esp_err_t nvs_get_keycode(uint8_t layer, uint8_t row, uint8_t col, uint16_t *keycode);
+
+/**
+ * @brief Update multiple layouts with a single version
+ *
+ * This function updates multiple layers in a single transaction and assigns a new version
+ * to the entire keymap. It's useful for batch updates from the web interface.
+ *
+ * @param version New layout version to set (must be > 0)
+ * @param nlayers Number of layers to update
+ * @param layer_names Array of layer names to update
+ * @param positions Array of position arrays, one per layer
+ * @param keycodes Array of keycode arrays, one per layer
+ * @param counts Array specifying number of changes for each layer
+ * @return esp_err_t ESP_OK on success, error code otherwise
+ */
+esp_err_t nvs_update_layout(uint64_t version, uint32_t nlayers,
+                            const char** layer_names,
+                            const uint16_t** positions,
+                            const uint16_t** keycodes,
+                            const uint16_t* nkeycode);
 
 #endif /* NVS_FUNCS_H_ */

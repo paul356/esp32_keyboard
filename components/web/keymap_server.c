@@ -35,29 +35,68 @@
 
 #define TAG "[HTTPD]"
 #define ARRAY_LEN(arr) (sizeof(arr)/sizeof(arr[0]))
-#define MAX_BUF_SIZE 2048
+#define RECV_BUF_SIZE 2048
 
 static time_t s_init_version;
-static char recv_buf[MAX_BUF_SIZE];
+static char recv_buf[RECV_BUF_SIZE];
 
 static esp_err_t parse_http_req(httpd_req_t* req, cJSON** root)
 {
-    size_t buf_len = req->content_len;
-    char* body = (char*)malloc(buf_len);
-    if (!body) {
-        return ESP_ERR_NO_MEM;
-    }
-
-    int ret = httpd_req_recv(req, body, buf_len);
-    if (ret <= 0) {
-        free(body);
+    if (!req || !root) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    *root = cJSON_ParseWithLength(body, buf_len);
-    free(body);
-    if (*root == NULL) {
+    // Check for reasonable content length to prevent memory exhaustion
+    size_t buf_len = req->content_len;
+    if (buf_len == 0) {
+        ESP_LOGW(TAG, "Empty request body");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Allocate memory for the request body
+    char* body = (char*)malloc(buf_len + 1); // +1 for null terminator
+    if (!body) {
+        ESP_LOGE(TAG, "Failed to allocate memory for request body");
         return ESP_ERR_NO_MEM;
+    }
+
+    // Read the request body with timeout handling
+    int received = 0;
+    int total_received = 0;
+    int remaining = buf_len;
+
+    while (remaining > 0) {
+        received = httpd_req_recv(req, body + total_received, remaining);
+        if (received <= 0) {
+            if (received == HTTPD_SOCK_ERR_TIMEOUT) {
+                // Timeout, try again
+                continue;
+            }
+            // Other error
+            ESP_LOGE(TAG, "Error receiving request data: %d", received);
+            free(body);
+            return ESP_ERR_INVALID_STATE;
+        }
+
+        total_received += received;
+        remaining -= received;
+    }
+
+    // Ensure null termination for safer JSON parsing
+    body[total_received] = '\0';
+
+    // Parse the JSON
+    *root = cJSON_Parse(body);
+    free(body);
+
+    // Check for JSON parsing errors
+    if (*root == NULL) {
+        const char* error_ptr = cJSON_GetErrorPtr();
+        if (error_ptr != NULL) {
+            ESP_LOGE(TAG, "JSON parsing error before: %s", error_ptr);
+        }
+        // Maybe invalid json
+        return ESP_ERR_INVALID_ARG;
     }
 
     return ESP_OK;
@@ -129,111 +168,224 @@ static esp_err_t update_keymap(httpd_req_t* req)
     httpd_resp_set_type(req, "text/plain");
     esp_err_t ret = ESP_OK;
     cJSON* root = NULL;
+    uint64_t new_version = 0;
 
-    int total_len = req->content_len;
-    if(total_len >= MAX_BUF_SIZE){
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "content too long");
-        return ESP_FAIL;
+    // Arrays for batch layout update
+    uint16_t** positions = NULL;
+    uint16_t** keycodes = NULL;  // These will store the parsed integer values of keycodes
+    uint16_t* counts = NULL;
+    const char** layer_names = NULL;  // Layer names to use directly
+
+    // Use the improved parse_http_req function instead of manual parsing
+    ret = parse_http_req(req, &root);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to parse HTTP request: %s", esp_err_to_name(ret));
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Failed to parse HTTP request");
+        return ret;
     }
 
-    memset(recv_buf, 0, MAX_BUF_SIZE);
-    int received = 0;
-    int cur_len  = 0;
-    while(cur_len < total_len){
-        received = httpd_req_recv(req, recv_buf + cur_len, total_len);
-        if(received <= 0){
-            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to post control value");
-            return ESP_FAIL;
-        }
-        cur_len += received;
-    }
-    recv_buf[total_len] = '\0';
+    // Validate required fields
+    cJSON* changes = cJSON_GetObjectItem(root, "changes");
+    cJSON* version = cJSON_GetObjectItem(root, "version");
 
-    root = cJSON_Parse(recv_buf);
-    if(root == NULL){
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid json");
-        return ESP_FAIL;
-    }
-
-    cJSON* layer = cJSON_GetObjectItem(root, "layer");
-    if(layer == NULL){
-        ret = ESP_FAIL;
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'layer' is invalid");
+    if (!changes || !cJSON_IsObject(changes) || !version || !cJSON_IsNumber(version)) {
+        ESP_LOGE(TAG, "Invalid JSON format: missing or invalid 'changes' or 'version'");
+        ret = ESP_ERR_INVALID_ARG;
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON format");
         goto cleanup;
     }
 
-    const char* layer_name = layer->valuestring;
-
-    cJSON* positions = cJSON_GetObjectItem(root, "positions");
-    if((positions == NULL) || (cJSON_GetArraySize(positions) == 0)){
-        ret = ESP_FAIL;
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'positions' is invalid");
+    // Parse version
+    if (version->valuedouble > (double)UINT64_MAX) {
+        ESP_LOGE(TAG, "Version value too large for uint64_t");
+        ret = ESP_ERR_INVALID_ARG;
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Version value too large");
         goto cleanup;
     }
+    new_version = (uint64_t)version->valuedouble;
+    ESP_LOGI(TAG, "Updating keymap to version %llu", (unsigned long long)new_version);
 
-    cJSON* keycodes = cJSON_GetObjectItem(root, "keycodes");
-    if((keycodes == NULL) || (cJSON_GetArraySize(keycodes) == 0)){
-        ret = ESP_FAIL;
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "'keycodes' is invalid");
-        goto cleanup;
-    }
-
-    if(cJSON_GetArraySize(positions) != cJSON_GetArraySize(keycodes)){
-        ret = ESP_FAIL;
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "length of 'positions' not match with 'keycodes'");
-        goto cleanup;
-    }
-
+    // Get keyboard dimensions
     uint8_t layers_count;
     uint32_t rows, cols;
-    nvs_get_keymap_info(&layers_count, &rows, &cols);
-    uint32_t layout_len = rows * cols;
-
-    // Use a temporary buffer to hold the modified layer data
-    uint16_t temp_layer[MATRIX_ROWS * MATRIX_COLS];
-    ret = nvs_get_layer(layer_name, temp_layer, (uint16_t)layout_len);
+    ret = nvs_get_keymap_info(&layers_count, &rows, &cols);
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to get layer %s, err=%d", layer_name, ret);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to get layer");
+        ESP_LOGE(TAG, "Failed to get keymap info: %s", esp_err_to_name(ret));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to get keymap info");
         goto cleanup;
     }
 
-    // Process all the position/keycode pairs
-    for (uint16_t i = 0; i < cJSON_GetArraySize(positions); ++i)
-    {
-        uint16_t pos = (uint16_t)cJSON_GetArrayItem(positions, i)->valueint;
-        const char* keyname = cJSON_GetArrayItem(keycodes, i)->valuestring;
-        ESP_LOGI(TAG, "%s: pos = '%hu', keycode = '%s'", __FUNCTION__, pos, keyname);
-
-        if (pos >= layout_len) {
-            ESP_LOGE(TAG, "%s: invalid position %hu", __FUNCTION__, pos);
-            continue;
-        }
-
-        uint16_t keycode;
-        // Parse the keycode name
-        esp_err_t err = parse_full_key_name(keyname, &keycode);
-        if (err != ESP_OK) {
-            ESP_LOGE(TAG, "Can't parse %s, err=%d", keyname, err);
-            continue;
-        }
-
-        temp_layer[pos] = keycode;
+    // First pass: count layers and allocate memory
+    // Count the number of children in the 'changes' object
+    int layer_count = 0;
+    cJSON* layer_entry;
+    cJSON_ArrayForEach(layer_entry, changes) {
+        layer_count++;
     }
 
-    // Save the keymap to NVS
-    ret = nvs_save_layer(layer_name, temp_layer, layout_len);
+    if (layer_count == 0) {
+        ESP_LOGW(TAG, "No layer changes found");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No layer changes found");
+        ret = ESP_ERR_INVALID_ARG;
+        goto cleanup;
+    }
+
+    // Allocate arrays for the batch update
+    positions = calloc(layer_count, sizeof(uint16_t*));
+    keycodes = calloc(layer_count, sizeof(uint16_t*));  // Will store the parsed integer values
+    counts = calloc(layer_count, sizeof(uint16_t));
+    layer_names = calloc(layer_count, sizeof(char*));  // Just need to store pointers, not copy strings
+
+    if (!positions || !keycodes || !counts || !layer_names) {
+        ESP_LOGE(TAG, "Failed to allocate memory for batch update");
+        ret = ESP_ERR_NO_MEM;
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Out of memory");
+        goto cleanup;
+    }
+
+    // Second pass: process each layer's changes
+    int valid_layer_count = 0;
+    cJSON* layer;
+
+    // Process each layer in the changes object
+    cJSON_ArrayForEach(layer, changes) {
+        // Get layer name directly from JSON - for objects, the name is in 'string' field
+        const char* layer_name = layer->string;
+        if (!layer_name) {
+            ESP_LOGW(TAG, "Missing layer name in JSON");
+            continue;
+        }
+
+        // Get positions and keycodes arrays
+        cJSON* pos_array = cJSON_GetObjectItem(layer, "positions");
+        cJSON* kc_array = cJSON_GetObjectItem(layer, "keycodes");
+
+        if (!pos_array || !kc_array ||
+            !cJSON_IsArray(pos_array) || !cJSON_IsArray(kc_array) ||
+            cJSON_GetArraySize(pos_array) != cJSON_GetArraySize(kc_array)) {
+            ESP_LOGW(TAG, "Invalid positions or keycodes array for layer '%s'", layer_name);
+            continue;
+        }
+
+        int pos_count = cJSON_GetArraySize(pos_array);
+        if (pos_count == 0) {
+            ESP_LOGD(TAG, "No changes for layer '%s'", layer_name);
+            continue;
+        }
+
+        // Allocate arrays for this layer's positions and keycodes
+        positions[valid_layer_count] = calloc(pos_count, sizeof(uint16_t));
+        keycodes[valid_layer_count] = calloc(pos_count, sizeof(uint16_t));
+
+        if (!positions[valid_layer_count] || !keycodes[valid_layer_count]) {
+            ESP_LOGE(TAG, "Failed to allocate memory for layer '%s'", layer_name);
+            ret = ESP_ERR_NO_MEM;
+            goto cleanup;
+        }
+
+        // Process positions and keycodes for this layer
+        int valid_changes = 0;
+        for (int i = 0; i < pos_count; i++) {
+            cJSON* pos = cJSON_GetArrayItem(pos_array, i);
+            cJSON* keycode_item = cJSON_GetArrayItem(kc_array, i);
+
+            // Validate position is a number
+            if (!cJSON_IsNumber(pos)) {
+                ESP_LOGW(TAG, "Invalid position entry at index %d", i);
+                continue;
+            }
+
+            int position = pos->valueint;
+
+            // Bounds checking for position
+            if (position >= rows * cols) {
+                ESP_LOGW(TAG, "Position out of range: %d", position);
+                continue;
+            }
+
+            // Enforce keycode as string only
+            if (!cJSON_IsString(keycode_item) || keycode_item->valuestring == NULL) {
+
+            }
+
+            uint16_t keycode_value = 0; // Numeric representation of the keycode after parsing
+            const char* keycode_str = keycode_item->valuestring;
+            // Parse the keycode string into integer value
+            if (parse_full_key_name(keycode_str, &keycode_value) != ESP_OK)
+            {
+                ESP_LOGW(TAG, "Failed to parse keycode string: %s", keycode_str);
+                continue;
+            }
+
+            // Add to layer changes
+            positions[valid_layer_count][valid_changes] = position;
+            keycodes[valid_layer_count][valid_changes] = keycode_value; // Store the parsed value
+            valid_changes++;
+
+            ESP_LOGD(TAG, "Layer '%s': position %d, keycode 0x%04x", layer_name, position, keycode_value);
+        }
+
+        // Update the count for this layer
+        if (valid_changes > 0) {
+            layer_names[valid_layer_count] = layer_name;  // Store pointer to layer name
+            counts[valid_layer_count] = valid_changes;
+            valid_layer_count++;
+            ESP_LOGI(TAG, "Layer '%s' has %d valid changes", layer_name, valid_changes);
+        } else {
+            // Free memory if no valid changes
+            free(positions[valid_layer_count]);
+            free(keycodes[valid_layer_count]);
+            positions[valid_layer_count] = NULL;
+            keycodes[valid_layer_count] = NULL;
+        }
+    }
+
+    if (valid_layer_count == 0) {
+        ESP_LOGW(TAG, "No valid layer changes found");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "No valid layer changes found");
+        ret = ESP_ERR_INVALID_ARG;
+        goto cleanup;
+    }
+
+    ESP_LOGI(TAG, "Applying batch update for %d layers with version %llu",
+             valid_layer_count, (unsigned long long)new_version);
+
+    // Use the updated function to update layers directly by name
+    ret = nvs_update_layout(new_version, valid_layer_count,
+                           layer_names,
+                           (const uint16_t**)positions,
+                           (const uint16_t**)keycodes,
+                           counts);
+
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to save layer %s, err=%d", layer_name, ret);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to save layer");
+        ESP_LOGE(TAG, "Failed to update layouts: %s", esp_err_to_name(ret));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to update layouts");
+    } else {
+        ESP_LOGI(TAG, "Successfully updated keymap to version %llu", (unsigned long long)new_version);
+        httpd_resp_sendstr(req, "Keymap updated successfully");
     }
 
 cleanup:
-    if (root) {
-        cJSON_Delete(root);
+    // Free memory
+    if (layer_names) free(layer_names);
+
+    if (positions) {
+        for (int i = 0; i < layer_count; i++) {
+            if (positions[i]) free(positions[i]);
+        }
+        free(positions);
     }
 
-    httpd_resp_sendstr_chunk(req, NULL);
+    if (keycodes) {
+        for (int i = 0; i < layer_count; i++) {
+            if (keycodes[i]) free(keycodes[i]);
+        }
+        free(keycodes);
+    }
+
+    if (counts) free(counts);
+    if (root) cJSON_Delete(root);
+
     return ret;
 }
 
@@ -241,25 +393,12 @@ static esp_err_t reset_keymap(httpd_req_t* req)
 {
     httpd_resp_set_type(req, "text/plain");
 
-    size_t buf_len = req->content_len;
-    char* body = (char*)malloc(buf_len);
-    if (!body) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, NULL);
-        return ESP_ERR_NO_MEM;
-    }
-
-    int ret = httpd_req_recv(req, body, buf_len);
-    if (ret <= 0) {
-        free(body);
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, NULL);
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    cJSON* root = cJSON_ParseWithLength(body, buf_len);
-    free(body);
-    if (!root) {
-        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "invalid json");
-        return ESP_ERR_NO_MEM;
+    cJSON* root = NULL;
+    esp_err_t err = parse_http_req(req, &root);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to parse reset keymap request: %s", esp_err_to_name(err));
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to parse body of reset keymap request");
+        return err;
     }
 
     cJSON* pos = cJSON_GetObjectItem(root, "positions");
@@ -279,7 +418,7 @@ static esp_err_t reset_keymap(httpd_req_t* req)
     cJSON_Delete(root);
 
     // Use the common API to reset the keymap
-    esp_err_t err = nvs_reset_layouts();
+    err = nvs_reset_layouts();
     if (err != ESP_OK) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "reset fail");
         return ESP_FAIL;
@@ -314,7 +453,7 @@ static esp_err_t upload_bin_file(httpd_req_t* req)
     }
 
     while (accumu_len < file_len) {
-        int recieved = httpd_req_recv(req, recv_buf, MAX_BUF_SIZE);
+        int recieved = httpd_req_recv(req, recv_buf, sizeof(recv_buf));
         if (recieved <= 0) {
             if (recieved == HTTPD_SOCK_ERR_TIMEOUT) {
                 continue;
