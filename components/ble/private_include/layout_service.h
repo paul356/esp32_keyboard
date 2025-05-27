@@ -53,18 +53,6 @@ extern "C" {
 #define KEYCODE_OFFSET_CHAR_UUID 0xDEF4  // Keycode offset characteristic UUID
 
 /**
- * @brief Data structure for storing JSON layout/keycode data
- */
-typedef struct {
-    uint8_t* data;          // Pointer to the JSON data
-    uint16_t data_len;      // Current data length
-    uint16_t max_len;       // Maximum allocation size
-    bool is_prepared;       // Flag for prepared writes
-    uint16_t prepared_len;  // Length of prepared data
-    uint16_t offset;        // Current offset for read operations
-} layout_json_data_t;
-
-/**
  * @brief Initialize the layout service
  */
 void layout_service_init(void);
@@ -77,66 +65,6 @@ void layout_service_init(void);
  * @param param Event parameters
  */
 void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param);
-
-/**
- * @brief Get the current layout JSON data
- *
- * @return Pointer to the layout JSON string or default
- */
-const char* layout_service_get_layout_json(void);
-
-/**
- * @brief Get the current keycode JSON data
- *
- * @return Pointer to the keycode JSON string or default
- */
-const char* layout_service_get_keycode_json(void);
-
-/**
- * @brief Update the layout JSON data
- *
- * @param json_data New JSON data as a null-terminated string
- * @return ESP_OK if successful
- */
-esp_err_t layout_service_set_layout_json(const char* json_data);
-
-/**
- * @brief Update the keycode JSON data
- *
- * @param json_data New JSON data as a null-terminated string
- * @return ESP_OK if successful
- */
-esp_err_t layout_service_set_keycode_json(const char* json_data);
-
-/**
- * @brief Set the offset for layout characteristic reads
- * 
- * @param offset Offset value (must be less than layout data length)
- * @return ESP_OK if successful, ESP_ERR_INVALID_ARG if offset is invalid
- */
-esp_err_t layout_service_set_layout_offset(uint16_t offset);
-
-/**
- * @brief Get the current layout offset
- * 
- * @return Current layout offset value
- */
-uint16_t layout_service_get_layout_offset(void);
-
-/**
- * @brief Set the offset for keycode characteristic reads
- * 
- * @param offset Offset value (must be less than keycode data length)
- * @return ESP_OK if successful, ESP_ERR_INVALID_ARG if offset is invalid
- */
-esp_err_t layout_service_set_keycode_offset(uint16_t offset);
-
-/**
- * @brief Get the current keycode offset
- * 
- * @return Current keycode offset value
- */
-uint16_t layout_service_get_keycode_offset(void);
 
 /** @brief Get the GATTS interface for the layout service
  * @return GATTS interface handle

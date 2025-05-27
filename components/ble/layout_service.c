@@ -29,6 +29,12 @@
 #define BLE_DEFAULT_MTU_SIZE 23
 #define BLE_MAX_ATTR_LEN 512 // Maximum attribute length for responses
 
+typedef struct {
+    uint8_t* data;          // Pointer to the JSON data
+    uint16_t data_len;      // Current data length
+    uint16_t max_len;       // Maximum allocation size
+} layout_json_data_t;
+
 // Service handles
 static uint16_t layout_service_handle = 0;
 static uint16_t layout_char_handle = 0;
@@ -49,10 +55,6 @@ static layout_json_data_t keycode_data = {0};
 // Offset values
 static uint16_t layout_offset = 0;
 static uint16_t keycode_offset = 0;
-
-// Default JSON content
-static const char *default_layout_json = "{\"layout\":\"qwerty\"}";
-static const char *default_keycode_json = "{\"keycodes\":[]}";
 
 // Helper macros for min/max
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
@@ -98,31 +100,6 @@ static void ble_append_str(void *target, const char *str)
     memcpy(json_data->data + json_data->data_len, str, str_len);
     json_data->data_len += str_len;
     json_data->data[json_data->data_len] = '\0'; // Ensure null termination
-    
-    /*int len = snprintf((char *)json_data->data + json_data->data_len, json_data->max_len - json_data->data_len, "[");
-    if (len >= json_data->max_len - json_data->data_len)
-    {
-            ESP_LOGE(TAG, "Buffer overflow while appending string");
-            return;
-    }
-    json_data->data_len += len;
-    for (int i = 0; i < 5; i++)
-    {
-        len = snprintf((char *)json_data->data + json_data->data_len, json_data->max_len - json_data->data_len, "%d, ", i);
-        if (len >= json_data->max_len - json_data->data_len)
-        {
-            ESP_LOGE(TAG, "Buffer overflow while appending string");
-            break;
-        }
-        json_data->data_len += len;
-    }
-    len = snprintf((char *)json_data->data + json_data->data_len, json_data->max_len - json_data->data_len, "]");
-    if (len >= json_data->max_len - json_data->data_len)
-    {
-            ESP_LOGE(TAG, "Buffer overflow while appending string");
-            return;
-    }
-    json_data->data_len += len; */
 }
 
 /**
@@ -133,13 +110,6 @@ static void ble_append_str(void *target, const char *str)
 esp_gatt_if_t layout_service_get_gatts_if(void)
 {
     return layout_service_gatts_if;
-}
-
-// This adapter function bridges between the old function name used in ESP-IDF
-// and our new implementation name
-void custom_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
-{
-    layout_service_event_handler(event, gatts_if, param);
 }
 
 void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
@@ -292,7 +262,6 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
             layout_data.data = (uint8_t *)malloc(LAYOUT_JSON_MAX_SIZE);
             layout_data.max_len = LAYOUT_JSON_MAX_SIZE;
             layout_data.data_len = 0;
-            layout_data.offset = layout_offset; // Use the current offset
 
             // Generate the JSON using our utility function
             generate_layouts_json(ble_append_str, &layout_data);
@@ -357,7 +326,6 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
             keycode_data.data = (uint8_t *)malloc(LAYOUT_JSON_MAX_SIZE);
             keycode_data.max_len = LAYOUT_JSON_MAX_SIZE;
             keycode_data.data_len = 0;
-            keycode_data.offset = keycode_offset; // Use the current offset
 
             // Generate the JSON using our utility function
             generate_keycodes_json(ble_append_str, &keycode_data);
@@ -454,7 +422,6 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                     
                     // Always allow setting the offset - even if it's beyond the data length
                     layout_offset = new_offset;
-                    layout_data.offset = new_offset;
                     ESP_LOGI(TAG, "Layout offset set to: %d (data length: %d)", 
                              layout_offset, layout_data.data ? layout_data.data_len : 0);
                 }
@@ -469,7 +436,6 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                     
                     // Always allow setting the offset - even if it's beyond the data length
                     keycode_offset = new_offset;
-                    keycode_data.offset = new_offset;
                     ESP_LOGI(TAG, "Keycode offset set to: %d (data length: %d)", 
                              keycode_offset, keycode_data.data ? keycode_data.data_len : 0);
                 }
@@ -482,8 +448,8 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                 // Respond with permission error if response is needed
                 if (param->write.need_rsp)
                 {
-                    esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, 
-                                               ESP_GATT_WRITE_NOT_PERMIT, NULL);
+                    esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id,
+                                                ESP_GATT_WRITE_NOT_PERMIT, NULL);
                     break; // Skip the standard response below
                 }
             }
@@ -493,63 +459,9 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
             {
                 esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);
             }
-        }
-        else
-        {
-            // This is a prepare write operation for long writes
-            if (param->write.handle == layout_offset_char_handle)
-            {
-                // Setup the prepared write if it's the first chunk
-                if (!layout_data.is_prepared)
-                {
-                    layout_data.is_prepared = true;
-                    layout_data.prepared_len = 0;
-                }
-
-                // Make sure we have enough memory
-                if (!layout_data.data)
-                {
-                    layout_data.data = (uint8_t *)malloc(LAYOUT_JSON_MAX_SIZE);
-                    layout_data.max_len = LAYOUT_JSON_MAX_SIZE;
-                }
-
-                // Check offset and length
-                if (param->write.offset + param->write.len <= LAYOUT_JSON_MAX_SIZE)
-                {
-                    memcpy(layout_data.data + param->write.offset, param->write.value, param->write.len);
-                    layout_data.prepared_len = MAX(layout_data.prepared_len, param->write.offset + param->write.len);
-                }
-            }
-            else if (param->write.handle == keycode_offset_char_handle)
-            {
-                // Setup the prepared write if it's the first chunk
-                if (!keycode_data.is_prepared)
-                {
-                    keycode_data.is_prepared = true;
-                    keycode_data.prepared_len = 0;
-                }
-
-                // Make sure we have enough memory
-                if (!keycode_data.data)
-                {
-                    keycode_data.data = (uint8_t *)malloc(LAYOUT_JSON_MAX_SIZE);
-                    keycode_data.max_len = LAYOUT_JSON_MAX_SIZE;
-                }
-
-                // Check offset and length
-                if (param->write.offset + param->write.len <= LAYOUT_JSON_MAX_SIZE)
-                {
-                    memcpy(keycode_data.data + param->write.offset, param->write.value, param->write.len);
-                    keycode_data.prepared_len = MAX(keycode_data.prepared_len, param->write.offset + param->write.len);
-                }
-            }
-            // For read-only characteristics, respond with error
-            else if (param->write.handle == layout_char_handle || param->write.handle == keycode_char_handle)
-            {
-                ESP_LOGW(TAG, "Attempt to prepare write to read-only characteristic: %d", param->write.handle);
-                esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, 
-                                           ESP_GATT_WRITE_NOT_PERMIT, NULL);
-            }
+        } else {
+            esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id,
+                                        ESP_GATT_WRITE_NOT_PERMIT, NULL);
         }
         break;
 
@@ -557,32 +469,16 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
         // Execute or cancel prepared writes
         if (param->exec_write.exec_write_flag == ESP_GATT_PREP_WRITE_EXEC)
         {
-            // Execute the prepared write
-            if (layout_data.is_prepared)
-            {
-                layout_data.data_len = layout_data.prepared_len;
-                layout_data.data[layout_data.data_len] = '\0'; // Null-terminate
-                ESP_LOGI(TAG, "Layout execute write, len: %d", layout_data.data_len);
-                ESP_LOGI(TAG, "Layout updated: %s", (char *)layout_data.data);
-            }
-
-            if (keycode_data.is_prepared)
-            {
-                keycode_data.data_len = keycode_data.prepared_len;
-                keycode_data.data[keycode_data.data_len] = '\0'; // Null-terminate
-                ESP_LOGI(TAG, "Keycode execute write, len: %d", keycode_data.data_len);
-                ESP_LOGI(TAG, "Keycode updated: %s", (char *)keycode_data.data);
-            }
+            // Execute prepared writes
+            ESP_LOGI(TAG, "Execute prepared writes");
+            // Here you can handle the execution of prepared writes if needed
+            // For now, we just log it
         }
         else
         {
             // Cancel prepared writes
             ESP_LOGI(TAG, "Cancel prepared writes");
         }
-
-        // Reset prepare flags
-        layout_data.is_prepared = false;
-        keycode_data.is_prepared = false;
         break;
 
     default:
@@ -597,22 +493,14 @@ void layout_service_init(void)
     {
         layout_data.data = (uint8_t *)malloc(LAYOUT_JSON_MAX_SIZE);
         layout_data.max_len = LAYOUT_JSON_MAX_SIZE;
-        size_t len = strlen(default_layout_json);
-        memcpy(layout_data.data, default_layout_json, len);
-        layout_data.data_len = len;
-        layout_data.data[len] = '\0';
-        layout_data.offset = 0; // Initialize offset
+        layout_data.data_len = 0;
     }
 
     if (!keycode_data.data)
     {
         keycode_data.data = (uint8_t *)malloc(LAYOUT_JSON_MAX_SIZE);
         keycode_data.max_len = LAYOUT_JSON_MAX_SIZE;
-        size_t len = strlen(default_keycode_json);
-        memcpy(keycode_data.data, default_keycode_json, len);
-        keycode_data.data_len = len;
-        keycode_data.data[len] = '\0';
-        keycode_data.offset = 0; // Initialize offset
+        keycode_data.data_len = 0;
     }
 
     // Initialize offset values
@@ -621,152 +509,4 @@ void layout_service_init(void)
 
     // Register custom service application
     esp_ble_gatts_app_register(LAYOUT_SERVICE_UUID);
-}
-
-const char *layout_service_get_layout_json(void)
-{
-    if (layout_data.data)
-    {
-        return (const char *)layout_data.data;
-    }
-    return default_layout_json;
-}
-
-const char *layout_service_get_keycode_json(void)
-{
-    if (keycode_data.data)
-    {
-        return (const char *)keycode_data.data;
-    }
-    return default_keycode_json;
-}
-
-esp_err_t layout_service_set_layout_json(const char *json_data)
-{
-    if (!json_data)
-    {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    size_t len = strlen(json_data);
-    if (len >= LAYOUT_JSON_MAX_SIZE)
-    {
-        ESP_LOGE(TAG, "JSON data too large");
-        return ESP_ERR_NO_MEM;
-    }
-
-    if (!layout_data.data)
-    {
-        layout_data.data = (uint8_t *)malloc(LAYOUT_JSON_MAX_SIZE);
-        layout_data.max_len = LAYOUT_JSON_MAX_SIZE;
-    }
-
-    memcpy(layout_data.data, json_data, len);
-    layout_data.data_len = len;
-    layout_data.data[len] = '\0';
-
-    // Send notification if connected and notifications are enabled
-    if (layout_service_connected && layout_char_handle > 0)
-    {
-        // Send notifications in chunks if data is larger than MTU
-        uint16_t offset = 0;
-        while (offset < layout_data.data_len)
-        {
-            uint16_t chunk_size = MIN(LAYOUT_CHUNK_SIZE, layout_data.data_len - offset);
-            esp_ble_gatts_send_indicate(layout_service_gatts_if, layout_service_conn_id, layout_char_handle, chunk_size,
-                                        layout_data.data + offset, false);
-            offset += chunk_size;
-        }
-    }
-
-    return ESP_OK;
-}
-
-esp_err_t layout_service_set_keycode_json(const char *json_data)
-{
-    if (!json_data)
-    {
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    size_t len = strlen(json_data);
-    if (len >= LAYOUT_JSON_MAX_SIZE)
-    {
-        ESP_LOGE(TAG, "JSON data too large");
-        return ESP_ERR_NO_MEM;
-    }
-
-    if (!keycode_data.data)
-    {
-        keycode_data.data = (uint8_t *)malloc(LAYOUT_JSON_MAX_SIZE);
-        keycode_data.max_len = LAYOUT_JSON_MAX_SIZE;
-    }
-
-    memcpy(keycode_data.data, json_data, len);
-    keycode_data.data_len = len;
-    keycode_data.data[len] = '\0';
-
-    // Send notification if connected and notifications are enabled
-    if (layout_service_connected && keycode_char_handle > 0)
-    {
-        // Send notifications in chunks if data is larger than MTU
-        uint16_t offset = 0;
-        while (offset < keycode_data.data_len)
-        {
-            uint16_t chunk_size = MIN(LAYOUT_CHUNK_SIZE, keycode_data.data_len - offset);
-            esp_ble_gatts_send_indicate(layout_service_gatts_if, layout_service_conn_id, keycode_char_handle,
-                                        chunk_size, keycode_data.data + offset, false);
-            offset += chunk_size;
-        }
-    }
-
-    return ESP_OK;
-}
-
-/**
- * @brief Set the offset for layout characteristic reads
- * 
- * @param offset Offset value (can be any value, even beyond the data length)
- * @return ESP_OK always successful
- */
-esp_err_t layout_service_set_layout_offset(uint16_t offset)
-{
-    // Allow any offset value, even beyond the data length
-    layout_offset = offset;
-    layout_data.offset = offset;
-    return ESP_OK;
-}
-
-/**
- * @brief Get the current layout offset
- * 
- * @return Current layout offset value
- */
-uint16_t layout_service_get_layout_offset(void)
-{
-    return layout_offset;
-}
-
-/**
- * @brief Set the offset for keycode characteristic reads
- * 
- * @param offset Offset value (can be any value, even beyond the data length)
- * @return ESP_OK always successful
- */
-esp_err_t layout_service_set_keycode_offset(uint16_t offset)
-{
-    // Allow any offset value, even beyond the data length
-    keycode_offset = offset;
-    keycode_data.offset = offset;
-    return ESP_OK;
-}
-
-/**
- * @brief Get the current keycode offset
- * 
- * @return Current keycode offset value
- */
-uint16_t layout_service_get_keycode_offset(void)
-{
-    return keycode_offset;
 }
