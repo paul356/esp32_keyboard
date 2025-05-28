@@ -8,12 +8,12 @@
 ```
 {
     "layouts" : {
-                "layer 0" :  [[code00, code01, code02, ...],
+                "Layer 0" :  [[code00, code01, code02, ...],
                              [code10, code11, code12, ...],
                              ...
                             ],
-                "layer 1" :     [...],
-                "layer 2" : [...]
+                "Layer 1" :     [...],
+                "Layer 2" : [...]
                }
     "version" : <layout-version>,
 }

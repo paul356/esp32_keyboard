@@ -464,11 +464,11 @@ function _get_keycodes(callback)
         if (xhttp.readyState == 4) {
             if (xhttp.status == 200) {
                 let keycode_json = JSON.parse(xhttp.responseText);
-                basic_key_codes = keycode_json["keycodes"];
+                basic_key_codes = keycode_json["basic_code"];
                 quantum_funct_descs = keycode_json["quantum_functs"];
                 mod_bit_names = keycode_json["mod_bits"];
-                macro_names = keycode_json["macros"];
-                function_keys = keycode_json["function_keys"];
+                macro_names = keycode_json["macro_code"];
+                function_keys = keycode_json["function_key_code"];
                 max_layer_num = keycode_json["layer_num"];
 
                 callback();

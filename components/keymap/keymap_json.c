@@ -146,7 +146,7 @@ esp_err_t generate_keycodes_json(append_str_fn_t append_str, void* target)
 {
     char scratch[16];
 
-    append_str(target, "{\n  \"keycodes\":[");
+    append_str(target, "{\n  \"basic_code\":[");
     uint16_t keyCodeNum = get_max_basic_key_code();
     bool firstKey = true;
     for (uint16_t kc = 0; kc < keyCodeNum; kc++) {
@@ -198,7 +198,7 @@ esp_err_t generate_keycodes_json(append_str_fn_t append_str, void* target)
     }
     append_str(target, "],\n");
 
-    append_str(target, "  \"macros\":[");
+    append_str(target, "  \"macro_code\":[");
     firstKey = true;
     for (uint16_t code = MACRO_CODE_MIN; code <= MACRO_CODE_MAX; code++) {
         if (firstKey) {
@@ -226,7 +226,7 @@ esp_err_t generate_keycodes_json(append_str_fn_t append_str, void* target)
     append_str(target, scratch);
     append_str(target, ",\n");
 
-    append_str(target, "  \"function_keys\":[");
+    append_str(target, "  \"function_key_code\":[");
     firstKey = true;
     for (uint16_t code = FUNCTION_KEY_MIN; code <= FUNCTION_KEY_MAX; code++) {
         if (firstKey) {
