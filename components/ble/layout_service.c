@@ -493,7 +493,7 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                     ESP_LOGI(TAG, "Updated layout data buffer, total length: %d", layout_update_data.data_len);
 
                     if (layout_update_data.data_len > 0) {
-                        
+
                         // Process the complete layout update data
                         process_layout_update_data(&layout_update_data);
                     }
@@ -534,7 +534,7 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
             // This is a prepare write operation (for data larger than MTU)
             if (param->write.handle == layout_update_char_handle)
             {
-                ESP_LOGI(TAG, "Prepare write for layout update, offset: %d, length: %d", 
+                ESP_LOGI(TAG, "Prepare write for layout update, offset: %d, length: %d",
                          param->write.offset, param->write.len);
 
                 if (layout_update_data.data == NULL)
@@ -561,19 +561,19 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                     {
                         layout_update_data.data_len = param->write.offset + param->write.len;
                     }
-                    
+
                     // Copy data to the buffer at the specified offset
                     memcpy(layout_update_data.data + param->write.offset, param->write.value, param->write.len);
-                    
+
                     // Prepare writes always need a response (as per BLE specification)
                     esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, ESP_GATT_OK, NULL);
                 }
                 else
                 {
-                    ESP_LOGE(TAG, "Prepare write buffer overflow, offset: %d, len: %d, max: %d", 
+                    ESP_LOGE(TAG, "Prepare write buffer overflow, offset: %d, len: %d, max: %d",
                              param->write.offset, param->write.len, layout_update_data.max_len);
                     // Prepare writes always need a response with appropriate error code
-                    esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id, 
+                    esp_ble_gatts_send_response(gatts_if, param->write.conn_id, param->write.trans_id,
                                                ESP_GATT_PREPARE_Q_FULL, NULL);
                 }
             }
@@ -593,15 +593,15 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
         {
             // Execute prepared writes
             ESP_LOGI(TAG, "Executing prepared writes for layout update data");
-            
+
             // Process the complete layout update data that was received through prepare writes
             if (layout_update_data.data_len > 0)
             {
                 // Ensure null-termination for JSON processing
                 layout_update_data.data[layout_update_data.data_len] = '\0';
-                
+
                 ESP_LOGI(TAG, "Received complete layout update JSON data, length: %d", layout_update_data.data_len);
-                
+
                 // Process the data using our shared helper function
                 process_layout_update_data(&layout_update_data);
             }
@@ -612,7 +612,7 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
             ESP_LOGI(TAG, "Cancelling prepared writes for layout update data");
             layout_update_data.data_len = 0;  // Reset buffer if writes are cancelled
         }
-        
+
         // Send response for execute write request
         esp_ble_gatts_send_response(gatts_if, param->exec_write.conn_id, param->exec_write.trans_id, ESP_GATT_OK, NULL);
         break;
@@ -663,7 +663,7 @@ void layout_service_init(void)
         LAYOUT_UPDATE_TASK_PRIORITY,     // Priority
         &layout_update_task_handle       // Task handle
     );
-    
+
     if (task_created != pdPASS) {
         ESP_LOGE(TAG, "Failed to create layout update task");
     }
@@ -674,7 +674,7 @@ void layout_service_init(void)
 
 /**
  * @brief Task handler for processing layout update JSON data
- * 
+ *
  * This task handles the processing of layout update data received from BLE clients
  * without blocking the BLE stack.
  *
@@ -683,9 +683,9 @@ void layout_service_init(void)
 static void layout_update_task(void *pvParameters)
 {
     layout_json_data_t update_data;
-    
+
     ESP_LOGI(TAG, "Layout update task started");
-    
+
     // Run indefinitely, processing updates from the queue
     while (1) {
         // Wait for a layout update to be queued
@@ -693,14 +693,22 @@ static void layout_update_task(void *pvParameters)
             // Copy of data received
             ESP_LOGI(TAG, "Processing layout update in task, data length: %d", update_data.data_len);
             ESP_LOGI(TAG, "JSON data: %s", (char*)update_data.data);
-            
-            // Process the JSON data to update keyboard layout
-            // TODO: Implement the actual layout update processing
-            // parse_layout_update_json((char*)update_data.data);
-            
+
+            cJSON* json_data = cJSON_Parse((char*)(update_data.data));
             // Free the allocated data
-            if (update_data.data != NULL) {
-                free(update_data.data);
+            free(update_data.data);
+            if (json_data == NULL) {
+                ESP_LOGE(TAG, "Failed to parse JSON data");
+            } else {
+                // Process the JSON data (e.g., update keymaps, layouts, etc.)
+                esp_err_t err = update_layout_from_json(json_data);
+                if (err != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to update layout from JSON: %d", err);
+                } else {
+                    ESP_LOGI(TAG, "Layout updated successfully from JSON");
+                }
+
+                cJSON_Delete(json_data); // Clean up after processing
             }
         }
     }
@@ -708,7 +716,7 @@ static void layout_update_task(void *pvParameters)
 
 /**
  * @brief Process complete layout update data and queue it for handling
- * 
+ *
  * This function creates a copy of the layout update data and sends it to
  * the processing queue. It's used for both regular and execute write events.
  *
@@ -724,13 +732,13 @@ static bool process_layout_update_data(layout_json_data_t *json_data)
     }
 
     ESP_LOGI(TAG, "Processing layout update data, length: %d", json_data->data_len);
-    
+
     // Send to the processing queue (xQueueSend makes a copy of the structure)
     if (xQueueSend(layout_update_queue, json_data, 0) != pdTRUE) {
         ESP_LOGE(TAG, "Failed to queue layout update for processing");
         return false;
     }
-    
+
     json_data->data = NULL;
     json_data->data_len = 0; // Reset the data after queuing
     ESP_LOGI(TAG, "Layout update queued for processing");
