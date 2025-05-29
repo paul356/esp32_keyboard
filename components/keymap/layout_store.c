@@ -310,30 +310,8 @@ esp_err_t nvs_get_layout_version(uint64_t* version)
 		return ESP_ERR_INVALID_ARG;
 	}
 
-	// Try to read the version from NVS
-	nvs_handle_t nvs_handle;
-	esp_err_t err = nvs_open(KEYMAP_NAMESPACE, NVS_READONLY, &nvs_handle);
-	if (err != ESP_OK) {
-		ESP_LOGE(NVS_TAG, "Error opening NVS namespace: %s", esp_err_to_name(err));
-		*version = current_layout_version;
-		return err;
-	}
-
-	err = nvs_get_u64(nvs_handle, LAYOUT_VERSION, version);
-	if (err == ESP_ERR_NVS_NOT_FOUND) {
-		// If the version is not found, use the default
-		*version = current_layout_version;
-		err = ESP_OK;
-	} else if (err != ESP_OK) {
-		ESP_LOGE(NVS_TAG, "Error reading layout version: %s", esp_err_to_name(err));
-		*version = current_layout_version;
-	} else {
-		// Update current version in memory
-		current_layout_version = *version;
-	}
-
-	nvs_close(nvs_handle);
-	return err;
+    *version = current_layout_version;
+    return ESP_OK;
 }
 
 /**
@@ -367,17 +345,16 @@ esp_err_t nvs_update_layout(uint64_t version, uint32_t nlayers,
 
 	ESP_LOGI(NVS_TAG, "Updating %" PRIu32 " layers with version %" PRIu64, nlayers, version);
 
+	if (version != current_layout_version + 1) {
+		ESP_LOGW(NVS_TAG, "Version must be exactly one greater than the current version");
+		return ESP_ERR_INVALID_VERSION;
+	}
+
 	nvs_handle_t nvs_handle;
 	err = nvs_open(KEYMAP_NAMESPACE, NVS_READWRITE, &nvs_handle);
 	if (err != ESP_OK) {
 		ESP_LOGE(NVS_TAG, "Error opening NVS namespace: %s", esp_err_to_name(err));
 		return err;
-	}
-
-	if (version != current_layout_version + 1) {
-		ESP_LOGW(NVS_TAG, "Version must be exactly one greater than the current version");
-		nvs_close(nvs_handle);
-		return ESP_ERR_INVALID_VERSION;
 	}
 
 	// Process each layer

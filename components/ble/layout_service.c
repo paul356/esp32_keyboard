@@ -317,7 +317,6 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
 
             if (send_len > 0)
             {
-                ESP_LOGI(TAG, "Layout JSON copied: len=%d %s", send_len, (char *)layout_query_data.data + effective_offset);
                 memcpy(rsp.attr_value.value, layout_query_data.data + effective_offset, send_len);
             }
 
@@ -373,7 +372,6 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
 
             if (send_len > 0)
             {
-                ESP_LOGI(TAG, "Keycode JSON copied: len=%d %s", send_len, (char *)layout_query_data.data + effective_offset);
                 memcpy(rsp.attr_value.value, keycode_query_data.data + effective_offset, send_len);
             }
 
