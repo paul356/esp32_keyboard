@@ -27,6 +27,7 @@
 #include "keymap_json.h"
 
 #define TAG "KEYMAP_JSON"
+#define KEYBOARD_NAME "ninjia-keyboard-v1"
 
 esp_err_t generate_layouts_json(append_str_fn_t append_str, void* target)
 {
@@ -49,7 +50,9 @@ esp_err_t generate_layouts_json(append_str_fn_t append_str, void* target)
 
     append_str(target, "{\"version\":");
     append_str(target, version_str);
-    append_str(target, ",\"layouts\":{\n");
+    append_str(target, ",\"keyboard-name\":\"");
+    append_str(target, KEYBOARD_NAME);
+    append_str(target, "\",\"layouts\":{\n");
 
     for (int i = 0; i < layers; i++) {
         append_str(target, "\"");
