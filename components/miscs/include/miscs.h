@@ -82,13 +82,6 @@ bool miscs_is_battery_charging(void);
 esp_err_t miscs_read_battery_voltage(uint32_t *voltage_mv);
 
 /**
- * @brief Initialize rotary encoder
- * 
- * @return esp_err_t ESP_OK on success, error code otherwise
- */
-esp_err_t miscs_encoder_init(void);
-
-/**
  * @brief Get current encoder position
  * 
  * @return int32_t Current encoder position (increments/decrements based on rotation)

@@ -35,6 +35,8 @@ static volatile int32_t encoder_position = 0;
 static volatile miscs_encoder_direction_t encoder_direction = MISCS_ENCODER_STOPPED;
 static volatile uint8_t encoder_last_state = 0;
 
+static esp_err_t miscs_encoder_init(void);
+
 // Encoder interrupt handler
 static void IRAM_ATTR encoder_isr_handler(void* arg)
 {
@@ -254,7 +256,7 @@ esp_err_t miscs_read_battery_voltage(uint32_t *voltage_mv)
 }
 
 // Rotary Encoder Functions
-esp_err_t miscs_encoder_init(void)
+static esp_err_t miscs_encoder_init(void)
 {
     esp_err_t ret = ESP_OK;
     

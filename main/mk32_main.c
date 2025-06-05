@@ -45,7 +45,6 @@
 #include "hid_desc.h"
 
 //HID Ble functions
-//#include "HID_kbdmousejoystick.h"
 #include "hal_ble.h"
 
 //MK32 functions
@@ -56,6 +55,7 @@
 #include "action_layer.h"
 #include "wait.h"
 #include "host.h"
+#include "miscs.h"
 
 extern esp_err_t start_file_server();
 extern void wifi_init_softap(void);
@@ -172,6 +172,36 @@ void start_keyboard_timer()
     }
 }
 
+// for test only
+void test_miscs(void)
+{
+    bool usb_powered = miscs_is_usb_powered();
+    ESP_LOGI(TAG, "USB Powered: %s", usb_powered ? "Yes" : "No");
+    bool charging = miscs_is_battery_charging();
+    ESP_LOGI(TAG, "Battery Charging: %s", charging ? "Yes" : "No");
+    uint32_t voltage_mv = 0;
+    esp_err_t ret = miscs_read_battery_voltage(&voltage_mv);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Battery Voltage: %lu mV", voltage_mv);
+    } else {
+        ESP_LOGE(TAG, "Failed to read battery voltage: %s", esp_err_to_name(ret));
+    }
+    uint32_t encoder_pos = miscs_encoder_get_position();
+    ESP_LOGI(TAG, "Encoder Position: %ld", encoder_pos);
+    miscs_encoder_direction_t encoder_direct = miscs_encoder_get_direction();
+    switch (encoder_direct) {
+        case MISCS_ENCODER_CW:
+            ESP_LOGI(TAG, "Encoder Direction: Clockwise");
+            break;
+        case MISCS_ENCODER_CCW:
+            ESP_LOGI(TAG, "Encoder Direction: Counter-Clockwise");
+            break;
+        case MISCS_ENCODER_STOPPED:
+            ESP_LOGI(TAG, "Encoder Direction: Stopped");
+            break;
+    }
+}
+
 void app_main()
 {
     esp_err_t ret;
@@ -183,6 +213,12 @@ void app_main()
 
     (void)register_keyboard_reporter();
     enable_usb_hid();
+    // Initialize miscs
+    ret = miscs_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize miscs: %s", esp_err_to_name(ret));
+        return;
+    }
 
     bool keyboard_inited = false;
     while (true) {
@@ -218,7 +254,8 @@ void app_main()
         }
 
         if (keyboard_inited) {
-            ESP_LOGI("MAIN", "MAIN finished...");
+            ESP_LOGI("MAIN", "Running main loop");
+            test_miscs();
             vTaskDelay(5000 / portTICK_PERIOD_MS);
         } else {
             vTaskDelay(5 / portTICK_PERIOD_MS);
