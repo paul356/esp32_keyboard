@@ -131,8 +131,8 @@ const char* basic_key_codes[] = {
     "Del",
     "End",
     "PgDn",
-    "Left",
-    "Right", /* 0x50 */
+    "Right",
+    "Left", /* 0x50 */
     "Down",
     "Up",
     "Num",
