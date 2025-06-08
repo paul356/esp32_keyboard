@@ -27,7 +27,6 @@ var macro_names = null;
 var function_keys = null;
 var max_layer_num = 0;
 var selected_key = null;
-var layout_version = 0; // Store the layout version
 
 function clear_label()
 {
@@ -448,7 +447,7 @@ function render_status_line()
             } else {
                 _handle_server_error(xhttp);
             }
-        }
+        }  
     }
 
     xhttp.open("GET", status_path, true);
@@ -479,7 +478,7 @@ function _get_keycodes(callback)
     }
 
     xhttp.open("GET", keycode_path, true);
-    xhttp.send();
+    xhttp.send();    
 }
 
 function _render_update_button()
@@ -510,13 +509,6 @@ function _render_layouts()
                 let layout_div = document.getElementById("key_layouts");
                 let layout_json = JSON.parse(xhttp.responseText);
                 let keymap = layout_json["layouts"];
-
-                // Store the layout version
-                if (layout_json.hasOwnProperty("version")) {
-                    layout_version = layout_json["version"];
-                    console.log("Loaded layout version: " + layout_version);
-                }
-
                 for (let layer in keymap) {
                     _render_keymap(layout_div, layer, keymap[layer]);
                 }
@@ -593,95 +585,58 @@ function render_layouts_and_macros()
         _render_layouts();
         _render_macros();
     }
-
+    
     _get_keycodes(callback);
 }
 
-function update_keymap()
+function _update_keymap_layer(layer_name)
 {
-    // First, check if we have an active selection and save it
-    if (selected_key !== null) {
-        _save_result(selected_key[1], selected_key[0]);
-        selected_key[1].replaceWith(selected_key[0]);
-        selected_key = null;
-    }
-    
-    // Create changes object for the new API format
-    let changes = {};
-    let hasChanges = false;
+    let update_arr = [];
+    let keycodes = [];
+    let col_size = keymap_changed[layer_name][0].length;
 
-    // Collect all changes across all layers
-    for (let layer_name in keymap_changed) {
-        let positions = [];
-        let keycodes = [];
-        let col_size = keymap_changed[layer_name][0].length;
-
-        // Gather changes for this layer
-        keymap_changed[layer_name].forEach((row, i) => {
-            row.forEach((changed, j) => {
-                if (changed) {
-                    positions.push(i * col_size + j);
-                    keycodes.push(keymap_layouts[layer_name][i][j]);
-                    hasChanges = true;
-                }
-            });
-        });
-
-        // Only include layers that have changes
-        if (positions.length > 0) {
-            changes[layer_name] = {
-                "positions": positions,
-                "keycodes": keycodes
-            };
+    let visit_row = function(row, i, arr) {
+        let visit_col = function(changed, j, arr) {
+            if (changed) {
+                update_arr.push(i * col_size + j);
+                keycodes.push(keymap_layouts[layer_name][i][j]);
+            }
         }
+        row.forEach(visit_col);
     }
 
-    // If no changes, exit early
-    if (!hasChanges) {
-        console.log("No changes to update");
+    keymap_changed[layer_name].forEach(visit_row);
+
+    if (update_arr.length == 0) {
         return;
     }
 
-    // Increment the version for this update
-    let new_version = layout_version + 1;
-
-    // Create the request payload
-    let payload = {
-        "changes": changes,
-        "version": new_version
-    };
-
     let update_path = "/api/keymap";
-    let xhttp = new XMLHttpRequest();
 
+    let xhttp = new XMLHttpRequest();
     xhttp.onreadystatechange = function() {
         if (xhttp.readyState == 4) {
             if (xhttp.status == 200) {
-                // Update local version on successful update
-                layout_version = new_version;
-                console.log("Updated layout to version: " + layout_version);
-
-                // Re-enable the update button
                 document.getElementById("button_ok").disabled = false;
-
-                // Reset the change tracking
-                for (let layer_name in keymap_changed) {
-                    for (let i = 0; i < keymap_changed[layer_name].length; i++) {
-                        keymap_changed[layer_name][i].fill(false);
-                    }
-                }
             } else {
                 _handle_server_error(xhttp);
             }
         }
-    };
+    }
 
-    // Disable the update button while the request is in progress
     document.getElementById("button_ok").disabled = true;
 
     xhttp.open("PUT", update_path, true);
     xhttp.setRequestHeader("Content-Type", "application/json");
-    xhttp.send(JSON.stringify(payload));
+    let data = JSON.stringify({"layer" : layer_name, "positions" : update_arr, "keycodes" : keycodes});
+    xhttp.send(data);
+}
+
+function update_keymap()
+{
+    for (let layer_name in keymap_changed) {
+        _update_keymap_layer(layer_name);
+    }
 }
 
 function restore_default_keymap()
