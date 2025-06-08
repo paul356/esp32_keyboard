@@ -450,7 +450,7 @@ static esp_err_t upload_bin_file(httpd_req_t* req)
 {
     int file_len = req->content_len;
     int accumu_len = 0;
-    char str_buf[25];
+    char str_buf[32];
 
     ESP_LOGI(TAG, "Starting OTA ...");
 

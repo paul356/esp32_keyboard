@@ -34,17 +34,18 @@ Until now (2023/03/30) I have finished or barely finished these functionalities.
 - Function Keys
   + Print Device Info
   + Print Welcome Introduction
+- Configure Wifi through Web UI
 
 ### Planned Features
 - Beautify Web GUI (use [numl.design](https://numl.design/))
 - Key Recording
-- Support Wifi Configuration
 
 ### Build Process
-It builds with esp-idf 5.3. It used to build with a customized esp-idf 4.4 for version v0.0.1. After you have esp-idf [installed and configured](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#manual-installation) installed, run following commands. Note `get_idf` is the bash alias for entering esp-idf environment.
+It builds with esp-idf 5.4. After you have esp-idf [installed and configured](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/index.html#manual-installation) installed, run following commands.
 ```
 git clone https://github.com/paul356/esp32_keyboard.git
-get_idf
+. $HOME/code/esp/esp-idf/export.sh
+export PS1="(ESP-IDF) $PS1"
 idf.py set-target esp32s3
 idf.py build
 idf.py flash

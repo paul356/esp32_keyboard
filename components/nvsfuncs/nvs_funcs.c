@@ -199,7 +199,7 @@ void nvs_read_keymap_cfg(void){
 		ESP_LOGI(NVS_TAG, "Success getting layout num");
 	}
 
-    uint32_t str_size = (MAX_LAYOUT_NAME_LENGTH + 1) * layers;
+    size_t str_size = (MAX_LAYOUT_NAME_LENGTH + 1) * layers;
     char *layer_names = (char*)malloc(str_size);
     if (!layer_names) {
         ESP_LOGE(NVS_TAG, "no memory for layer name buffer");

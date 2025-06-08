@@ -94,8 +94,7 @@ const LV_ATTRIBUTE_MEM_ALIGN LV_ATTRIBUTE_LARGE_CONST LV_ATTRIBUTE_IMG_WIFI_ICON
 };
 
 const lv_img_dsc_t wifi_icon = {
-  .header.magic = LV_IMAGE_HEADER_MAGIC,
-  .header.cf = LV_COLOR_FORMAT_I4,
+  .header.cf = LV_IMG_CF_INDEXED_4BIT,
   .header.w = 26,
   .header.h = 32,
   .data_size = 480,
