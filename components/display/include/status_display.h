@@ -22,6 +22,14 @@
 
 #include "esp_err.h"
 
+/**
+ * @brief Initialize the display component
+ * @return esp_err_t ESP_OK on success
+ */
 esp_err_t init_display(void);
 
+/**
+ * @brief Update display with last pressed key
+ * @param last_key The keycode of the last pressed key
+ */
 void update_display(uint16_t last_key);
