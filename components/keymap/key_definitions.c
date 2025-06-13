@@ -152,7 +152,7 @@ const char* basic_key_codes[] = {
     "KP_9",
     "KP_0",
     "KP_.",
-    "\(EU)", /* Non-US \ and | (Typically near the Left-Shift key) */
+    "\\\\(EU)", /* Non-US \ and | (Typically near the Left-Shift key) */
     "App",
     NULL, /* from Power to EXSEL are not recognized by Windows and Mac*/
     NULL,
