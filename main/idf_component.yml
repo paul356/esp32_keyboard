@@ -1,8 +1,6 @@
 ## IDF Component Manager Manifest File
 dependencies:
   espressif/esp_lvgl_port: "^2.6.0"
-  lvgl/lvgl:
-    version: "^8"
   espressif/esp_tinyusb: "^1.4.4"
   ## Required IDF version
   idf:

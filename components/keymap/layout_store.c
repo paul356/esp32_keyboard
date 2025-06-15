@@ -26,7 +26,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_system.h"
-#include "nvs_flash.h"
+//#include "nvs_flash.h"
 #include "nvs.h"
 #include "nvs_io.h"
 #include "layout_store.h"
