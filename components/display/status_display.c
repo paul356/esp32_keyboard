@@ -19,14 +19,47 @@
  */
 
 #include "status_display.h"
+#include "keyboard_gui.h"
+#include "esp_log.h"
+
+static const char *TAG = "status_display";
 
 esp_err_t init_display(void)
 {
-    // TODO: Implement display initialization
+    ESP_LOGI(TAG, "Initializing display");
+    
+    esp_err_t ret = keyboard_gui_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize keyboard GUI: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    
+    ESP_LOGI(TAG, "Display initialization complete");
     return ESP_OK;
 }
 
 void update_display(uint16_t last_key)
 {
-    // TODO: Implement display update
+    keyboard_gui_update_stats(last_key);
+}
+
+void display_handle_encoder_rotation(int direction)
+{
+    keyboard_gui_handle_encoder(direction);
+}
+
+void display_handle_enter(void)
+{
+    keyboard_gui_handle_enter();
+}
+
+void display_handle_esc(void)
+{
+    keyboard_gui_handle_esc();
+}
+
+void display_set_status_info(const keyboard_stats_t *status)
+{
+    // This function might not be needed as we now use keyboard_gui_update_stats
+    // for individual key updates. Could be removed or adapted.
 }

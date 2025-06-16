@@ -3,17 +3,17 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301, USA.
- * 
+ *
  * Copyright 2018 Gal Zaidenstein.
  */
 
@@ -29,6 +29,7 @@
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
+#include "esp_err.h"
 #include "nvs_flash.h"
 #include "esp_bt.h"
 #include "esp_bt_main.h"
@@ -41,7 +42,8 @@
 #include "tusb.h"
 #include "port_mgmt.h"
 #include "function_control.h"
-//#include "status_display.h"
+#include "status_display.h"
+#include "keyboard_gui.h"
 #include "hid_desc.h"
 
 //HID Ble functions
@@ -158,7 +160,7 @@ void start_keyboard_timer()
 {
     esp_timer_create_args_t timer_args = {&keyboard_timer_func, NULL, ESP_TIMER_TASK, "kb_task", true};
     esp_timer_handle_t timer_handle = NULL;
-    
+
     esp_err_t ret = esp_timer_create(&timer_args, &timer_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Create esp timer failed, ret=%d", ret);
@@ -192,9 +194,11 @@ void test_miscs(void)
     switch (encoder_direct) {
         case MISCS_ENCODER_CW:
             ESP_LOGI(TAG, "Encoder Direction: Clockwise");
+            display_handle_encoder_rotation(1);  // Positive direction for clockwise
             break;
         case MISCS_ENCODER_CCW:
             ESP_LOGI(TAG, "Encoder Direction: Counter-Clockwise");
+            display_handle_encoder_rotation(-1); // Negative direction for counter-clockwise
             break;
         case MISCS_ENCODER_STOPPED:
             ESP_LOGI(TAG, "Encoder Direction: Stopped");
@@ -245,10 +249,10 @@ void app_main()
 
             ESP_ERROR_CHECK(start_file_server());
 
-            //(void)init_display();
+            ESP_ERROR_CHECK(init_display());
 
             //(void)update_display(0);
-            
+
             //xTaskCreatePinnedToCore(send_keys, "period send key", 4096, NULL, configMAX_PRIORITIES, NULL, 1);
             keyboard_inited = true;
         }
@@ -256,7 +260,11 @@ void app_main()
         if (keyboard_inited) {
             ESP_LOGI("MAIN", "Running main loop");
             test_miscs();
-            vTaskDelay(5000 / portTICK_PERIOD_MS);
+
+            // Update GUI for menu handling and LVGL tasks
+            keyboard_gui_update();
+
+            vTaskDelay(50 / portTICK_PERIOD_MS);  // Reduced delay for better GUI responsiveness
         } else {
             vTaskDelay(5 / portTICK_PERIOD_MS);
         }

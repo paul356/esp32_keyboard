@@ -21,6 +21,8 @@
 #pragma once
 
 #include "esp_err.h"
+#include <stdbool.h>
+#include "keyboard_gui.h"
 
 /**
  * @brief Initialize the display component
@@ -33,3 +35,38 @@ esp_err_t init_display(void);
  * @param last_key The keycode of the last pressed key
  */
 void update_display(uint16_t last_key);
+
+/**
+ * @brief Handle rotary encoder input
+ * @param direction 1 for clockwise, -1 for counter-clockwise
+ */
+void display_handle_encoder_rotation(int direction);
+
+/**
+ * @brief Handle Enter key press for menu navigation
+ */
+void display_handle_enter(void);
+
+/**
+ * @brief Handle ESC key press for menu navigation
+ */
+void display_handle_esc(void);
+
+/**
+ * @brief Update display task - should be called periodically
+ */
+void display_update_task(void);
+
+/**
+ * @brief Set display brightness
+ * @param brightness Brightness level (0-100)
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t display_set_brightness(uint8_t brightness);
+
+/**
+ * @brief Turn display on/off
+ * @param on true to turn on, false to turn off
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t display_on_off(bool on);
