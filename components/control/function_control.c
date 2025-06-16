@@ -27,6 +27,7 @@
 #include "esp_random.h"
 #include "hal_ble.h"
 #include "wifi_intf.h"
+#include "memory_debug.h"
 
 #define TAG "FUNC_CTRL"
 #define FUNCTION_CTRL_NAMESPACE "FUNC_CTRL"
@@ -237,16 +238,20 @@ static esp_err_t update_persisted_config(function_control_e func)
 
 esp_err_t restore_saved_state(void)
 {
+    log_memory_usage("BEFORE restore_saved_state");
+
     esp_err_t ret = recover_persisted_config();
     if (ret != ESP_OK) {
         return ret;
     }
 
+    log_memory_usage("After recover_persisted_config");
     ret = wifi_init(function_state.wifi.mode, function_state.wifi.ssid, function_state.wifi.passwd);
     if (ret != ESP_OK) {
         return ret;
     }
 
+    log_memory_usage("After wifi_init");
     if (function_state.ble.enabled) {
         ret = halBLEInit(function_state.ble.name);
         if (ret != ESP_OK) {
@@ -254,6 +259,7 @@ esp_err_t restore_saved_state(void)
         }
     }
 
+    log_memory_usage("After halBLEInit");
     return ESP_OK;
 }
 

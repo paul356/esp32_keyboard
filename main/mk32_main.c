@@ -58,6 +58,7 @@
 #include "wait.h"
 #include "host.h"
 #include "miscs.h"
+#include "memory_debug.h"
 
 extern esp_err_t start_file_server();
 extern void wifi_init_softap(void);
@@ -209,6 +210,10 @@ void test_miscs(void)
 void app_main()
 {
     esp_err_t ret;
+
+    // Log initial memory state
+    log_memory_usage("INITIAL STATE");
+
     //Underclocking for better current draw (not really effective)
     //    esp_pm_config_esp32_t pm_config;
     //    pm_config.max_freq_mhz = 10;
@@ -216,21 +221,32 @@ void app_main()
     //    esp_pm_configure(&pm_config);
 
     (void)register_keyboard_reporter();
+    log_memory_usage("After keyboard reporter registration");
+
     enable_usb_hid();
+    log_memory_usage("After USB HID enable");
+
     // Initialize miscs
     ret = miscs_init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize miscs: %s", esp_err_to_name(ret));
         return;
     }
+    log_memory_usage("After miscs_init");
 
     bool keyboard_inited = false;
     while (true) {
         if (/*tud_ready() && */!keyboard_inited) {
             vTaskDelay(500 / portTICK_PERIOD_MS);
+
             matrix_setup();
+            log_memory_usage("After matrix_setup");
+
             matrix_init();
+            log_memory_usage("After matrix_init");
+
             default_layer_set(0x1);
+            log_memory_usage("After default_layer_set");
 
             // Initialize NVS.
             ret = nvs_flash_init();
@@ -239,34 +255,40 @@ void app_main()
                 ret = nvs_flash_init();
             }
             ESP_ERROR_CHECK(ret);
+            log_memory_usage("After NVS flash init");
 
             // Load layouts from nvs (if found)
             nvs_load_layouts();
+            log_memory_usage("After nvs_load_layouts");
 
             start_keyboard_timer();
+            log_memory_usage("After start_keyboard_timer");
 
             ESP_ERROR_CHECK(restore_saved_state());
+            log_memory_usage("After restore_saved_state");
 
             ESP_ERROR_CHECK(start_file_server());
+            log_memory_usage("After start_file_server");
 
             ESP_ERROR_CHECK(init_display());
+            log_memory_usage("After init_display");
 
             //(void)update_display(0);
 
             //xTaskCreatePinnedToCore(send_keys, "period send key", 4096, NULL, configMAX_PRIORITIES, NULL, 1);
             keyboard_inited = true;
+            log_memory_usage("Keyboard initialization complete");
         }
 
         if (keyboard_inited) {
             ESP_LOGI("MAIN", "Running main loop");
-            test_miscs();
 
             // Update GUI for menu handling and LVGL tasks
             keyboard_gui_update();
 
-            vTaskDelay(50 / portTICK_PERIOD_MS);  // Reduced delay for better GUI responsiveness
+            vTaskDelay(5000 / portTICK_PERIOD_MS);  // Reduced delay for better GUI responsiveness
         } else {
-            vTaskDelay(5 / portTICK_PERIOD_MS);
+            vTaskDelay(500 / portTICK_PERIOD_MS);
         }
     }
 }
