@@ -177,7 +177,7 @@ static unsigned long get_default_device_id(void)
 
 void set_default_wifi_mode(control_state_t* state)
 {
-    state->wifi.mode = WIFI_MODE_AP;
+    state->wifi.mode = WIFI_MODE_NULL;
 }
 void set_default_wifi_ssid(control_state_t* state)
 {
@@ -246,12 +246,17 @@ esp_err_t restore_saved_state(void)
     }
 
     log_memory_usage("After recover_persisted_config");
-    ret = wifi_init(function_state.wifi.mode, function_state.wifi.ssid, function_state.wifi.passwd);
-    if (ret != ESP_OK) {
-        return ret;
+    // comment out wifi to save memory
+    /*
+    if (function_state.wifi.mode != WIFI_MODE_NULL) {
+        ret = wifi_init(function_state.wifi.mode, function_state.wifi.ssid, function_state.wifi.passwd);
+        if (ret != ESP_OK) {
+            return ret;
+        }
     }
-
     log_memory_usage("After wifi_init");
+    */
+
     if (function_state.ble.enabled) {
         ret = halBLEInit(function_state.ble.name);
         if (ret != ESP_OK) {

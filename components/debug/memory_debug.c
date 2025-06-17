@@ -28,7 +28,7 @@ void log_heap_usage(const char* stage_name, uint32_t caps, const char* caps_name
     size_t largest_free = heap_caps_get_largest_free_block(caps);
     size_t minimum_free = heap_caps_get_minimum_free_size(caps);
 
-    ESP_LOGI(TAG, "    [%s] %s Memory:", stage_name, caps_name);
+    ESP_LOGI(TAG, "    %s Memory:", caps_name);
     ESP_LOGI(TAG, "      Free: %u bytes (%.1f%%)", free_size,
              total_size > 0 ? (100.0 * free_size / total_size) : 0.0);
     ESP_LOGI(TAG, "      Total: %u bytes", total_size);

@@ -270,8 +270,8 @@ void app_main()
             ESP_ERROR_CHECK(restore_saved_state());
             log_memory_usage("After restore_saved_state");
 
-            ESP_ERROR_CHECK(start_file_server());
-            log_memory_usage("After start_file_server");
+            //ESP_ERROR_CHECK(start_file_server());
+            //log_memory_usage("After start_file_server");
 
             (void)update_display(0);
 
