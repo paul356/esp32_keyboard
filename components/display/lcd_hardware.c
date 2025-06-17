@@ -43,7 +43,7 @@
 // SPI Configuration
 #define LCD_SPI_HOST        SPI2_HOST
 #define LCD_PIXEL_CLOCK_HZ  (20 * 1000 * 1000)  // 20MHz
-#define DRAW_BUFFER_SIZE    (LCD_WIDTH * LCD_HEIGHT * LCD_BIT_PER_PIXEL / 10)
+#define DRAW_BUFFER_SIZE    (LCD_WIDTH * LCD_HEIGHT * sizeof(lv_color16_t) / 10)
 #define SCREEN_OFFSET_X     20  // Offset for X coordinate, adjust as needed
 
 /**
