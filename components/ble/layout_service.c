@@ -13,6 +13,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301, USA.
+ *
+ * Copyright 2025 github.com/paul356
  */
 
 /** @file
@@ -21,6 +23,8 @@
 
 #include "layout_service.h"
 #include "keymap_json.h"
+#include "drv_loop.h"
+#include "esp_event.h"
 #include <string.h>
 
 #define TAG "layout_service"
@@ -30,21 +34,29 @@
 #define LAYOUT_UPDATE_TASK_PRIORITY 5
 #define LAYOUT_UPDATE_QUEUE_SIZE 3
 
-// Define the queue for layout updates
-static QueueHandle_t layout_update_queue = NULL;
-
-// Define task handle
-static TaskHandle_t layout_update_task_handle = NULL;
-
 // Define BLE default MTU size (23 bytes according to BLE specification)
 #define BLE_DEFAULT_MTU_SIZE 23
 #define BLE_MAX_ATTR_LEN 512 // Maximum attribute length for responses
+
+// Helper macros for min/max
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 typedef struct {
     uint8_t* data;          // Pointer to the JSON data
     uint16_t data_len;      // Current data length
     uint16_t max_len;       // Maximum allocation size
 } layout_json_data_t;
+
+// Layout Event data structures
+typedef struct {
+    uint8_t* json_data;
+    size_t data_len;
+} layout_update_event_t;
+
+enum {
+    LAYOUT_UPDATE_EVENT = 0, // Event for layout updates
+} layout_event_id_t;
 
 // Service handles
 static uint16_t layout_service_handle = 0;
@@ -69,13 +81,86 @@ static layout_json_data_t layout_update_data = {0}; // Buffer for incoming layou
 static uint16_t layout_query_offset = 0;
 static uint16_t keycode_query_offset = 0;
 
-// Helper macros for min/max
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+ESP_EVENT_DEFINE_BASE(LAYOUT_EVENTS);
 
 static bool process_layout_update_data(layout_json_data_t *json_data);
-static void layout_update_task(void *pvParameters);
 
+static esp_err_t layout_post_update_event(uint8_t* json_data, size_t data_len)
+{
+    if (!json_data || data_len == 0) {
+        ESP_LOGE(TAG, "Invalid JSON data parameters");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    layout_update_event_t event_data = {
+        .json_data = json_data,
+        .data_len = data_len
+    };
+
+    esp_err_t err = drv_loop_post_event(LAYOUT_EVENTS,
+                                       LAYOUT_UPDATE_EVENT,
+                                       &event_data, sizeof(event_data),
+                                       portMAX_DELAY);
+
+    if (err != ESP_OK) {
+        // Free the allocated memory if posting failed
+        ESP_LOGE(TAG, "Failed to post layout event: %s", esp_err_to_name(err));
+        free(json_data);
+    }
+
+    return err;
+}
+
+static void layout_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data) {
+    layout_update_event_t* layout_data = (layout_update_event_t*)event_data;
+
+    ESP_LOGI(TAG, "Processing layout update in event handler, data length: %d", layout_data->data_len);
+    ESP_LOGI(TAG, "JSON data: %s", (char*)layout_data->json_data);
+
+    cJSON* json_data = cJSON_Parse((char*)(layout_data->json_data));
+
+    // Free the allocated data immediately after parsing
+    free(layout_data->json_data);
+    layout_data->json_data = NULL;
+
+    if (json_data == NULL) {
+        ESP_LOGE(TAG, "Failed to parse JSON data");
+    } else {
+        // Process the JSON data (e.g., update keymaps, layouts, etc.)
+        esp_err_t err = update_layout_from_json(json_data);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to update layout from JSON: %d", err);
+        } else {
+            ESP_LOGI(TAG, "Layout updated successfully from JSON");
+        }
+
+        cJSON_Delete(json_data); // Clean up after processing
+    }
+}
+
+static esp_err_t layout_events_init(void)
+{
+    ESP_LOGI(TAG, "Initializing layout events");
+
+    // Register event handler using the generic drv_loop interface
+    ESP_ERROR_CHECK(drv_loop_register_handler(LAYOUT_EVENTS, LAYOUT_UPDATE_EVENT,
+                                             layout_event_handler, NULL));
+
+    ESP_LOGI(TAG, "Layout event handler registered");
+    return ESP_OK;
+}
+
+/**
+ * @brief Event handler for layout updates
+ *
+ * This handler processes layout update data received via events
+ * without blocking the BLE stack.
+ *
+ * @param handler_args Handler arguments (unused)
+ * @param base Event base
+ * @param id Event ID
+ * @param event_data Event data containing layout update information
+ */
 /**
  * Helper function to append a string to the JSON buffer
  */
@@ -284,7 +369,19 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                 break;
             }
 
-            layout_query_data.data_len = 0;
+            if (layout_query_data.data == NULL)
+            {
+                // Initialize the layout query data buffer if not already done
+                layout_query_data.max_len = LAYOUT_JSON_MAX_SIZE;
+                layout_query_data.data = malloc(layout_query_data.max_len);
+                layout_query_data.data_len = 0;
+                if (!layout_query_data.data)
+                {
+                    ESP_LOGE(TAG, "Failed to allocate memory for layout query data");
+                    esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id, ESP_GATT_INSUF_RESOURCE, NULL);
+                    break;
+                }
+            }
 
             // Generate the JSON using our utility function
             generate_layouts_json(ble_append_str, &layout_query_data);
@@ -327,6 +424,10 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
             {
                 ESP_LOGE(TAG, "Send response failed: %d", ret);
             }
+
+            free(layout_query_data.data);
+            layout_query_data.data = NULL; // Free the buffer after sending
+            layout_query_data.data_len = 0; // Reset the length
         }
         else if (param->read.handle == keycode_char_handle)
         {
@@ -339,7 +440,19 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                 break;
             }
 
-            keycode_query_data.data_len = 0;
+            if (keycode_query_data.data == NULL)
+            {
+                // Initialize the layout query data buffer if not already done
+                keycode_query_data.max_len = LAYOUT_JSON_MAX_SIZE;
+                keycode_query_data.data = malloc(keycode_query_data.max_len);
+                keycode_query_data.data_len = 0;
+                if (!keycode_query_data.data)
+                {
+                    ESP_LOGE(TAG, "Failed to allocate memory for keycode query data");
+                    esp_ble_gatts_send_response(gatts_if, param->read.conn_id, param->read.trans_id, ESP_GATT_INSUF_RESOURCE, NULL);
+                    break;
+                }
+            }
 
             // Generate the JSON using our utility function
             generate_keycodes_json(ble_append_str, &keycode_query_data);
@@ -382,6 +495,10 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
             {
                 ESP_LOGE(TAG, "Send response failed: %d", ret);
             }
+
+            free(keycode_query_data.data);
+            keycode_query_data.data_len = 0; // Reset the length
+            keycode_query_data.data = NULL; // Free the buffer after sending
         }
         else if (param->read.handle == layout_offset_char_handle)
         {
@@ -620,19 +737,19 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
     }
 }
 
-void layout_service_init(void)
+esp_err_t layout_service_init(void)
 {
     // Initialize with default JSON data
     if (!layout_query_data.data)
     {
-        layout_query_data.data = (uint8_t *)malloc(LAYOUT_JSON_MAX_SIZE);
+        layout_query_data.data = NULL;
         layout_query_data.max_len = LAYOUT_JSON_MAX_SIZE;
         layout_query_data.data_len = 0;
     }
 
     if (!keycode_query_data.data)
     {
-        keycode_query_data.data = (uint8_t *)malloc(LAYOUT_JSON_MAX_SIZE);
+        keycode_query_data.data = NULL;
         keycode_query_data.max_len = LAYOUT_JSON_MAX_SIZE;
         keycode_query_data.data_len = 0;
     }
@@ -646,70 +763,16 @@ void layout_service_init(void)
     layout_query_offset = 0;
     keycode_query_offset = 0;
 
-    // Create the layout update queue
-    layout_update_queue = xQueueCreate(LAYOUT_UPDATE_QUEUE_SIZE, sizeof(layout_json_data_t));
-    if (layout_update_queue == NULL) {
-        ESP_LOGE(TAG, "Failed to create layout update queue");
+    // Initialize the generic event system and register layout event handler
+    esp_err_t err = layout_events_init();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize layout events: %s", esp_err_to_name(err));
+        return err;
     }
-
-    // Create the layout update task
-    BaseType_t task_created = xTaskCreate(
-        layout_update_task,              // Task function
-        "layout_update_task",            // Task name
-        LAYOUT_UPDATE_TASK_STACK_SIZE,   // Stack size
-        NULL,                            // Parameters
-        LAYOUT_UPDATE_TASK_PRIORITY,     // Priority
-        &layout_update_task_handle       // Task handle
-    );
-
-    if (task_created != pdPASS) {
-        ESP_LOGE(TAG, "Failed to create layout update task");
-    }
+    ESP_LOGI(TAG, "Layout event handler registered");
 
     // Register custom service application
-    esp_ble_gatts_app_register(LAYOUT_SERVICE_UUID);
-}
-
-/**
- * @brief Task handler for processing layout update JSON data
- *
- * This task handles the processing of layout update data received from BLE clients
- * without blocking the BLE stack.
- *
- * @param pvParameters Task parameters (unused)
- */
-static void layout_update_task(void *pvParameters)
-{
-    layout_json_data_t update_data;
-
-    ESP_LOGI(TAG, "Layout update task started");
-
-    // Run indefinitely, processing updates from the queue
-    while (1) {
-        // Wait for a layout update to be queued
-        if (xQueueReceive(layout_update_queue, &update_data, portMAX_DELAY) == pdTRUE) {
-            // Copy of data received
-            ESP_LOGI(TAG, "Processing layout update in task, data length: %d", update_data.data_len);
-            ESP_LOGI(TAG, "JSON data: %s", (char*)update_data.data);
-
-            cJSON* json_data = cJSON_Parse((char*)(update_data.data));
-            // Free the allocated data
-            free(update_data.data);
-            if (json_data == NULL) {
-                ESP_LOGE(TAG, "Failed to parse JSON data");
-            } else {
-                // Process the JSON data (e.g., update keymaps, layouts, etc.)
-                esp_err_t err = update_layout_from_json(json_data);
-                if (err != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to update layout from JSON: %d", err);
-                } else {
-                    ESP_LOGI(TAG, "Layout updated successfully from JSON");
-                }
-
-                cJSON_Delete(json_data); // Clean up after processing
-            }
-        }
-    }
+    return esp_ble_gatts_app_register(LAYOUT_SERVICE_UUID);
 }
 
 /**
@@ -731,9 +794,10 @@ static bool process_layout_update_data(layout_json_data_t *json_data)
 
     ESP_LOGI(TAG, "Processing layout update data, length: %d", json_data->data_len);
 
-    // Send to the processing queue (xQueueSend makes a copy of the structure)
-    if (xQueueSend(layout_update_queue, json_data, 0) != pdTRUE) {
-        ESP_LOGE(TAG, "Failed to queue layout update for processing");
+    // Post layout event instead of using queue
+    esp_err_t ret = layout_post_update_event(json_data->data, json_data->data_len);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to post layout event: %d", ret);
         return false;
     }
 

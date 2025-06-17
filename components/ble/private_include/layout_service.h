@@ -13,6 +13,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
  * MA 02110-1301, USA.
+ * 
+ * Copyright 2025 github.com/paul356
  */
 
 /** @file
@@ -43,7 +45,6 @@ extern "C" {
 
 // Maximum size for JSON data
 #define LAYOUT_JSON_MAX_SIZE  2048
-#define LAYOUT_CHUNK_SIZE     512
 
 // UUIDs for the custom service and characteristics
 #define LAYOUT_SERVICE_UUID      0x181C  // Custom service UUID
@@ -56,7 +57,7 @@ extern "C" {
 /**
  * @brief Initialize the layout service
  */
-void layout_service_init(void);
+esp_err_t layout_service_init(void);
 
 /**
  * @brief GATT event handler for the layout service

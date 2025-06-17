@@ -46,9 +46,6 @@
 #include "keyboard_gui.h"
 #include "hid_desc.h"
 
-//HID Ble functions
-#include "hal_ble.h"
-
 //MK32 functions
 #include "matrix.h"
 #include "keyboard_config.h"
@@ -59,6 +56,7 @@
 #include "host.h"
 #include "miscs.h"
 #include "memory_debug.h"
+#include "drv_loop.h"
 
 extern esp_err_t start_file_server();
 extern void wifi_init_softap(void);
@@ -219,6 +217,8 @@ void app_main()
     //    pm_config.max_freq_mhz = 10;
     //    pm_config.min_freq_mhz = 10;
     //    esp_pm_configure(&pm_config);
+
+    ESP_ERROR_CHECK(drv_loop_init());
 
     (void)register_keyboard_reporter();
     log_memory_usage("After keyboard reporter registration");

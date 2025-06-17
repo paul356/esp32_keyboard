@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "hal_ble.h"
 #include "status_display.h"
+#include "ble_events.h"  // Include BLE-specific events
 
 static void send_keyboard_to_queue(report_keyboard_t*);
 static uint8_t keyboard_leds_status(void);
@@ -63,7 +64,7 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
     }
 
     if (keyboard_q) {
-        xQueueSend(keyboard_q, report_state, (TickType_t) 0);
+        ble_post_keyboard_event(report_state, REPORT_LEN);
     }
 
     update_display(report_state[2]);

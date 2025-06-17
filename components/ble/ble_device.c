@@ -23,10 +23,13 @@
  */
 #include <string.h>
 #include "hal_ble.h"
+#include "keyboard_config.h"  // For REPORT_LEN definition
 #include "esp_hidd.h"
 #include "esp_check.h"
 #include "ble_gap.h"
 #include "layout_service.h"  // Include the layout service header
+#include "ble_device.h"
+#include "ble_events_prv.h"
 
 #define TAG "hal_ble"
 
@@ -39,6 +42,11 @@ uint8_t battery_report[1] = { 0 };
 uint8_t key_report[REPORT_LEN] = { 0 };
 
 static esp_hidd_dev_t* hid_dev;
+
+// Make hid_dev accessible to other BLE modules
+esp_hidd_dev_t* ble_get_hid_dev(void) {
+    return hid_dev;
+}
 
 const unsigned char hidapiReportMap[] = { //8 bytes input, 8 bytes feature
     0x05, 0x01,  // Usage Pg (Generic Desktop)
@@ -240,62 +248,6 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
     return;
 }
 
-void halBLETask_battery(void * params) {
-
-	if(battery_q != NULL)
-		xQueueReset(battery_q);
-
-	if(battery_q != NULL)
-    {
-        while (1){
-            if(xQueueReceive(battery_q, &battery_report, portMAX_DELAY)){
-                if (!esp_hidd_dev_connected(hid_dev))
-                    continue;
-
-				uint8_t battery_lev = *battery_report;
-
-                esp_hidd_dev_battery_set(hid_dev, battery_lev);
-            } else {
-                ESP_LOGE(TAG, "ble hid queue not initialized, retry in 1s");
-                vTaskDelay(1000 / portTICK_PERIOD_MS);
-            }
-        }
-    }
-
-}
-/** @brief CONTINOUS TASK - sending HID commands via BLE
- *
- * This task is used to wait for HID commands, sent to the hid_ble
- * queue. If one command is received, it will be sent to a (possibly)
- * connected BLE device.
- */
-void halBLETask_keyboard(void * params) {
-
-	//Empty queue if initialized (there might be something left from last connection)
-	if (keyboard_q != NULL)
-		xQueueReset(keyboard_q);
-
-	//check if queue is initialized
-	if (keyboard_q != NULL) {
-        while (1) {
-            //pend on MQ, if timeout triggers, just wait again.
-            if (xQueueReceive(keyboard_q, &key_report, portMAX_DELAY)) {
-                //if we are not connected, discard.
-
-                if (!esp_hidd_dev_connected(hid_dev))
-                    continue;
-
-                esp_hidd_dev_input_set(hid_dev, 0, 1, key_report, REPORT_LEN);
-            }
-
-        }
-	} else {
-		ESP_LOGE(TAG, "ble hid queue not initialized, retry in 1s");
-		vTaskDelay(1000 / portTICK_PERIOD_MS);
-	}
-
-}
-
 bool isBLERunning()
 {
     return keyboard_q != NULL && hid_dev != NULL;
@@ -357,26 +309,28 @@ esp_err_t halBLEInit(const char* name)
 
     // Initialize the custom layout service
     ESP_LOGI(TAG, "setting custom service");
-    layout_service_init();
+    ret = layout_service_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize layout service: %s", esp_err_to_name(ret));
+        return ret;
+    }
 
     ret = ble_gap_adv_start();
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "BLE adv start failed: %d", ret);
     }
 
-	//create BLE task
-	TaskHandle_t xBLETask_battery;
-	TaskHandle_t xBLETask_keyboard;
+    // Initialize BLE-specific events and register handlers
+    ret = ble_events_init();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize BLE events: %s", esp_err_to_name(ret));
+        return ret;
+    }
 
-	xTaskCreatePinnedToCore(halBLETask_battery, "ble_task_battery",
-			TASK_BLE_STACKSIZE, NULL, configMAX_PRIORITIES - 1, &xBLETask_battery,
-			0);
-	xTaskCreatePinnedToCore(halBLETask_keyboard, "ble_task_keyboard",
-			TASK_BLE_STACKSIZE, NULL, configMAX_PRIORITIES - 1, &xBLETask_keyboard,
-			1);
+    ESP_LOGI(TAG, "BLE event handlers registered");
 
-	//set log level according to define
-	esp_log_level_set(TAG, ESP_LOG_INFO);
+    //set log level according to define
+    esp_log_level_set(TAG, ESP_LOG_INFO);
 
-	return ESP_OK;
+    return ESP_OK;
 }
