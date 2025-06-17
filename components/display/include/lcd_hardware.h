@@ -20,48 +20,24 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include "esp_err.h"
-#include "esp_lcd_types.h"
-#include "lvgl.h"
 
+#define TEST_HARDWARE
+#ifdef TEST_HARDWARE
+#define LCD_WIDTH           280
+#define LCD_HEIGHT          240
+#else
 // LCD Configuration
 #define LCD_WIDTH           284
 #define LCD_HEIGHT          76
-#define LCD_BIT_PER_PIXEL   16
-
-// GPIO Pin Definitions
-#define LCD_PIN_MOSI        11
-#define LCD_PIN_CLK         12
-#define LCD_PIN_CS          10
-#define LCD_PIN_DC          13
-#define LCD_PIN_RST         9
-#define LCD_PIN_BL          14
-
-// SPI Configuration
-#define LCD_SPI_HOST        SPI2_HOST
-#define LCD_PIXEL_CLOCK_HZ  (20 * 1000 * 1000)  // 20MHz
-
-/**
- * @brief LCD hardware interface structure
- */
-typedef struct {
-    esp_lcd_panel_handle_t panel_handle;
-    esp_lcd_panel_io_handle_t io_handle;
-    lv_display_t *lvgl_display;
-    bool initialized;
-} lcd_hardware_t;
+#endif
 
 /**
  * @brief Initialize ST7789 LCD hardware
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t lcd_hardware_init(void);
-
-/**
- * @brief Get LCD hardware instance
- * @return lcd_hardware_t* Pointer to LCD hardware instance
- */
-lcd_hardware_t* lcd_hardware_get_instance(void);
 
 /**
  * @brief Set LCD backlight brightness

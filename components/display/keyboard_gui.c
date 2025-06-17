@@ -19,7 +19,7 @@
  */
 
 #include "keyboard_gui.h"
-#include "lcd_hardware_st7789.h"
+#include "lcd_hardware.h"
 #include "menu_state_machine.h"
 #include "esp_log.h"
 #include "esp_timer.h"

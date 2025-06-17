@@ -234,6 +234,9 @@ void app_main()
     }
     log_memory_usage("After miscs_init");
 
+    ESP_ERROR_CHECK(init_display());
+    log_memory_usage("After init_display");
+
     bool keyboard_inited = false;
     while (true) {
         if (/*tud_ready() && */!keyboard_inited) {
@@ -270,25 +273,16 @@ void app_main()
             ESP_ERROR_CHECK(start_file_server());
             log_memory_usage("After start_file_server");
 
-            ESP_ERROR_CHECK(init_display());
-            log_memory_usage("After init_display");
-
-            //(void)update_display(0);
+            (void)update_display(0);
 
             //xTaskCreatePinnedToCore(send_keys, "period send key", 4096, NULL, configMAX_PRIORITIES, NULL, 1);
             keyboard_inited = true;
             log_memory_usage("Keyboard initialization complete");
         }
 
-        if (keyboard_inited) {
-            ESP_LOGI("MAIN", "Running main loop");
+        // Update GUI for menu handling and LVGL tasks
+        keyboard_gui_update();
 
-            // Update GUI for menu handling and LVGL tasks
-            keyboard_gui_update();
-
-            vTaskDelay(5000 / portTICK_PERIOD_MS);  // Reduced delay for better GUI responsiveness
-        } else {
-            vTaskDelay(500 / portTICK_PERIOD_MS);
-        }
+        vTaskDelay(500 / portTICK_PERIOD_MS);  // Reduced delay for better GUI responsiveness
     }
 }
