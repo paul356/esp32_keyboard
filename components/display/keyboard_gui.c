@@ -213,40 +213,43 @@ static keyboard_info_gui_t* create_keyboard_info_gui(void)
     lv_obj_set_pos(gui->container, 0, 0);
     lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
     lv_obj_set_style_border_width(gui->container, 0, 0);
-    lv_obj_set_style_pad_all(gui->container, 2, 0);
+    lv_obj_set_style_pad_all(gui->container, 20, 0);  // Increased padding from 2 to 20
+
+    // Hide container initially - will be shown when prepare_gui_func is called
+    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
 
     // Main stats label
     gui->stats_label = lv_label_create(gui->container);
     lv_obj_set_style_text_color(gui->stats_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->stats_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_font(gui->stats_label, &lv_font_montserrat_14, 0);  // Changed to available font
     lv_obj_align(gui->stats_label, LV_ALIGN_TOP_LEFT, 0, 0);
     lv_label_set_text(gui->stats_label, "MK32 Keyboard");
 
     // Char count label
     gui->char_count_label = lv_label_create(gui->container);
     lv_obj_set_style_text_color(gui->char_count_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->char_count_label, &lv_font_montserrat_10, 0);
-    lv_obj_align(gui->char_count_label, LV_ALIGN_TOP_LEFT, 0, 15);
+    lv_obj_set_style_text_font(gui->char_count_label, &lv_font_montserrat_12, 0);  // Changed to available font
+    lv_obj_align(gui->char_count_label, LV_ALIGN_TOP_LEFT, 0, 22);  // Adjusted spacing from 15 to 22
     lv_label_set_text(gui->char_count_label, "Chars: 0");
 
     // Key count label
     gui->key_count_label = lv_label_create(gui->container);
     lv_obj_set_style_text_color(gui->key_count_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->key_count_label, &lv_font_montserrat_10, 0);
-    lv_obj_align(gui->key_count_label, LV_ALIGN_TOP_LEFT, 0, 30);
+    lv_obj_set_style_text_font(gui->key_count_label, &lv_font_montserrat_12, 0);  // Changed to available font
+    lv_obj_align(gui->key_count_label, LV_ALIGN_TOP_LEFT, 0, 42);  // Adjusted spacing from 30 to 42
     lv_label_set_text(gui->key_count_label, "Keys: 0/0");
 
     // Last key label
     gui->last_key_label = lv_label_create(gui->container);
     lv_obj_set_style_text_color(gui->last_key_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->last_key_label, &lv_font_montserrat_10, 0);
-    lv_obj_align(gui->last_key_label, LV_ALIGN_TOP_LEFT, 0, 45);
+    lv_obj_set_style_text_font(gui->last_key_label, &lv_font_montserrat_12, 0);  // Changed to available font
+    lv_obj_align(gui->last_key_label, LV_ALIGN_TOP_LEFT, 0, 62);  // Adjusted spacing from 45 to 62
     lv_label_set_text(gui->last_key_label, "Last: -");
 
     // Instructions
     lv_obj_t *instruction_label = lv_label_create(gui->container);
     lv_obj_set_style_text_color(instruction_label, lv_color_hex(0x808080), 0);
-    lv_obj_set_style_text_font(instruction_label, &lv_font_montserrat_8, 0);
+    lv_obj_set_style_text_font(instruction_label, &lv_font_montserrat_10, 0);  // Increased from 8 to 10
     lv_obj_align(instruction_label, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     lv_label_set_text(instruction_label, "Rotate encoder for menu");
 
@@ -280,6 +283,9 @@ static nonleaf_item_gui_t* create_nonleaf_item_gui(void)
     lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
     lv_obj_set_style_border_width(gui->container, 0, 0);
     lv_obj_set_style_pad_all(gui->container, 2, 0);
+
+    // Hide container initially - will be shown when prepare_gui_func is called
+    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
 
     // Menu title
     gui->menu_title_label = lv_label_create(gui->container);
@@ -417,12 +423,14 @@ static esp_err_t prepare_keyboard_info_gui(struct menu_item *self)
             ESP_LOGE(TAG, "Failed to create keyboard info GUI");
             return ESP_ERR_NO_MEM;
         }
+        ESP_LOGI(TAG, "Created new keyboard info GUI");
     }
 
     keyboard_info_gui_t *gui = (keyboard_info_gui_t *)self->user_ctx;
 
     // Show the keyboard info container
     lv_obj_remove_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+    ESP_LOGI(TAG, "Showed keyboard info container");
 
     // Start periodic updates
     if (gui->update_timer) {
@@ -449,6 +457,7 @@ static esp_err_t post_keyboard_info_gui(struct menu_item *self)
 
     // Hide the keyboard info container
     lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+    ESP_LOGI(TAG, "Hidden keyboard info container");
 
     return ESP_OK;
 }
@@ -468,12 +477,14 @@ static esp_err_t prepare_nonleaf_item_gui(struct menu_item *self)
             ESP_LOGE(TAG, "Failed to create nonleaf item GUI");
             return ESP_ERR_NO_MEM;
         }
+        ESP_LOGI(TAG, "Created new nonleaf item GUI for: %s", self->text);
     }
 
     nonleaf_item_gui_t *gui = (nonleaf_item_gui_t *)self->user_ctx;
 
     // Show the nonleaf item container
     lv_obj_remove_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+    ESP_LOGI(TAG, "Showed nonleaf item container for: %s", self->text);
 
     // Update menu display to reflect current state
     update_nonleaf_item_display(gui, self);
@@ -493,6 +504,7 @@ static esp_err_t post_nonleaf_item_gui(struct menu_item *self)
 
     // Hide the nonleaf item container
     lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+    ESP_LOGI(TAG, "Hidden nonleaf item container for: %s", self->text);
 
     return ESP_OK;
 }

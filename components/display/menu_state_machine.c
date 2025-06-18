@@ -44,7 +44,7 @@ bool menu_state_init(void)
     ESP_LOGI(TAG, "Initializing menu state machine with tree structure");
 
     memset(&s_menu_context, 0, sizeof(s_menu_context));
-    s_menu_context.timeout_ms = 10000; // 10 seconds default timeout
+    s_menu_context.timeout_ms = 10000; // 10 seconds
 
     // Setup the menu tree
     menu_setup_tree();
@@ -61,7 +61,7 @@ bool menu_state_process_event(input_event_t event)
     bool event_consumed = false;
     s_menu_context.last_activity_time = esp_timer_get_time() / 1000; // Convert to ms
 
-    ESP_LOGD(TAG, "Processing event %d in menu item: %s", event,
+    ESP_LOGI(TAG, "Processing event %d in menu item: %s", event,
              s_menu_context.current_menu ? s_menu_context.current_menu->text : "NULL");
 
     if (!s_menu_context.current_menu) {
@@ -93,6 +93,12 @@ bool menu_state_process_event(input_event_t event)
             if (!LIST_EMPTY(&target->children))
             {
                 // Non-leaf node: navigate down
+                // Call post_gui_func of current menu before navigating
+                if (s_menu_context.current_menu->post_gui_func)
+                {
+                    s_menu_context.current_menu->post_gui_func(s_menu_context.current_menu);
+                }
+
                 s_menu_context.current_menu = target;
 
                 // Call prepare function if available
@@ -120,16 +126,24 @@ bool menu_state_process_event(input_event_t event)
         break;
 
     case INPUT_EVENT_ESC:
-        // Navigate up the tree or return to keyboard mode
+        // Navigate up the tree or do nothing if at root
         if (s_menu_context.current_menu->parent)
         {
+            // Call post_gui_func of current menu before navigating up
+            if (s_menu_context.current_menu->post_gui_func)
+            {
+                s_menu_context.current_menu->post_gui_func(s_menu_context.current_menu);
+            }
+
             s_menu_context.current_menu = s_menu_context.current_menu->parent;
+
+            // Call prepare_gui_func of the parent menu
+            if (s_menu_context.current_menu->prepare_gui_func)
+            {
+                s_menu_context.current_menu->prepare_gui_func(s_menu_context.current_menu);
+            }
+
             ESP_LOGI(TAG, "Navigated up to: %s", s_menu_context.current_menu->text);
-        }
-        else
-        {
-            // At root level, return to keyboard mode
-            menu_state_return_to_keyboard();
         }
         event_consumed = true;
         break;
@@ -486,6 +500,11 @@ bool menu_navigate_to(struct menu_item *target)
         return false;
     }
 
+    // Call post_gui_func of current menu before navigating
+    if (s_menu_context.current_menu && s_menu_context.current_menu->post_gui_func) {
+        s_menu_context.current_menu->post_gui_func(s_menu_context.current_menu);
+    }
+
     s_menu_context.current_menu = target;
     s_menu_context.last_activity_time = esp_timer_get_time() / 1000; // Convert to ms
 
@@ -534,7 +553,7 @@ static void menu_setup_tree(void)
     s_menu_context.root_menu = menu_item_create("Main Menu", keyboard_gui_prepare_nonleaf_item, NULL, keyboard_gui_post_nonleaf_item);
 
     // Create main menu children: Keyboard Mode, Bluetooth, WiFi, LED, Advanced
-    struct menu_item *keyboard_mode_menu = menu_item_create("Keyboard Mode", NULL, NULL, NULL);
+    struct menu_item *keyboard_mode_menu = s_menu_context.keyboard_info;
     struct menu_item *bluetooth_menu = menu_item_create("Bluetooth", keyboard_gui_prepare_nonleaf_item, NULL, keyboard_gui_post_nonleaf_item);
     struct menu_item *wifi_menu = menu_item_create("WiFi", keyboard_gui_prepare_nonleaf_item, NULL, keyboard_gui_post_nonleaf_item);
     struct menu_item *led_menu = menu_item_create("LED", keyboard_gui_prepare_nonleaf_item, NULL, keyboard_gui_post_nonleaf_item);

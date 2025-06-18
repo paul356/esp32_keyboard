@@ -88,8 +88,6 @@ bool menu_state_process_event(input_event_t event);
  */
 struct menu_item* menu_state_get_current(void);
 
-
-
 /**
  * @brief Force return to keyboard mode (default state)
  */
