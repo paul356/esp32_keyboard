@@ -19,6 +19,7 @@
 
 #include "memory_debug.h"
 
+#ifdef DEBUG_MEMORY
 static const char* TAG = "MEMORY_DEBUG";
 
 void log_heap_usage(const char* stage_name, uint32_t caps, const char* caps_name)
@@ -59,3 +60,5 @@ void log_memory_usage(const char* stage_name)
 
     ESP_LOGI(TAG, "=== End Memory Report: %s ===", stage_name);
 }
+
+#endif

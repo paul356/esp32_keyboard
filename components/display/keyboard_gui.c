@@ -30,45 +30,47 @@
 
 static const char *TAG = "keyboard_gui";
 
-// GUI context
+// GUI context structures for different menu types
 typedef struct {
-    bool initialized;
-    lv_obj_t *main_screen;
-    lv_obj_t *keyboard_mode_container;
-    lv_obj_t *menu_mode_container;
-    
-    // Keyboard mode widgets
+    lv_obj_t *container;
     lv_obj_t *stats_label;
-    lv_obj_t *wpm_label;
+    lv_obj_t *char_count_label;
     lv_obj_t *key_count_label;
     lv_obj_t *last_key_label;
-    
-    // Menu mode widgets
+    lv_timer_t *update_timer;  // Timer for periodic updates
+} keyboard_info_gui_t;
+
+typedef struct {
+    lv_obj_t *container;
     lv_obj_t *menu_title_label;
     lv_obj_t *menu_items_list;
     lv_obj_t *current_selection_bar;
-    
-    keyboard_stats_t stats;
-    uint32_t last_update_time;
-    uint32_t last_key_time;
-    uint32_t char_count_for_wpm;
-} gui_context_t;
+} nonleaf_item_gui_t;
 
-static gui_context_t s_gui_context = {0};
+// Global state for GUI
+static bool s_gui_initialized = false;
+static lv_obj_t *s_main_screen = NULL;
+static keyboard_stats_t s_keyboard_stats = {0};
 
 // Forward declarations
-static void create_keyboard_mode_ui(void);
-static void create_menu_mode_ui(void);
-static void update_keyboard_mode_display(void);
-static void update_menu_mode_display(void);
-static void show_keyboard_mode(void);
-static void show_menu_mode(void);
-static uint32_t calculate_wpm(void);
+static keyboard_info_gui_t* create_keyboard_info_gui(void);
+static nonleaf_item_gui_t* create_nonleaf_item_gui(void);
+static void destroy_keyboard_info_gui(keyboard_info_gui_t *gui);
+static void destroy_nonleaf_item_gui(nonleaf_item_gui_t *gui);
+static void update_keyboard_info_display(keyboard_info_gui_t *gui);
+static void update_nonleaf_item_display(nonleaf_item_gui_t *gui, struct menu_item *menu_item);
+static void keyboard_info_timer_cb(lv_timer_t *timer);
 static char keycode_to_char(uint16_t keycode);
+
+// GUI setup and teardown functions for menu items
+static esp_err_t prepare_keyboard_info_gui(struct menu_item *self);
+static esp_err_t post_keyboard_info_gui(struct menu_item *self);
+static esp_err_t prepare_nonleaf_item_gui(struct menu_item *self);
+static esp_err_t post_nonleaf_item_gui(struct menu_item *self);
 
 esp_err_t keyboard_gui_init(void)
 {
-    if (s_gui_context.initialized) {
+    if (s_gui_initialized) {
         ESP_LOGW(TAG, "Keyboard GUI already initialized");
         return ESP_OK;
     }
@@ -85,22 +87,18 @@ esp_err_t keyboard_gui_init(void)
     }
 
     // Initialize statistics
-    memset(&s_gui_context.stats, 0, sizeof(keyboard_stats_t));
-    s_gui_context.stats.session_start_time = esp_timer_get_time() / 1000; // Convert to ms
+    memset(&s_keyboard_stats, 0, sizeof(keyboard_stats_t));
+    s_keyboard_stats.session_start_time = esp_timer_get_time() / 1000; // Convert to ms
 
     // Create main screen
-    s_gui_context.main_screen = lv_screen_active();
-    lv_obj_set_style_bg_color(s_gui_context.main_screen, lv_color_black(), 0);
+    s_main_screen = lv_screen_active();
+    lv_obj_set_style_bg_color(s_main_screen, lv_color_black(), 0);
 
-    // Create UI components
-    create_keyboard_mode_ui();
-    create_menu_mode_ui();
+    s_gui_initialized = true;
 
-    // Start in keyboard mode
-    show_keyboard_mode();
-
-    s_gui_context.initialized = true;
-    s_gui_context.last_update_time = esp_timer_get_time() / 1000;
+    // Initialize display with keyboard information
+    ESP_LOGI(TAG, "Displaying initial keyboard information");
+    menu_state_return_to_keyboard();
 
     ESP_LOGI(TAG, "Keyboard GUI initialized successfully");
     return ESP_OK;
@@ -108,35 +106,15 @@ esp_err_t keyboard_gui_init(void)
 
 void keyboard_gui_update(void)
 {
-    if (!s_gui_context.initialized) {
+    if (!s_gui_initialized) {
         return;
     }
 
-    uint32_t current_time = esp_timer_get_time() / 1000;
-    
     // Update menu timeout
     menu_state_update_timeout();
-    
-    // Check if we need to switch between keyboard and menu mode
-    bool menu_active = menu_state_is_active();
-    bool keyboard_container_visible = !lv_obj_has_flag(s_gui_context.keyboard_mode_container, LV_OBJ_FLAG_HIDDEN);
-    
-    if (menu_active && keyboard_container_visible) {
-        show_menu_mode();
-    } else if (!menu_active && !keyboard_container_visible) {
-        show_keyboard_mode();
-    }
 
-    // Update display content based on current mode
-    if (menu_active) {
-        update_menu_mode_display();
-    } else {
-        // Update keyboard mode display every 100ms
-        if (current_time - s_gui_context.last_update_time > 100) {
-            update_keyboard_mode_display();
-            s_gui_context.last_update_time = current_time;
-        }
-    }
+    // The menu state machine handles all state transitions via prepare_gui_func and post_gui_func
+    // No special handling needed here - all menu items manage themselves
 
     // Handle LVGL tasks
     lv_timer_handler();
@@ -160,33 +138,33 @@ void keyboard_gui_handle_esc(void)
 
 void keyboard_gui_update_stats(uint16_t keycode)
 {
-    s_gui_context.stats.total_key_count++;
-    s_gui_context.stats.session_key_count++;
-    s_gui_context.stats.last_key_pressed = keycode;
-    s_gui_context.stats.last_char_typed = keycode_to_char(keycode);
-    s_gui_context.last_key_time = esp_timer_get_time() / 1000;
-    
-    // Count characters for WPM calculation (approximate)
+    s_keyboard_stats.total_key_count++;
+    s_keyboard_stats.session_key_count++;
+    s_keyboard_stats.last_key_pressed = keycode;
+    s_keyboard_stats.last_char_typed = keycode_to_char(keycode);
+
+    // Count characters for statistics
     if (keycode >= 0x04 && keycode <= 0x1D) { // A-Z keys
-        s_gui_context.char_count_for_wpm++;
+        s_keyboard_stats.session_char_count++;
+    } else if (keycode >= 0x1E && keycode <= 0x27) { // 1-0 keys
+        s_keyboard_stats.session_char_count++;
     } else if (keycode == 0x2C) { // Space key
-        s_gui_context.char_count_for_wpm++;
+        s_keyboard_stats.session_char_count++;
+    } else if (keycode == 0x28) { // Enter key
+        s_keyboard_stats.session_char_count++;
     }
-    
-    s_gui_context.stats.words_per_minute = calculate_wpm();
 }
 
 keyboard_stats_t* keyboard_gui_get_stats(void)
 {
-    return &s_gui_context.stats;
+    return &s_keyboard_stats;
 }
 
 void keyboard_gui_reset_session_stats(void)
 {
-    s_gui_context.stats.session_key_count = 0;
-    s_gui_context.stats.words_per_minute = 0;
-    s_gui_context.stats.session_start_time = esp_timer_get_time() / 1000;
-    s_gui_context.char_count_for_wpm = 0;
+    s_keyboard_stats.session_key_count = 0;
+    s_keyboard_stats.session_char_count = 0;
+    s_keyboard_stats.session_start_time = esp_timer_get_time() / 1000;
     ESP_LOGI(TAG, "Session statistics reset");
 }
 
@@ -202,218 +180,321 @@ esp_err_t keyboard_gui_display_on_off(bool on)
 
 esp_err_t keyboard_gui_deinit(void)
 {
-    if (!s_gui_context.initialized) {
+    if (!s_gui_initialized) {
         return ESP_OK;
     }
 
     // Clean up LVGL objects
-    if (s_gui_context.main_screen) {
-        lv_obj_clean(s_gui_context.main_screen);
+    if (s_main_screen) {
+        lv_obj_clean(s_main_screen);
     }
 
     // Deinitialize LCD hardware
     lcd_hardware_deinit();
 
-    s_gui_context.initialized = false;
+    s_gui_initialized = false;
     ESP_LOGI(TAG, "Keyboard GUI deinitialized");
 
     return ESP_OK;
 }
 
 // UI Creation Functions
-static void create_keyboard_mode_ui(void)
+static keyboard_info_gui_t* create_keyboard_info_gui(void)
 {
-    // Create container for keyboard mode
-    s_gui_context.keyboard_mode_container = lv_obj_create(s_gui_context.main_screen);
-    lv_obj_set_size(s_gui_context.keyboard_mode_container, LCD_WIDTH, LCD_HEIGHT);
-    lv_obj_set_pos(s_gui_context.keyboard_mode_container, 0, 0);
-    lv_obj_set_style_bg_color(s_gui_context.keyboard_mode_container, lv_color_black(), 0);
-    lv_obj_set_style_border_width(s_gui_context.keyboard_mode_container, 0, 0);
-    lv_obj_set_style_pad_all(s_gui_context.keyboard_mode_container, 2, 0);
+    keyboard_info_gui_t *gui = malloc(sizeof(keyboard_info_gui_t));
+    if (!gui) {
+        ESP_LOGE(TAG, "Failed to allocate keyboard info GUI");
+        return NULL;
+    }
+
+    // Create container for keyboard info
+    gui->container = lv_obj_create(s_main_screen);
+    lv_obj_set_size(gui->container, LCD_WIDTH, LCD_HEIGHT);
+    lv_obj_set_pos(gui->container, 0, 0);
+    lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
+    lv_obj_set_style_border_width(gui->container, 0, 0);
+    lv_obj_set_style_pad_all(gui->container, 2, 0);
 
     // Main stats label
-    s_gui_context.stats_label = lv_label_create(s_gui_context.keyboard_mode_container);
-    lv_obj_set_style_text_color(s_gui_context.stats_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(s_gui_context.stats_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(s_gui_context.stats_label, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_label_set_text(s_gui_context.stats_label, "MK32 Keyboard");
+    gui->stats_label = lv_label_create(gui->container);
+    lv_obj_set_style_text_color(gui->stats_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->stats_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(gui->stats_label, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_label_set_text(gui->stats_label, "MK32 Keyboard");
 
-    // WPM label
-    s_gui_context.wpm_label = lv_label_create(s_gui_context.keyboard_mode_container);
-    lv_obj_set_style_text_color(s_gui_context.wpm_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(s_gui_context.wpm_label, &lv_font_montserrat_10, 0);
-    lv_obj_align(s_gui_context.wpm_label, LV_ALIGN_TOP_LEFT, 0, 15);
-    lv_label_set_text(s_gui_context.wpm_label, "WPM: 0");
+    // Char count label
+    gui->char_count_label = lv_label_create(gui->container);
+    lv_obj_set_style_text_color(gui->char_count_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->char_count_label, &lv_font_montserrat_10, 0);
+    lv_obj_align(gui->char_count_label, LV_ALIGN_TOP_LEFT, 0, 15);
+    lv_label_set_text(gui->char_count_label, "Chars: 0");
 
     // Key count label
-    s_gui_context.key_count_label = lv_label_create(s_gui_context.keyboard_mode_container);
-    lv_obj_set_style_text_color(s_gui_context.key_count_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(s_gui_context.key_count_label, &lv_font_montserrat_10, 0);
-    lv_obj_align(s_gui_context.key_count_label, LV_ALIGN_TOP_LEFT, 0, 30);
-    lv_label_set_text(s_gui_context.key_count_label, "Keys: 0/0");
+    gui->key_count_label = lv_label_create(gui->container);
+    lv_obj_set_style_text_color(gui->key_count_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->key_count_label, &lv_font_montserrat_10, 0);
+    lv_obj_align(gui->key_count_label, LV_ALIGN_TOP_LEFT, 0, 30);
+    lv_label_set_text(gui->key_count_label, "Keys: 0/0");
 
     // Last key label
-    s_gui_context.last_key_label = lv_label_create(s_gui_context.keyboard_mode_container);
-    lv_obj_set_style_text_color(s_gui_context.last_key_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(s_gui_context.last_key_label, &lv_font_montserrat_10, 0);
-    lv_obj_align(s_gui_context.last_key_label, LV_ALIGN_TOP_LEFT, 0, 45);
-    lv_label_set_text(s_gui_context.last_key_label, "Last: -");
+    gui->last_key_label = lv_label_create(gui->container);
+    lv_obj_set_style_text_color(gui->last_key_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->last_key_label, &lv_font_montserrat_10, 0);
+    lv_obj_align(gui->last_key_label, LV_ALIGN_TOP_LEFT, 0, 45);
+    lv_label_set_text(gui->last_key_label, "Last: -");
 
     // Instructions
-    lv_obj_t *instruction_label = lv_label_create(s_gui_context.keyboard_mode_container);
+    lv_obj_t *instruction_label = lv_label_create(gui->container);
     lv_obj_set_style_text_color(instruction_label, lv_color_hex(0x808080), 0);
     lv_obj_set_style_text_font(instruction_label, &lv_font_montserrat_8, 0);
     lv_obj_align(instruction_label, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     lv_label_set_text(instruction_label, "Rotate encoder for menu");
+
+    // Create timer for periodic updates (100ms interval)
+    gui->update_timer = lv_timer_create(keyboard_info_timer_cb, 100, gui);
+    lv_timer_pause(gui->update_timer);  // Start paused, will be enabled when GUI is shown
+
+    return gui;
 }
 
-static void create_menu_mode_ui(void)
+static void keyboard_info_timer_cb(lv_timer_t *timer)
 {
-    // Create container for menu mode
-    s_gui_context.menu_mode_container = lv_obj_create(s_gui_context.main_screen);
-    lv_obj_set_size(s_gui_context.menu_mode_container, LCD_WIDTH, LCD_HEIGHT);
-    lv_obj_set_pos(s_gui_context.menu_mode_container, 0, 0);
-    lv_obj_set_style_bg_color(s_gui_context.menu_mode_container, lv_color_black(), 0);
-    lv_obj_set_style_border_width(s_gui_context.menu_mode_container, 0, 0);
-    lv_obj_set_style_pad_all(s_gui_context.menu_mode_container, 2, 0);
+    keyboard_info_gui_t *gui = (keyboard_info_gui_t *)lv_timer_get_user_data(timer);
+    if (gui) {
+        update_keyboard_info_display(gui);
+    }
+}
+
+static nonleaf_item_gui_t* create_nonleaf_item_gui(void)
+{
+    nonleaf_item_gui_t *gui = malloc(sizeof(nonleaf_item_gui_t));
+    if (!gui) {
+        ESP_LOGE(TAG, "Failed to allocate nonleaf item GUI");
+        return NULL;
+    }
+
+    // Create container for nonleaf item
+    gui->container = lv_obj_create(s_main_screen);
+    lv_obj_set_size(gui->container, LCD_WIDTH, LCD_HEIGHT);
+    lv_obj_set_pos(gui->container, 0, 0);
+    lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
+    lv_obj_set_style_border_width(gui->container, 0, 0);
+    lv_obj_set_style_pad_all(gui->container, 2, 0);
 
     // Menu title
-    s_gui_context.menu_title_label = lv_label_create(s_gui_context.menu_mode_container);
-    lv_obj_set_style_text_color(s_gui_context.menu_title_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(s_gui_context.menu_title_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(s_gui_context.menu_title_label, LV_ALIGN_TOP_MID, 0, 0);
-    lv_label_set_text(s_gui_context.menu_title_label, "Menu");
+    gui->menu_title_label = lv_label_create(gui->container);
+    lv_obj_set_style_text_color(gui->menu_title_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->menu_title_label, &lv_font_montserrat_12, 0);
+    lv_obj_align(gui->menu_title_label, LV_ALIGN_TOP_MID, 0, 0);
+    lv_label_set_text(gui->menu_title_label, "Menu");
 
     // Menu items container
-    s_gui_context.menu_items_list = lv_obj_create(s_gui_context.menu_mode_container);
-    lv_obj_set_size(s_gui_context.menu_items_list, LCD_WIDTH - 4, LCD_HEIGHT - 30);
-    lv_obj_set_pos(s_gui_context.menu_items_list, 2, 15);
-    lv_obj_set_style_bg_color(s_gui_context.menu_items_list, lv_color_black(), 0);
-    lv_obj_set_style_border_width(s_gui_context.menu_items_list, 0, 0);
-    lv_obj_set_style_pad_all(s_gui_context.menu_items_list, 2, 0);
+    gui->menu_items_list = lv_obj_create(gui->container);
+    lv_obj_set_size(gui->menu_items_list, LCD_WIDTH - 4, LCD_HEIGHT - 30);
+    lv_obj_set_pos(gui->menu_items_list, 2, 15);
+    lv_obj_set_style_bg_color(gui->menu_items_list, lv_color_black(), 0);
+    lv_obj_set_style_border_width(gui->menu_items_list, 0, 0);
+    lv_obj_set_style_pad_all(gui->menu_items_list, 2, 0);
 
     // Selection highlight bar
-    s_gui_context.current_selection_bar = lv_obj_create(s_gui_context.menu_items_list);
-    lv_obj_set_size(s_gui_context.current_selection_bar, LCD_WIDTH - 8, 12);
-    lv_obj_set_style_bg_color(s_gui_context.current_selection_bar, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_border_width(s_gui_context.current_selection_bar, 1, 0);
-    lv_obj_set_style_border_color(s_gui_context.current_selection_bar, lv_color_white(), 0);
+    gui->current_selection_bar = lv_obj_create(gui->menu_items_list);
+    lv_obj_set_size(gui->current_selection_bar, LCD_WIDTH - 8, 12);
+    lv_obj_set_style_bg_color(gui->current_selection_bar, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_border_width(gui->current_selection_bar, 1, 0);
+    lv_obj_set_style_border_color(gui->current_selection_bar, lv_color_white(), 0);
 
     // Instructions
-    lv_obj_t *instruction_label = lv_label_create(s_gui_context.menu_mode_container);
+    lv_obj_t *instruction_label = lv_label_create(gui->container);
     lv_obj_set_style_text_color(instruction_label, lv_color_hex(0x808080), 0);
     lv_obj_set_style_text_font(instruction_label, &lv_font_montserrat_8, 0);
     lv_obj_align(instruction_label, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_label_set_text(instruction_label, "Enter=Select ESC=Back");
 
-    // Initially hide menu mode
-    lv_obj_add_flag(s_gui_context.menu_mode_container, LV_OBJ_FLAG_HIDDEN);
+    return gui;
 }
 
-static void update_keyboard_mode_display(void)
+static void update_keyboard_info_display(keyboard_info_gui_t *gui)
 {
+    if (!gui) {
+        return;
+    }
+
     char buffer[64];
 
-    // Update WPM
-    snprintf(buffer, sizeof(buffer), "WPM: %lu", s_gui_context.stats.words_per_minute);
-    lv_label_set_text(s_gui_context.wpm_label, buffer);
+    // Update character count
+    snprintf(buffer, sizeof(buffer), "Chars: %lu", s_keyboard_stats.session_char_count);
+    lv_label_set_text(gui->char_count_label, buffer);
 
     // Update key counts
-    snprintf(buffer, sizeof(buffer), "Keys: %lu/%lu", 
-             s_gui_context.stats.session_key_count, 
-             s_gui_context.stats.total_key_count);
-    lv_label_set_text(s_gui_context.key_count_label, buffer);
+    snprintf(buffer, sizeof(buffer), "Keys: %lu/%lu",
+             s_keyboard_stats.session_key_count,
+             s_keyboard_stats.total_key_count);
+    lv_label_set_text(gui->key_count_label, buffer);
 
     // Update last key
-    if (s_gui_context.stats.last_char_typed != 0) {
-        snprintf(buffer, sizeof(buffer), "Last: %c (0x%02X)", 
-                 s_gui_context.stats.last_char_typed, 
-                 s_gui_context.stats.last_key_pressed);
+    if (s_keyboard_stats.last_char_typed != 0) {
+        snprintf(buffer, sizeof(buffer), "Last: %c (0x%02X)",
+                 s_keyboard_stats.last_char_typed,
+                 s_keyboard_stats.last_key_pressed);
     } else {
-        snprintf(buffer, sizeof(buffer), "Last: 0x%02X", s_gui_context.stats.last_key_pressed);
+        snprintf(buffer, sizeof(buffer), "Last: 0x%02X", s_keyboard_stats.last_key_pressed);
     }
-    lv_label_set_text(s_gui_context.last_key_label, buffer);
+    lv_label_set_text(gui->last_key_label, buffer);
 }
 
-static void update_menu_mode_display(void)
+static void update_nonleaf_item_display(nonleaf_item_gui_t *gui, struct menu_item *menu_item)
 {
-    menu_def_t *current_menu = menu_state_get_current_menu();
-    if (!current_menu) {
+    if (!gui || !menu_item) {
         return;
     }
 
     // Update menu title
-    lv_label_set_text(s_gui_context.menu_title_label, current_menu->title);
+    lv_label_set_text(gui->menu_title_label, menu_item->text);
 
     // Clear existing menu items
-    lv_obj_clean(s_gui_context.menu_items_list);
+    lv_obj_clean(gui->menu_items_list);
 
     // Recreate selection bar
-    s_gui_context.current_selection_bar = lv_obj_create(s_gui_context.menu_items_list);
-    lv_obj_set_size(s_gui_context.current_selection_bar, LCD_WIDTH - 8, 12);
-    lv_obj_set_style_bg_color(s_gui_context.current_selection_bar, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_border_width(s_gui_context.current_selection_bar, 1, 0);
-    lv_obj_set_style_border_color(s_gui_context.current_selection_bar, lv_color_white(), 0);
+    gui->current_selection_bar = lv_obj_create(gui->menu_items_list);
+    lv_obj_set_size(gui->current_selection_bar, LCD_WIDTH - 8, 12);
+    lv_obj_set_style_bg_color(gui->current_selection_bar, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_border_width(gui->current_selection_bar, 1, 0);
+    lv_obj_set_style_border_color(gui->current_selection_bar, lv_color_white(), 0);
 
-    // Add menu items
-    menu_item_t *item = current_menu->items;
+    // Add menu items (children of current menu)
+    struct menu_item *child;
     int y_pos = 0;
     int item_index = 0;
-    
-    if (item) {
-        do {
-            lv_obj_t *item_label = lv_label_create(s_gui_context.menu_items_list);
-            lv_obj_set_style_text_color(item_label, lv_color_white(), 0);
-            lv_obj_set_style_text_font(item_label, &lv_font_montserrat_10, 0);
-            lv_obj_set_pos(item_label, 2, y_pos);
-            lv_label_set_text(item_label, item->text);
 
-            // Highlight current selection
-            if (item == current_menu->current_item) {
-                lv_obj_set_pos(s_gui_context.current_selection_bar, 0, y_pos - 1);
-            }
+    LIST_FOREACH(child, &menu_item->children, entry) {
+        if (y_pos >= LCD_HEIGHT - 35) {
+            break; // Don't overflow the display
+        }
 
-            y_pos += 12;
-            item = item->next;
-            item_index++;
-        } while (item != current_menu->items && y_pos < LCD_HEIGHT - 35);
+        lv_obj_t *item_label = lv_label_create(gui->menu_items_list);
+        lv_obj_set_style_text_color(item_label, lv_color_white(), 0);
+        lv_obj_set_style_text_font(item_label, &lv_font_montserrat_10, 0);
+        lv_obj_set_pos(item_label, 2, y_pos);
+        lv_label_set_text(item_label, child->text);
+
+        // Highlight current selection
+        if (child == menu_item->focused_child) {
+            lv_obj_set_pos(gui->current_selection_bar, 0, y_pos - 1);
+        }
+
+        y_pos += 12;
+        item_index++;
+    }
+
+    // If no children, show that this is a leaf menu
+    if (LIST_EMPTY(&menu_item->children)) {
+        lv_obj_t *info_label = lv_label_create(gui->menu_items_list);
+        lv_obj_set_style_text_color(info_label, lv_color_hex(0x808080), 0);
+        lv_obj_set_style_text_font(info_label, &lv_font_montserrat_10, 0);
+        lv_obj_set_pos(info_label, 2, 0);
+        lv_label_set_text(info_label, "Press ENTER to execute");
+
+        // Hide selection bar for leaf menus
+        lv_obj_add_flag(gui->current_selection_bar, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_remove_flag(gui->current_selection_bar, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
-static void show_keyboard_mode(void)
+// GUI setup and teardown functions for menu items
+static esp_err_t prepare_keyboard_info_gui(struct menu_item *self)
 {
-    lv_obj_remove_flag(s_gui_context.keyboard_mode_container, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(s_gui_context.menu_mode_container, LV_OBJ_FLAG_HIDDEN);
+    ESP_LOGI(TAG, "Preparing keyboard info GUI");
+
+    if (!self) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Create keyboard GUI if not already created
+    if (!self->user_ctx) {
+        self->user_ctx = create_keyboard_info_gui();
+        if (!self->user_ctx) {
+            ESP_LOGE(TAG, "Failed to create keyboard info GUI");
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
+    keyboard_info_gui_t *gui = (keyboard_info_gui_t *)self->user_ctx;
+
+    // Show the keyboard info container
+    lv_obj_remove_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+
+    // Start periodic updates
+    if (gui->update_timer) {
+        lv_timer_resume(gui->update_timer);
+    }
+
+    return ESP_OK;
 }
 
-static void show_menu_mode(void)
+static esp_err_t post_keyboard_info_gui(struct menu_item *self)
 {
-    lv_obj_add_flag(s_gui_context.keyboard_mode_container, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_remove_flag(s_gui_context.menu_mode_container, LV_OBJ_FLAG_HIDDEN);
-    update_menu_mode_display();
+    ESP_LOGD(TAG, "Post keyboard info GUI cleanup");
+
+    if (!self || !self->user_ctx) {
+        return ESP_OK;
+    }
+
+    keyboard_info_gui_t *gui = (keyboard_info_gui_t *)self->user_ctx;
+
+    // Stop periodic updates
+    if (gui->update_timer) {
+        lv_timer_pause(gui->update_timer);
+    }
+
+    // Hide the keyboard info container
+    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+
+    return ESP_OK;
 }
 
-static uint32_t calculate_wpm(void)
+static esp_err_t prepare_nonleaf_item_gui(struct menu_item *self)
 {
-    uint32_t current_time = esp_timer_get_time() / 1000;
-    uint32_t session_duration = current_time - s_gui_context.stats.session_start_time;
-    
-    if (session_duration < 1000) { // Less than 1 second
-        return 0;
+    ESP_LOGI(TAG, "Preparing nonleaf item GUI for: %s", self ? self->text : "NULL");
+
+    if (!self) {
+        return ESP_ERR_INVALID_ARG;
     }
-    
-    // WPM = (characters typed / 5) / (time in minutes)
-    // Assuming average word length is 5 characters
-    uint32_t words = s_gui_context.char_count_for_wpm / 5;
-    uint32_t minutes = session_duration / 60000; // Convert ms to minutes
-    
-    if (minutes == 0) {
-        // For less than a minute, calculate based on seconds and scale up
-        uint32_t seconds = session_duration / 1000;
-        return (words * 60) / seconds;
+
+    // Create menu GUI if not already created
+    if (!self->user_ctx) {
+        self->user_ctx = create_nonleaf_item_gui();
+        if (!self->user_ctx) {
+            ESP_LOGE(TAG, "Failed to create nonleaf item GUI");
+            return ESP_ERR_NO_MEM;
+        }
     }
-    
-    return words / minutes;
+
+    nonleaf_item_gui_t *gui = (nonleaf_item_gui_t *)self->user_ctx;
+
+    // Show the nonleaf item container
+    lv_obj_remove_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+
+    // Update menu display to reflect current state
+    update_nonleaf_item_display(gui, self);
+
+    return ESP_OK;
+}
+
+static esp_err_t post_nonleaf_item_gui(struct menu_item *self)
+{
+    ESP_LOGD(TAG, "Post nonleaf item GUI cleanup for: %s", self ? self->text : "NULL");
+
+    if (!self || !self->user_ctx) {
+        return ESP_OK;
+    }
+
+    nonleaf_item_gui_t *gui = (nonleaf_item_gui_t *)self->user_ctx;
+
+    // Hide the nonleaf item container
+    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+
+    return ESP_OK;
 }
 
 static char keycode_to_char(uint16_t keycode)
@@ -430,4 +511,56 @@ static char keycode_to_char(uint16_t keycode)
         return '\n';
     }
     return 0; // Non-printable
+}
+
+static void destroy_keyboard_info_gui(keyboard_info_gui_t *gui)
+{
+    if (!gui) {
+        return;
+    }
+
+    // Clean up timer
+    if (gui->update_timer) {
+        lv_timer_del(gui->update_timer);
+    }
+
+    if (gui->container) {
+        lv_obj_del(gui->container);
+    }
+
+    free(gui);
+}
+
+static void destroy_nonleaf_item_gui(nonleaf_item_gui_t *gui)
+{
+    if (!gui) {
+        return;
+    }
+
+    if (gui->container) {
+        lv_obj_del(gui->container);
+    }
+
+    free(gui);
+}
+
+// Public API functions for menu integration
+esp_err_t keyboard_gui_prepare_keyboard_info(struct menu_item *self)
+{
+    return prepare_keyboard_info_gui(self);
+}
+
+esp_err_t keyboard_gui_post_keyboard_info(struct menu_item *self)
+{
+    return post_keyboard_info_gui(self);
+}
+
+esp_err_t keyboard_gui_prepare_nonleaf_item(struct menu_item *self)
+{
+    return prepare_nonleaf_item_gui(self);
+}
+
+esp_err_t keyboard_gui_post_nonleaf_item(struct menu_item *self)
+{
+    return post_nonleaf_item_gui(self);
 }

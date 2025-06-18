@@ -26,19 +26,18 @@
 extern "C" {
 #endif
 
+#ifdef DEBUG_MEMORY
 /**
  * @brief Print detailed memory usage information
  * @param stage_name Name of the initialization stage for logging
  */
 void log_memory_usage(const char* stage_name);
-
-/**
- * @brief Print memory usage for a specific heap capability
- * @param stage_name Name of the initialization stage for logging
- * @param caps Heap capability flags (e.g., MALLOC_CAP_INTERNAL, MALLOC_CAP_SPIRAM)
- * @param caps_name Human readable name for the capability
- */
-void log_heap_usage(const char* stage_name, uint32_t caps, const char* caps_name);
+#else
+#define log_memory_usage(stage_name) \
+    do { \
+        /* No-op in release builds */ \
+    } while (0)
+#endif // DEBUG_MEMORY
 
 #ifdef __cplusplus
 }

@@ -19,59 +19,40 @@
  */
 
 #include "menu_state_machine.h"
+#include "keyboard_gui.h"
 #include "esp_log.h"
 #include "esp_timer.h"
+#include "esp_heap_caps.h"
 #include <string.h>
+#include <stdlib.h>
 
 static const char *TAG = "menu_state";
 
 static menu_context_t s_menu_context = {0};
 
 // Forward declarations
-static void menu_create_main_menu(void);
-static void menu_create_bluetooth_menu(void);
-static void menu_create_wifi_menu(void);
-static void menu_create_led_menu(void);
-static void menu_create_advanced_menu(void);
-static void menu_create_about_menu(void);
-static menu_item_t* menu_create_item(const char *text, menu_state_t target_state, bool (*action_func)(void));
-static void menu_add_item(menu_def_t *menu, menu_item_t *item);
-static void menu_set_current_selection(menu_def_t *menu, int selection);
-
-// Menu items storage
-static menu_item_t main_menu_items[5];
-static menu_item_t bluetooth_menu_items[3];
-static menu_item_t wifi_menu_items[2];
-static menu_item_t led_menu_items[2];
-static menu_item_t advanced_menu_items[3];
-static menu_item_t about_menu_items[1];
-
-// Menu definitions
-static menu_def_t main_menu;
-static menu_def_t bluetooth_menu;
-static menu_def_t wifi_menu;
-static menu_def_t led_menu;
-static menu_def_t advanced_menu;
-static menu_def_t about_menu;
+static void menu_setup_tree(void);
+static void menu_focus_next_child(struct menu_item *parent);
+static void menu_focus_prev_child(struct menu_item *parent);
+static struct menu_item* menu_get_first_child(struct menu_item *parent);
+static struct menu_item* menu_get_last_child(struct menu_item *parent);
+static struct menu_item* menu_get_next_sibling(struct menu_item *item);
+static struct menu_item* menu_get_prev_sibling(struct menu_item *item);
 
 bool menu_state_init(void)
 {
-    ESP_LOGI(TAG, "Initializing menu state machine");
+    ESP_LOGI(TAG, "Initializing menu state machine with tree structure");
 
     memset(&s_menu_context, 0, sizeof(s_menu_context));
-    s_menu_context.current_state = MENU_STATE_KEYBOARD_MODE;
-    s_menu_context.menu_active = false;
     s_menu_context.timeout_ms = 10000; // 10 seconds default timeout
 
-    // Create all menus
-    menu_create_main_menu();
-    menu_create_bluetooth_menu();
-    menu_create_wifi_menu();
-    menu_create_led_menu();
-    menu_create_advanced_menu();
-    menu_create_about_menu();
+    // Setup the menu tree
+    menu_setup_tree();
 
-    ESP_LOGI(TAG, "Menu state machine initialized");
+    // set current_menu to NULL initially, then menu_state_return_to_keyboard will draw the GUI
+    s_menu_context.current_menu = NULL;
+
+    ESP_LOGI(TAG, "Menu state machine initialized with tree structure");
     return true;
 }
 
@@ -80,124 +61,125 @@ bool menu_state_process_event(input_event_t event)
     bool event_consumed = false;
     s_menu_context.last_activity_time = esp_timer_get_time() / 1000; // Convert to ms
 
-    ESP_LOGD(TAG, "Processing event %d in state %d", event, s_menu_context.current_state);
+    ESP_LOGD(TAG, "Processing event %d in menu item: %s", event,
+             s_menu_context.current_menu ? s_menu_context.current_menu->text : "NULL");
 
-    switch (s_menu_context.current_state) {
-        case MENU_STATE_KEYBOARD_MODE:
-            if (event == INPUT_EVENT_ENCODER_CW || event == INPUT_EVENT_ENCODER_CCW) {
-                // Enter main menu on encoder rotation
-                s_menu_context.current_state = MENU_STATE_MAIN_MENU;
-                s_menu_context.menu_active = true;
-                s_menu_context.current_selection = 0;
-                menu_set_current_selection(s_menu_context.menus[MENU_STATE_MAIN_MENU], 0);
-                event_consumed = true;
-                ESP_LOGI(TAG, "Entered main menu");
-            }
-            break;
+    if (!s_menu_context.current_menu) {
+        return false;
+    }
 
-        case MENU_STATE_MAIN_MENU:
-        case MENU_STATE_BLUETOOTH_MENU:
-        case MENU_STATE_WIFI_MENU:
-        case MENU_STATE_LED_MENU:
-        case MENU_STATE_ADVANCED_MENU:
-        case MENU_STATE_ABOUT_MENU:
+    // Menu system active: handle navigation
+    switch (event)
+    {
+    case INPUT_EVENT_ENCODER_CW:
+        // Move to next child
+        menu_focus_next_child(s_menu_context.current_menu);
+        event_consumed = true;
+        break;
+
+    case INPUT_EVENT_ENCODER_CCW:
+        // Move to previous child
+        menu_focus_prev_child(s_menu_context.current_menu);
+        event_consumed = true;
+        break;
+
+    case INPUT_EVENT_ENTER:
+        // Navigate down the tree or execute action
+        if (s_menu_context.current_menu->focused_child)
+        {
+            struct menu_item *target = s_menu_context.current_menu->focused_child;
+
+            // Check if this is a leaf node (has user_action) or has children
+            if (!LIST_EMPTY(&target->children))
             {
-                menu_def_t *current_menu = s_menu_context.menus[s_menu_context.current_state];
-                if (!current_menu) break;
+                // Non-leaf node: navigate down
+                s_menu_context.current_menu = target;
 
-                switch (event) {
-                    case INPUT_EVENT_ENCODER_CW:
-                        // Move to next item
-                        s_menu_context.current_selection = (s_menu_context.current_selection + 1) % current_menu->item_count;
-                        menu_set_current_selection(current_menu, s_menu_context.current_selection);
-                        event_consumed = true;
-                        break;
-
-                    case INPUT_EVENT_ENCODER_CCW:
-                        // Move to previous item
-                        s_menu_context.current_selection = (s_menu_context.current_selection - 1 + current_menu->item_count) % current_menu->item_count;
-                        menu_set_current_selection(current_menu, s_menu_context.current_selection);
-                        event_consumed = true;
-                        break;
-
-                    case INPUT_EVENT_ENTER:
-                        // Execute current item action or navigate to submenu
-                        if (current_menu->current_item) {
-                            if (current_menu->current_item->action_func) {
-                                // Execute action function
-                                current_menu->current_item->action_func();
-                            } else if (current_menu->current_item->target_state != MENU_STATE_KEYBOARD_MODE) {
-                                // Navigate to submenu
-                                s_menu_context.previous_state = s_menu_context.current_state;
-                                s_menu_context.current_state = current_menu->current_item->target_state;
-                                s_menu_context.current_selection = 0;
-                                menu_set_current_selection(s_menu_context.menus[s_menu_context.current_state], 0);
-                            }
-                        }
-                        event_consumed = true;
-                        break;
-
-                    case INPUT_EVENT_ESC:
-                        // Return to parent menu or keyboard mode
-                        if (current_menu->parent_state == MENU_STATE_KEYBOARD_MODE) {
-                            s_menu_context.current_state = MENU_STATE_KEYBOARD_MODE;
-                            s_menu_context.menu_active = false;
-                            ESP_LOGI(TAG, "Returned to keyboard mode");
-                        } else {
-                            s_menu_context.current_state = current_menu->parent_state;
-                            s_menu_context.current_selection = 0;
-                            menu_set_current_selection(s_menu_context.menus[s_menu_context.current_state], 0);
-                        }
-                        event_consumed = true;
-                        break;
-
-                    case INPUT_EVENT_TIMEOUT:
-                        // Return to keyboard mode on timeout
-                        menu_state_return_to_keyboard();
-                        event_consumed = true;
-                        break;
-
-                    default:
-                        break;
+                // Call prepare function if available
+                if (target->prepare_gui_func)
+                {
+                    target->prepare_gui_func(target);
                 }
-            }
-            break;
 
-        default:
-            break;
+                ESP_LOGI(TAG, "Navigated to: %s", target->text);
+            }
+            else if (target->user_action)
+            {
+                // Leaf node: execute action
+                ESP_LOGI(TAG, "Executing action for: %s", target->text);
+                target->user_action(target);
+            }
+        }
+        else if (s_menu_context.current_menu->user_action)
+        {
+            // Current menu item has an action
+            ESP_LOGI(TAG, "Executing action for current menu: %s", s_menu_context.current_menu->text);
+            s_menu_context.current_menu->user_action(s_menu_context.current_menu);
+        }
+        event_consumed = true;
+        break;
+
+    case INPUT_EVENT_ESC:
+        // Navigate up the tree or return to keyboard mode
+        if (s_menu_context.current_menu->parent)
+        {
+            s_menu_context.current_menu = s_menu_context.current_menu->parent;
+            ESP_LOGI(TAG, "Navigated up to: %s", s_menu_context.current_menu->text);
+        }
+        else
+        {
+            // At root level, return to keyboard mode
+            menu_state_return_to_keyboard();
+        }
+        event_consumed = true;
+        break;
+
+    case INPUT_EVENT_TIMEOUT:
+        // Return to keyboard mode on timeout
+        menu_state_return_to_keyboard();
+        event_consumed = true;
+        break;
+
+    default:
+        break;
     }
 
     return event_consumed;
 }
 
-menu_state_t menu_state_get_current(void)
+struct menu_item* menu_state_get_current(void)
 {
-    return s_menu_context.current_state;
-}
-
-bool menu_state_is_active(void)
-{
-    return s_menu_context.menu_active;
-}
-
-menu_def_t* menu_state_get_current_menu(void)
-{
-    if (!s_menu_context.menu_active) {
-        return NULL;
-    }
-    return s_menu_context.menus[s_menu_context.current_state];
+    return s_menu_context.current_menu;
 }
 
 void menu_state_return_to_keyboard(void)
 {
-    s_menu_context.current_state = MENU_STATE_KEYBOARD_MODE;
-    s_menu_context.menu_active = false;
+    // Check if we're already in keyboard mode
+    if (s_menu_context.current_menu == s_menu_context.keyboard_info) {
+        ESP_LOGD(TAG, "Already in keyboard mode, no action needed");
+        return;
+    }
+
+    // Call post_gui_func of the current menu if it exists
+    if (s_menu_context.current_menu && s_menu_context.current_menu->post_gui_func) {
+        s_menu_context.current_menu->post_gui_func(s_menu_context.current_menu);
+    }
+
+    // Set current menu to keyboard info
+    s_menu_context.current_menu = s_menu_context.keyboard_info;
+
+    // Call prepare_gui_func to display keyboard info
+    if (s_menu_context.current_menu && s_menu_context.current_menu->prepare_gui_func) {
+        s_menu_context.current_menu->prepare_gui_func(s_menu_context.current_menu);
+    }
+
     ESP_LOGI(TAG, "Returned to keyboard mode");
 }
 
 void menu_state_update_timeout(void)
 {
-    if (!s_menu_context.menu_active || s_menu_context.timeout_ms == 0) {
+    // Only apply timeout when not in keyboard mode
+    if (s_menu_context.current_menu == s_menu_context.keyboard_info || s_menu_context.timeout_ms == 0) {
         return;
     }
 
@@ -210,232 +192,394 @@ void menu_state_update_timeout(void)
 void menu_state_set_timeout(uint32_t timeout_ms)
 {
     s_menu_context.timeout_ms = timeout_ms;
+    ESP_LOGI(TAG, "Menu timeout set to %lu ms", timeout_ms);
 }
 
-// Menu creation functions
-static void menu_create_main_menu(void)
+esp_err_t action_bluetooth_toggle(struct menu_item *self)
 {
-    main_menu.state = MENU_STATE_MAIN_MENU;
-    main_menu.title = "Main Menu";
-    main_menu.parent_state = MENU_STATE_KEYBOARD_MODE;
-    main_menu.items = NULL;
-    main_menu.current_item = NULL;
-    main_menu.item_count = 0;
-
-    menu_add_item(&main_menu, menu_create_item("1. Bluetooth", MENU_STATE_BLUETOOTH_MENU, NULL));
-    menu_add_item(&main_menu, menu_create_item("2. WiFi", MENU_STATE_WIFI_MENU, NULL));
-    menu_add_item(&main_menu, menu_create_item("3. LED", MENU_STATE_LED_MENU, NULL));
-    menu_add_item(&main_menu, menu_create_item("4. Advanced", MENU_STATE_ADVANCED_MENU, NULL));
-    menu_add_item(&main_menu, menu_create_item("5. About", MENU_STATE_ABOUT_MENU, NULL));
-
-    s_menu_context.menus[MENU_STATE_MAIN_MENU] = &main_menu;
+    ESP_LOGI(TAG, "Toggling Bluetooth");
+    // TODO: Implement actual Bluetooth toggle functionality
+    return ESP_OK;
 }
 
-static void menu_create_bluetooth_menu(void)
+esp_err_t action_bluetooth_pair_keyboard(struct menu_item *self)
 {
-    bluetooth_menu.state = MENU_STATE_BLUETOOTH_MENU;
-    bluetooth_menu.title = "Bluetooth Settings";
-    bluetooth_menu.parent_state = MENU_STATE_MAIN_MENU;
-    bluetooth_menu.items = NULL;
-    bluetooth_menu.current_item = NULL;
-    bluetooth_menu.item_count = 0;
-
-    menu_add_item(&bluetooth_menu, menu_create_item("1) Turn On/Off BT", MENU_STATE_BLUETOOTH_MENU, action_bluetooth_toggle));
-    menu_add_item(&bluetooth_menu, menu_create_item("2) Keyboard Pairing", MENU_STATE_BLUETOOTH_MENU, action_bluetooth_pair_keyboard));
-    menu_add_item(&bluetooth_menu, menu_create_item("3) Admin App Pairing", MENU_STATE_BLUETOOTH_MENU, action_bluetooth_pair_admin));
-
-    s_menu_context.menus[MENU_STATE_BLUETOOTH_MENU] = &bluetooth_menu;
+    ESP_LOGI(TAG, "Pairing keyboard via Bluetooth");
+    // TODO: Implement Bluetooth keyboard pairing
+    return ESP_OK;
 }
 
-static void menu_create_wifi_menu(void)
+esp_err_t action_bluetooth_pair_admin(struct menu_item *self)
 {
-    wifi_menu.state = MENU_STATE_WIFI_MENU;
-    wifi_menu.title = "WiFi Settings";
-    wifi_menu.parent_state = MENU_STATE_MAIN_MENU;
-    wifi_menu.items = NULL;
-    wifi_menu.current_item = NULL;
-    wifi_menu.item_count = 0;
-
-    menu_add_item(&wifi_menu, menu_create_item("1) Turn On/Off WiFi", MENU_STATE_WIFI_MENU, action_wifi_toggle));
-    menu_add_item(&wifi_menu, menu_create_item("2) WiFi Settings", MENU_STATE_WIFI_MENU, action_wifi_settings));
-
-    s_menu_context.menus[MENU_STATE_WIFI_MENU] = &wifi_menu;
+    ESP_LOGI(TAG, "Pairing admin device via Bluetooth");
+    // TODO: Implement Bluetooth admin device pairing
+    return ESP_OK;
 }
 
-static void menu_create_led_menu(void)
+esp_err_t action_wifi_toggle(struct menu_item *self)
 {
-    led_menu.state = MENU_STATE_LED_MENU;
-    led_menu.title = "LED Settings";
-    led_menu.parent_state = MENU_STATE_MAIN_MENU;
-    led_menu.items = NULL;
-    led_menu.current_item = NULL;
-    led_menu.item_count = 0;
-
-    menu_add_item(&led_menu, menu_create_item("1) Turn On/Off LED", MENU_STATE_LED_MENU, action_led_toggle));
-    menu_add_item(&led_menu, menu_create_item("2) Choose LED Pattern", MENU_STATE_LED_MENU, action_led_pattern));
-
-    s_menu_context.menus[MENU_STATE_LED_MENU] = &led_menu;
+    ESP_LOGI(TAG, "Toggling WiFi");
+    // TODO: Implement actual WiFi toggle functionality
+    return ESP_OK;
 }
 
-static void menu_create_advanced_menu(void)
+esp_err_t action_wifi_settings(struct menu_item *self)
 {
-    advanced_menu.state = MENU_STATE_ADVANCED_MENU;
-    advanced_menu.title = "Advanced Features";
-    advanced_menu.parent_state = MENU_STATE_MAIN_MENU;
-    advanced_menu.items = NULL;
-    advanced_menu.current_item = NULL;
-    advanced_menu.item_count = 0;
-
-    menu_add_item(&advanced_menu, menu_create_item("1) Keyboard Lock", MENU_STATE_ADVANCED_MENU, action_keyboard_lock_toggle));
-    menu_add_item(&advanced_menu, menu_create_item("2) Input Logging", MENU_STATE_ADVANCED_MENU, action_input_logging_toggle));
-    menu_add_item(&advanced_menu, menu_create_item("3) Stand-Up Reminder", MENU_STATE_ADVANCED_MENU, action_standup_reminder_toggle));
-
-    s_menu_context.menus[MENU_STATE_ADVANCED_MENU] = &advanced_menu;
+    ESP_LOGI(TAG, "Opening WiFi settings");
+    // TODO: Implement WiFi settings menu
+    return ESP_OK;
 }
 
-static void menu_create_about_menu(void)
+esp_err_t action_led_toggle(struct menu_item *self)
 {
-    about_menu.state = MENU_STATE_ABOUT_MENU;
-    about_menu.title = "About Keyboard";
-    about_menu.parent_state = MENU_STATE_MAIN_MENU;
-    about_menu.items = NULL;
-    about_menu.current_item = NULL;
-    about_menu.item_count = 0;
-
-    menu_add_item(&about_menu, menu_create_item("View Information", MENU_STATE_ABOUT_MENU, action_show_about));
-
-    s_menu_context.menus[MENU_STATE_ABOUT_MENU] = &about_menu;
+    ESP_LOGI(TAG, "Toggling LED");
+    // TODO: Implement LED toggle functionality
+    return ESP_OK;
 }
 
-static menu_item_t* menu_create_item(const char *text, menu_state_t target_state, bool (*action_func)(void))
+esp_err_t action_led_pattern(struct menu_item *self)
 {
-    static int item_index = 0;
-    static menu_item_t all_items[20]; // Static storage for all menu items
-
-    if (item_index >= 20) {
-        ESP_LOGE(TAG, "Too many menu items created");
-        return NULL;
-    }
-
-    menu_item_t *item = &all_items[item_index++];
-    item->text = text;
-    item->target_state = target_state;
-    item->action_func = action_func;
-    item->next = NULL;
-    item->prev = NULL;
-
-    return item;
+    ESP_LOGI(TAG, "Changing LED pattern");
+    // TODO: Implement LED pattern change
+    return ESP_OK;
 }
 
-static void menu_add_item(menu_def_t *menu, menu_item_t *item)
+esp_err_t action_keyboard_lock_toggle(struct menu_item *self)
 {
-    if (!menu || !item) return;
-
-    if (!menu->items) {
-        // First item
-        menu->items = item;
-        menu->current_item = item;
-        item->next = item;
-        item->prev = item;
-    } else {
-        // Insert at end of circular list
-        menu_item_t *last = menu->items->prev;
-        last->next = item;
-        item->prev = last;
-        item->next = menu->items;
-        menu->items->prev = item;
-    }
-
-    menu->item_count++;
+    ESP_LOGI(TAG, "Toggling keyboard lock");
+    // TODO: Implement keyboard lock toggle
+    return ESP_OK;
 }
 
-static void menu_set_current_selection(menu_def_t *menu, int selection)
+esp_err_t action_input_logging_toggle(struct menu_item *self)
 {
-    if (!menu || !menu->items || selection < 0 || selection >= menu->item_count) {
+    ESP_LOGI(TAG, "Toggling input logging");
+    // TODO: Implement input logging toggle
+    return ESP_OK;
+}
+
+esp_err_t action_standup_reminder_toggle(struct menu_item *self)
+{
+    ESP_LOGI(TAG, "Toggling standup reminder");
+    // TODO: Implement standup reminder toggle
+    return ESP_OK;
+}
+
+esp_err_t action_show_about(struct menu_item *self)
+{
+    ESP_LOGI(TAG, "Showing about information");
+    // TODO: Implement about information display
+    return ESP_OK;
+}
+
+// Prepare function implementations
+esp_err_t prepare_main_menu(struct menu_item *self)
+{
+    ESP_LOGD(TAG, "Preparing main menu");
+    // TODO: Update main menu display, refresh status information
+    return ESP_OK;
+}
+
+esp_err_t prepare_bluetooth_menu(struct menu_item *self)
+{
+    ESP_LOGD(TAG, "Preparing Bluetooth menu");
+    // TODO: Update Bluetooth status, scan for devices, etc.
+    return ESP_OK;
+}
+
+esp_err_t prepare_wifi_menu(struct menu_item *self)
+{
+    ESP_LOGD(TAG, "Preparing WiFi menu");
+    // TODO: Update WiFi status, scan for networks, etc.
+    return ESP_OK;
+}
+
+esp_err_t prepare_led_menu(struct menu_item *self)
+{
+    ESP_LOGD(TAG, "Preparing LED menu");
+    // TODO: Update LED status display
+    return ESP_OK;
+}
+
+esp_err_t prepare_advanced_menu(struct menu_item *self)
+{
+    ESP_LOGD(TAG, "Preparing advanced menu");
+    // TODO: Update advanced settings display
+    return ESP_OK;
+}
+
+// Helper functions for menu navigation
+static void menu_focus_next_child(struct menu_item *parent)
+{
+    if (!parent || LIST_EMPTY(&parent->children)) {
         return;
     }
 
-    menu_item_t *item = menu->items;
-    for (int i = 0; i < selection; i++) {
-        item = item->next;
+    if (!parent->focused_child) {
+        parent->focused_child = menu_get_first_child(parent);
+    } else {
+        struct menu_item *next = menu_get_next_sibling(parent->focused_child);
+        if (next) {
+            parent->focused_child = next;
+        } else {
+            // Wrap around to first child
+            parent->focused_child = menu_get_first_child(parent);
+        }
     }
-    menu->current_item = item;
+
+    ESP_LOGD(TAG, "Next child focused: %s", parent->focused_child ? parent->focused_child->text : "NULL");
 }
 
-// Action function implementations
-bool action_bluetooth_toggle(void)
+static void menu_focus_prev_child(struct menu_item *parent)
 {
-    ESP_LOGI(TAG, "Bluetooth toggle action");
-    // TODO: Implement Bluetooth toggle functionality
+    if (!parent || LIST_EMPTY(&parent->children)) {
+        return;
+    }
+
+    if (!parent->focused_child) {
+        parent->focused_child = menu_get_last_child(parent);
+    } else {
+        struct menu_item *prev = menu_get_prev_sibling(parent->focused_child);
+        if (prev) {
+            parent->focused_child = prev;
+        } else {
+            // Wrap around to last child
+            parent->focused_child = menu_get_last_child(parent);
+        }
+    }
+
+    ESP_LOGD(TAG, "Previous child focused: %s", parent->focused_child ? parent->focused_child->text : "NULL");
+}
+
+static struct menu_item* menu_get_first_child(struct menu_item *parent)
+{
+    if (!parent || LIST_EMPTY(&parent->children)) {
+        return NULL;
+    }
+    return LIST_FIRST(&parent->children);
+}
+
+static struct menu_item* menu_get_last_child(struct menu_item *parent)
+{
+    if (!parent || LIST_EMPTY(&parent->children)) {
+        return NULL;
+    }
+
+    struct menu_item *item = LIST_FIRST(&parent->children);
+    struct menu_item *last = item;
+
+    LIST_FOREACH(item, &parent->children, entry) {
+        last = item;
+    }
+
+    return last;
+}
+
+static struct menu_item* menu_get_next_sibling(struct menu_item *item)
+{
+    if (!item) {
+        return NULL;
+    }
+    return LIST_NEXT(item, entry);
+}
+
+static struct menu_item* menu_get_prev_sibling(struct menu_item *item)
+{
+    if (!item || !item->parent) {
+        return NULL;
+    }
+
+    struct menu_item *current;
+    struct menu_item *prev = NULL;
+
+    LIST_FOREACH(current, &item->parent->children, entry) {
+        if (current == item) {
+            return prev;
+        }
+        prev = current;
+    }
+
+    return NULL;
+}
+
+// Public functions for menu item management
+struct menu_item* menu_item_create(const char *text,
+                                  esp_err_t (*prepare_gui_func)(struct menu_item *self),
+                                  esp_err_t (*user_action)(struct menu_item *self),
+                                  esp_err_t (*post_gui_func)(struct menu_item *self))
+{
+    if (!text) {
+        ESP_LOGE(TAG, "Cannot create menu item with NULL text");
+        return NULL;
+    }
+
+    struct menu_item *item = heap_caps_calloc(1, sizeof(struct menu_item), MALLOC_CAP_DEFAULT);
+    if (!item) {
+        ESP_LOGE(TAG, "Failed to allocate memory for menu item");
+        return NULL;
+    }
+
+    // Allocate and copy text
+    item->text = heap_caps_malloc(strlen(text) + 1, MALLOC_CAP_DEFAULT);
+    if (!item->text) {
+        ESP_LOGE(TAG, "Failed to allocate memory for menu item text");
+        heap_caps_free(item);
+        return NULL;
+    }
+    strcpy(item->text, text);
+
+    // Initialize fields
+    item->icon = NULL;
+    item->prepare_gui_func = prepare_gui_func;
+    item->user_action = user_action;
+    item->post_gui_func = post_gui_func;
+    item->user_ctx = NULL;  // Removed user_ctx parameter, always set to NULL
+    item->parent = NULL;
+    item->focused_child = NULL;
+
+    // Initialize children list
+    LIST_INIT(&item->children);
+
+    ESP_LOGD(TAG, "Created menu item: %s", text);
+    return item;
+}
+
+bool menu_item_add_child(struct menu_item *parent, struct menu_item *child)
+{
+    if (!parent || !child) {
+        ESP_LOGE(TAG, "Cannot add child: parent or child is NULL");
+        return false;
+    }
+
+    if (child->parent) {
+        ESP_LOGW(TAG, "Child '%s' already has a parent", child->text);
+        return false;
+    }
+
+    // Set parent relationship
+    child->parent = parent;
+
+    // Add to parent's children list
+    LIST_INSERT_HEAD(&parent->children, child, entry);
+
+    // If this is the first child, set it as focused
+    if (!parent->focused_child) {
+        parent->focused_child = child;
+    }
+
+    ESP_LOGD(TAG, "Added child '%s' to parent '%s'", child->text, parent->text);
     return true;
 }
 
-bool action_bluetooth_pair_keyboard(void)
+void menu_item_set_icon(struct menu_item *item, lv_obj_t *icon)
 {
-    ESP_LOGI(TAG, "Bluetooth keyboard pairing action");
-    // TODO: Implement Bluetooth keyboard pairing
+    if (item) {
+        item->icon = icon;
+        ESP_LOGD(TAG, "Set icon for menu item: %s", item->text);
+    }
+}
+
+bool menu_navigate_to(struct menu_item *target)
+{
+    if (!target) {
+        ESP_LOGE(TAG, "Cannot navigate to NULL menu item");
+        return false;
+    }
+
+    s_menu_context.current_menu = target;
+    s_menu_context.last_activity_time = esp_timer_get_time() / 1000; // Convert to ms
+
+    // Call prepare function if available
+    if (target->prepare_gui_func) {
+        target->prepare_gui_func(target);
+    }
+
+    ESP_LOGI(TAG, "Navigated to menu item: %s", target->text);
     return true;
 }
 
-bool action_bluetooth_pair_admin(void)
+void menu_item_destroy(struct menu_item *item)
 {
-    ESP_LOGI(TAG, "Bluetooth admin app pairing action");
-    // TODO: Implement Bluetooth admin app pairing
-    return true;
+    if (!item) {
+        return;
+    }
+
+    ESP_LOGD(TAG, "Destroying menu item: %s", item->text);
+
+    // Recursively destroy all children first
+    struct menu_item *child, *temp_child;
+    LIST_FOREACH_SAFE(child, &item->children, entry, temp_child) {
+        LIST_REMOVE(child, entry);
+        menu_item_destroy(child);
+    }
+
+    // Free the text string
+    if (item->text) {
+        heap_caps_free(item->text);
+    }
+
+    // Free the item itself
+    heap_caps_free(item);
 }
 
-bool action_wifi_toggle(void)
+// Setup the complete menu tree structure
+static void menu_setup_tree(void)
 {
-    ESP_LOGI(TAG, "WiFi toggle action");
-    // TODO: Implement WiFi toggle functionality
-    return true;
-}
+    ESP_LOGI(TAG, "Setting up menu tree structure");
 
-bool action_wifi_settings(void)
-{
-    ESP_LOGI(TAG, "WiFi settings action");
-    // TODO: Implement WiFi settings functionality
-    return true;
-}
+    // Create keyboard mode (default state) - shows keyboard info
+    s_menu_context.keyboard_info = menu_item_create("Keyboard Mode", keyboard_gui_prepare_keyboard_info, NULL, keyboard_gui_post_keyboard_info);
 
-bool action_led_toggle(void)
-{
-    ESP_LOGI(TAG, "LED toggle action");
-    // TODO: Implement LED toggle functionality
-    return true;
-}
+    // Create root menu (main menu) - nonleaf item that shows menu interface
+    s_menu_context.root_menu = menu_item_create("Main Menu", keyboard_gui_prepare_nonleaf_item, NULL, keyboard_gui_post_nonleaf_item);
 
-bool action_led_pattern(void)
-{
-    ESP_LOGI(TAG, "LED pattern selection action");
-    // TODO: Implement LED pattern selection
-    return true;
-}
+    // Create main menu children: Keyboard Mode, Bluetooth, WiFi, LED, Advanced
+    struct menu_item *keyboard_mode_menu = menu_item_create("Keyboard Mode", NULL, NULL, NULL);
+    struct menu_item *bluetooth_menu = menu_item_create("Bluetooth", keyboard_gui_prepare_nonleaf_item, NULL, keyboard_gui_post_nonleaf_item);
+    struct menu_item *wifi_menu = menu_item_create("WiFi", keyboard_gui_prepare_nonleaf_item, NULL, keyboard_gui_post_nonleaf_item);
+    struct menu_item *led_menu = menu_item_create("LED", keyboard_gui_prepare_nonleaf_item, NULL, keyboard_gui_post_nonleaf_item);
+    struct menu_item *advanced_menu = menu_item_create("Advanced", keyboard_gui_prepare_nonleaf_item, NULL, keyboard_gui_post_nonleaf_item);
 
-bool action_keyboard_lock_toggle(void)
-{
-    ESP_LOGI(TAG, "Keyboard lock toggle action");
-    // TODO: Implement keyboard lock toggle
-    return true;
-}
+    // Add main menu children
+    menu_item_add_child(s_menu_context.root_menu, keyboard_mode_menu);
+    menu_item_add_child(s_menu_context.root_menu, bluetooth_menu);
+    menu_item_add_child(s_menu_context.root_menu, wifi_menu);
+    menu_item_add_child(s_menu_context.root_menu, led_menu);
+    menu_item_add_child(s_menu_context.root_menu, advanced_menu);
 
-bool action_input_logging_toggle(void)
-{
-    ESP_LOGI(TAG, "Input logging toggle action");
-    // TODO: Implement input logging toggle
-    return true;
-}
+    // Create Bluetooth submenu items
+    struct menu_item *bt_toggle = menu_item_create("Toggle Bluetooth", NULL, action_bluetooth_toggle, NULL);
+    struct menu_item *bt_pair_kb = menu_item_create("Pair Keyboard", NULL, action_bluetooth_pair_keyboard, NULL);
+    struct menu_item *bt_pair_admin = menu_item_create("Pair Admin Device", NULL, action_bluetooth_pair_admin, NULL);
 
-bool action_standup_reminder_toggle(void)
-{
-    ESP_LOGI(TAG, "Stand-up reminder toggle action");
-    // TODO: Implement stand-up reminder toggle
-    return true;
-}
+    menu_item_add_child(bluetooth_menu, bt_toggle);
+    menu_item_add_child(bluetooth_menu, bt_pair_kb);
+    menu_item_add_child(bluetooth_menu, bt_pair_admin);
 
-bool action_show_about(void)
-{
-    ESP_LOGI(TAG, "Show about information action");
-    // TODO: Implement about information display
-    return true;
+    // Create WiFi submenu items
+    struct menu_item *wifi_toggle = menu_item_create("Toggle WiFi", NULL, action_wifi_toggle, NULL);
+    struct menu_item *wifi_settings = menu_item_create("WiFi Settings", NULL, action_wifi_settings, NULL);
+
+    menu_item_add_child(wifi_menu, wifi_toggle);
+    menu_item_add_child(wifi_menu, wifi_settings);
+
+    // Create LED submenu items
+    struct menu_item *led_toggle = menu_item_create("Toggle LED", NULL, action_led_toggle, NULL);
+    struct menu_item *led_pattern = menu_item_create("LED Pattern", NULL, action_led_pattern, NULL);
+
+    menu_item_add_child(led_menu, led_toggle);
+    menu_item_add_child(led_menu, led_pattern);
+
+    // Create Advanced submenu items
+    struct menu_item *kb_lock = menu_item_create("Keyboard Lock", NULL, action_keyboard_lock_toggle, NULL);
+    struct menu_item *input_log = menu_item_create("Input Logging", NULL, action_input_logging_toggle, NULL);
+    struct menu_item *standup_reminder = menu_item_create("Standup Reminder", NULL, action_standup_reminder_toggle, NULL);
+    struct menu_item *about = menu_item_create("About", NULL, action_show_about, NULL);
+
+    menu_item_add_child(advanced_menu, kb_lock);
+    menu_item_add_child(advanced_menu, input_log);
+    menu_item_add_child(advanced_menu, standup_reminder);
+    menu_item_add_child(advanced_menu, about);
+
+    ESP_LOGI(TAG, "Menu tree structure setup complete");
 }

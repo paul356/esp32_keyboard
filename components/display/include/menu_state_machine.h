@@ -22,23 +22,14 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <sys/queue.h>
+#include "esp_err.h"
+
+// Forward declare LVGL object type to avoid including LVGL headers
+typedef struct _lv_obj_t lv_obj_t;
 
 /**
- * @brief Menu states
- */
-typedef enum {
-    MENU_STATE_KEYBOARD_MODE = 0,
-    MENU_STATE_MAIN_MENU,
-    MENU_STATE_BLUETOOTH_MENU,
-    MENU_STATE_WIFI_MENU,
-    MENU_STATE_LED_MENU,
-    MENU_STATE_ADVANCED_MENU,
-    MENU_STATE_ABOUT_MENU,
-    MENU_STATE_MAX
-} menu_state_t;
-
-/**
- * @brief Input events
+ * @brief Input events for menu navigation
  */
 typedef enum {
     INPUT_EVENT_NONE = 0,
@@ -51,43 +42,35 @@ typedef enum {
 } input_event_t;
 
 /**
- * @brief Menu item structure
+ * @brief Menu item structure representing nodes in the menu tree
+ * Each menu_item represents a state in the state machine
  */
-typedef struct menu_item {
-    const char *text;
-    menu_state_t target_state;
-    bool (*action_func)(void);   // Optional action function
-    struct menu_item *next;
-    struct menu_item *prev;
-} menu_item_t;
-
-/**
- * @brief Menu definition structure
- */
-typedef struct {
-    menu_state_t state;
-    const char *title;
-    menu_item_t *items;
-    menu_item_t *current_item;
-    menu_state_t parent_state;
-    int item_count;
-} menu_def_t;
+struct menu_item {
+    char *text;                                         // Display text for this menu item (dynamically allocated)
+    lv_obj_t *icon;                                     // Optional icon (can be NULL)
+    esp_err_t (*prepare_gui_func)(struct menu_item *self);  // Optional preparation function
+    esp_err_t (*user_action)(struct menu_item *self);   // Optional user action function
+    esp_err_t (*post_gui_func)(struct menu_item *self); // Optional long press action function
+    void *user_ctx;                                     // User context data
+    struct menu_item *parent;                           // Parent menu item
+    LIST_ENTRY(menu_item) entry;                        // List entry for siblings
+    LIST_HEAD(menu_item_children, menu_item) children;  // List of child menu items
+    struct menu_item *focused_child;                    // Currently focused child
+};
 
 /**
  * @brief Menu state machine context
  */
 typedef struct {
-    menu_state_t current_state;
-    menu_state_t previous_state;
-    menu_def_t *menus[MENU_STATE_MAX];
-    int current_selection;
-    bool menu_active;
-    uint32_t last_activity_time;
-    uint32_t timeout_ms;
+    struct menu_item *root_menu;        // Root menu item (top level)
+    struct menu_item *current_menu;     // Current active menu item
+    struct menu_item *keyboard_info;    // Keyboard mode menu item (default state)
+    uint32_t last_activity_time;        // Last activity timestamp
+    uint32_t timeout_ms;                // Timeout in milliseconds
 } menu_context_t;
 
 /**
- * @brief Initialize menu state machine
+ * @brief Initialize menu state machine with tree structure
  * @return true on success, false on failure
  */
 bool menu_state_init(void);
@@ -100,25 +83,15 @@ bool menu_state_init(void);
 bool menu_state_process_event(input_event_t event);
 
 /**
- * @brief Get current menu state
- * @return Current menu state
+ * @brief Get current menu item (state)
+ * @return Pointer to current menu item
  */
-menu_state_t menu_state_get_current(void);
+struct menu_item* menu_state_get_current(void);
+
+
 
 /**
- * @brief Check if menu is currently active
- * @return true if menu is active, false if in keyboard mode
- */
-bool menu_state_is_active(void);
-
-/**
- * @brief Get current menu definition
- * @return Pointer to current menu definition, NULL if in keyboard mode
- */
-menu_def_t* menu_state_get_current_menu(void);
-
-/**
- * @brief Force return to keyboard mode
+ * @brief Force return to keyboard mode (default state)
  */
 void menu_state_return_to_keyboard(void);
 
@@ -133,15 +106,63 @@ void menu_state_update_timeout(void);
  */
 void menu_state_set_timeout(uint32_t timeout_ms);
 
+/**
+ * @brief Create a new menu item
+ * @param text Display text for the menu item
+ * @param prepare_func Optional preparation function called when entering this menu
+ * @param user_action Optional action function called when ENTER is pressed
+ * @param post_func Optional cleanup function called when leaving this menu
+ * @return Pointer to created menu item, NULL on failure
+ */
+struct menu_item* menu_item_create(const char *text,
+                                  esp_err_t (*prepare_func)(struct menu_item *self),
+                                  esp_err_t (*user_action)(struct menu_item *self),
+                                  esp_err_t (*post_func)(struct menu_item *self));
+
+/**
+ * @brief Add a child menu item to a parent
+ * @param parent Parent menu item
+ * @param child Child menu item to add
+ * @return true on success, false on failure
+ */
+bool menu_item_add_child(struct menu_item *parent, struct menu_item *child);
+
+/**
+ * @brief Set an icon for a menu item
+ * @param item Menu item to set icon for
+ * @param icon LVGL object representing the icon
+ */
+void menu_item_set_icon(struct menu_item *item, lv_obj_t *icon);
+
+/**
+ * @brief Navigate to a specific menu item
+ * @param target Target menu item to navigate to
+ * @return true on success, false on failure
+ */
+bool menu_navigate_to(struct menu_item *target);
+
+/**
+ * @brief Free memory allocated for a menu item and its children recursively
+ * @param item Menu item to free (can be NULL)
+ */
+void menu_item_destroy(struct menu_item *item);
+
 // Action functions for menu items
-bool action_bluetooth_toggle(void);
-bool action_bluetooth_pair_keyboard(void);
-bool action_bluetooth_pair_admin(void);
-bool action_wifi_toggle(void);
-bool action_wifi_settings(void);
-bool action_led_toggle(void);
-bool action_led_pattern(void);
-bool action_keyboard_lock_toggle(void);
-bool action_input_logging_toggle(void);
-bool action_standup_reminder_toggle(void);
-bool action_show_about(void);
+esp_err_t action_bluetooth_toggle(struct menu_item *self);
+esp_err_t action_bluetooth_pair_keyboard(struct menu_item *self);
+esp_err_t action_bluetooth_pair_admin(struct menu_item *self);
+esp_err_t action_wifi_toggle(struct menu_item *self);
+esp_err_t action_wifi_settings(struct menu_item *self);
+esp_err_t action_led_toggle(struct menu_item *self);
+esp_err_t action_led_pattern(struct menu_item *self);
+esp_err_t action_keyboard_lock_toggle(struct menu_item *self);
+esp_err_t action_input_logging_toggle(struct menu_item *self);
+esp_err_t action_standup_reminder_toggle(struct menu_item *self);
+esp_err_t action_show_about(struct menu_item *self);
+
+// Prepare functions for menu items
+esp_err_t prepare_main_menu(struct menu_item *self);
+esp_err_t prepare_bluetooth_menu(struct menu_item *self);
+esp_err_t prepare_wifi_menu(struct menu_item *self);
+esp_err_t prepare_led_menu(struct menu_item *self);
+esp_err_t prepare_advanced_menu(struct menu_item *self);

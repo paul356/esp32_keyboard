@@ -58,8 +58,17 @@ void display_handle_esc(void)
     keyboard_gui_handle_esc();
 }
 
-void display_set_status_info(const keyboard_stats_t *status)
+void display_update_task(void)
 {
-    // This function might not be needed as we now use keyboard_gui_update_stats
-    // for individual key updates. Could be removed or adapted.
+    keyboard_gui_update();
+}
+
+esp_err_t display_set_brightness(uint8_t brightness)
+{
+    return keyboard_gui_set_brightness(brightness);
+}
+
+esp_err_t display_on_off(bool on)
+{
+    return keyboard_gui_display_on_off(on);
 }
