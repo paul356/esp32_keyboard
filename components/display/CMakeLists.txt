@@ -1,5 +1,4 @@
-idf_component_register(SRCS "status_display.c"
-                              "lcd_hardware.c"
+idf_component_register(SRCS "lcd_hardware.c"
                               "menu_state_machine.c"
                               "keyboard_gui.c"
                        INCLUDE_DIRS "include"

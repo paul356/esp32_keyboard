@@ -26,7 +26,7 @@ esp_err_t drv_loop_init(void)
         .queue_size = 32,
         .task_name = "drv_loop_task",
         .task_priority = 10,
-        .task_stack_size = 4096,
+        .task_stack_size = 8192,
         .task_core_id = tskNO_AFFINITY
     };
 
@@ -103,6 +103,22 @@ esp_err_t drv_loop_post_event(esp_event_base_t event_base,
     }
 
     return esp_event_post_to(s_event_loop, event_base, event_id, event_data, event_data_size, ticks_to_wait);
+}
+
+esp_err_t drv_loop_post_event_isr(esp_event_base_t event_base,
+                                  int32_t event_id,
+                                  const void *event_data,
+                                  size_t event_data_size)
+{
+    if (!s_event_loop) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (!event_base) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    return esp_event_post_to(s_event_loop, event_base, event_id, event_data, event_data_size, 0);
 }
 
 esp_event_loop_handle_t drv_loop_get_handle(void)

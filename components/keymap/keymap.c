@@ -73,8 +73,10 @@ uint16_t _LAYERS[LAYERS][MATRIX_ROWS][MATRIX_COLS] = {
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (keycode >= MACRO_CODE_MIN && keycode <= MACRO_CODE_MAX && record->event.pressed) {
         process_macro_code(keycode);
+        return false; // Prevent further processing of this keycode
     } else if (keycode >= FUNCTION_KEY_MIN && keycode <= FUNCTION_KEY_MAX && record->event.pressed) {
         process_function_key(keycode);
+        return false;  // Prevent further processing of this keycode
     }
 
     return true;

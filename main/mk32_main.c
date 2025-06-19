@@ -25,6 +25,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
+#include "freertos/queue.h"
 #include "esp_system.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -41,7 +42,6 @@
 #include "tusb.h"
 #include "port_mgmt.h"
 #include "function_control.h"
-#include "status_display.h"
 #include "keyboard_gui.h"
 #include "hid_desc.h"
 
@@ -158,11 +158,9 @@ void test_miscs(void)
     switch (encoder_direct) {
         case MISCS_ENCODER_CW:
             ESP_LOGI(TAG, "Encoder Direction: Clockwise");
-            display_handle_encoder_rotation(1);  // Positive direction for clockwise
             break;
         case MISCS_ENCODER_CCW:
             ESP_LOGI(TAG, "Encoder Direction: Counter-Clockwise");
-            display_handle_encoder_rotation(-1); // Negative direction for counter-clockwise
             break;
         case MISCS_ENCODER_STOPPED:
             ESP_LOGI(TAG, "Encoder Direction: Stopped");
@@ -199,8 +197,8 @@ void app_main()
     }
     log_memory_usage("After miscs_init");
 
-    ESP_ERROR_CHECK(init_display());
-    log_memory_usage("After init_display");
+    ESP_ERROR_CHECK(keyboard_gui_init());
+    log_memory_usage("After keyboard_gui_init");
 
     matrix_setup();
     log_memory_usage("After matrix_setup");

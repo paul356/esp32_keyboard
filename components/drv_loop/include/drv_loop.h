@@ -72,6 +72,20 @@ esp_err_t drv_loop_post_event(esp_event_base_t event_base,
                              TickType_t ticks_to_wait);
 
 /**
+ * @brief Post an event with arbitrary data
+ *
+ * @param event_base Event base
+ * @param event_id Event ID
+ * @param event_data Pointer to event data
+ * @param event_data_size Size of event data
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t drv_loop_post_event_isr(esp_event_base_t event_base,
+                                  int32_t event_id,
+                                  const void *event_data,
+                                  size_t event_data_size);
+
+/**
  * @brief Get the event loop handle for advanced use cases
  *
  * @return esp_event_loop_handle_t The event loop handle, or NULL if not initialized

@@ -56,7 +56,7 @@ bool menu_state_init(void)
     return true;
 }
 
-bool menu_state_process_event(input_event_t event)
+bool menu_state_process_event(input_event_e event, unsigned char ch)
 {
     bool event_consumed = false;
     s_menu_context.last_activity_time = esp_timer_get_time() / 1000; // Convert to ms
@@ -84,15 +84,15 @@ bool menu_state_process_event(input_event_t event)
         event_consumed = true;
         break;
 
-    case INPUT_EVENT_ENTER:
-        // Navigate down the tree or execute action
-        if (s_menu_context.current_menu->focused_child)
+    case INPUT_EVENT_KEYCODE:
+        switch (ch)
         {
-            struct menu_item *target = s_menu_context.current_menu->focused_child;
-
-            // Check if this is a leaf node (has user_action) or has children
-            if (!LIST_EMPTY(&target->children))
+        case '\n': // Enter key
+            // Navigate down the tree or execute action
+            if (s_menu_context.current_menu->focused_child)
             {
+                struct menu_item *target = s_menu_context.current_menu->focused_child;
+
                 // Non-leaf node: navigate down
                 // Call post_gui_func of current menu before navigating
                 if (s_menu_context.current_menu->post_gui_func)
@@ -110,41 +110,38 @@ bool menu_state_process_event(input_event_t event)
 
                 ESP_LOGI(TAG, "Navigated to: %s", target->text);
             }
-            else if (target->user_action)
+            else if (s_menu_context.current_menu->user_action)
             {
-                // Leaf node: execute action
-                ESP_LOGI(TAG, "Executing action for: %s", target->text);
-                target->user_action(target);
+                // Current menu item has an action
+                ESP_LOGI(TAG, "Executing action for current menu: %s", s_menu_context.current_menu->text);
+                s_menu_context.current_menu->user_action(s_menu_context.current_menu);
             }
-        }
-        else if (s_menu_context.current_menu->user_action)
-        {
-            // Current menu item has an action
-            ESP_LOGI(TAG, "Executing action for current menu: %s", s_menu_context.current_menu->text);
-            s_menu_context.current_menu->user_action(s_menu_context.current_menu);
-        }
-        event_consumed = true;
-        break;
+            break;
 
-    case INPUT_EVENT_ESC:
-        // Navigate up the tree or do nothing if at root
-        if (s_menu_context.current_menu->parent)
-        {
-            // Call post_gui_func of current menu before navigating up
-            if (s_menu_context.current_menu->post_gui_func)
+        case '\x1b': // Escape key
+            // Navigate up the tree or do nothing if at root
+            if (s_menu_context.current_menu->parent)
             {
-                s_menu_context.current_menu->post_gui_func(s_menu_context.current_menu);
+                // Call post_gui_func of current menu before navigating up
+                if (s_menu_context.current_menu->post_gui_func)
+                {
+                    s_menu_context.current_menu->post_gui_func(s_menu_context.current_menu);
+                }
+
+                s_menu_context.current_menu = s_menu_context.current_menu->parent;
+
+                // Call prepare_gui_func of the parent menu
+                if (s_menu_context.current_menu->prepare_gui_func)
+                {
+                    s_menu_context.current_menu->prepare_gui_func(s_menu_context.current_menu);
+                }
+
+                ESP_LOGI(TAG, "Navigated up to: %s", s_menu_context.current_menu->text);
             }
-
-            s_menu_context.current_menu = s_menu_context.current_menu->parent;
-
-            // Call prepare_gui_func of the parent menu
-            if (s_menu_context.current_menu->prepare_gui_func)
-            {
-                s_menu_context.current_menu->prepare_gui_func(s_menu_context.current_menu);
-            }
-
-            ESP_LOGI(TAG, "Navigated up to: %s", s_menu_context.current_menu->text);
+            break;
+        default:
+            ESP_LOGW(TAG, "Unhandled input key: %c", ch);
+            break;
         }
         event_consumed = true;
         break;
@@ -200,7 +197,7 @@ void menu_state_update_timeout(void)
 
     uint32_t current_time = esp_timer_get_time() / 1000; // Convert to ms
     if (current_time - s_menu_context.last_activity_time > s_menu_context.timeout_ms) {
-        menu_state_process_event(INPUT_EVENT_TIMEOUT);
+        menu_state_process_event(INPUT_EVENT_TIMEOUT, 0);
     }
 }
 

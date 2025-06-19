@@ -35,11 +35,10 @@ typedef enum {
     INPUT_EVENT_NONE = 0,
     INPUT_EVENT_ENCODER_CW,      // Rotate clockwise
     INPUT_EVENT_ENCODER_CCW,     // Rotate counter-clockwise
-    INPUT_EVENT_ENTER,           // Enter key pressed
-    INPUT_EVENT_ESC,             // ESC key pressed
+    INPUT_EVENT_KEYCODE,           // Press Enter
     INPUT_EVENT_TIMEOUT,         // Timeout to return to keyboard mode
     INPUT_EVENT_MAX
-} input_event_t;
+} input_event_e;
 
 /**
  * @brief Menu item structure representing nodes in the menu tree
@@ -80,7 +79,7 @@ bool menu_state_init(void);
  * @param event Input event to process
  * @return true if event was consumed, false otherwise
  */
-bool menu_state_process_event(input_event_t event);
+bool menu_state_process_event(input_event_e event, unsigned char ch);
 
 /**
  * @brief Get current menu item (state)

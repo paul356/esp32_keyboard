@@ -49,20 +49,13 @@ esp_err_t keyboard_gui_init(void);
 void keyboard_gui_update(void);
 
 /**
- * @brief Handle rotary encoder rotation
- * @param direction 1 for clockwise, -1 for counter-clockwise
+ * @brief Post input event from ISR
+ * This function is called from ISR to post input events to the GUI
+ * @param event The input event type
+ * @param keycode The keycode associated with the event
+ * @return esp_err_t ESP_OK on success
  */
-void keyboard_gui_handle_encoder(int direction);
-
-/**
- * @brief Handle Enter key press
- */
-void keyboard_gui_handle_enter(void);
-
-/**
- * @brief Handle ESC key press
- */
-void keyboard_gui_handle_esc(void);
+esp_err_t keyboard_gui_post_input_event_isr(input_event_e event, unsigned char keycode);
 
 /**
  * @brief Update keyboard statistics

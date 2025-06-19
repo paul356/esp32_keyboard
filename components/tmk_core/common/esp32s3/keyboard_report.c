@@ -5,7 +5,6 @@
 #include "tinyusb.h"
 #include "esp_log.h"
 #include "hal_ble.h"
-#include "status_display.h"
 #include "ble_events.h"  // Include BLE-specific events
 
 static void send_keyboard_to_queue(report_keyboard_t*);
@@ -66,6 +65,4 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
     if (is_ble_ready()) {
         ble_post_keyboard_event(report_state, REPORT_LEN);
     }
-
-    update_display(report_state[2]);
 }

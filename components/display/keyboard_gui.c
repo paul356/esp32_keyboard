@@ -27,6 +27,9 @@
 #include "lvgl.h"
 #include <string.h>
 #include <stdio.h>
+#include "drv_loop.h"
+
+#define UPDATE_LVGL_PERIOD_MS  250  // Update LVGL every second
 
 static const char *TAG = "keyboard_gui";
 
@@ -47,6 +50,18 @@ typedef struct {
     lv_obj_t *current_selection_bar;
 } nonleaf_item_gui_t;
 
+typedef struct {
+    int8_t input_event;
+    unsigned char keycode;  // Keycode of the pressed key
+} input_event_data_t;
+
+enum {
+    UPDATE_LVGL_EVENT = 0,  // Update LVGL display
+    GUI_INPUT_EVENT,
+};
+
+ESP_EVENT_DEFINE_BASE(KEYBOARD_GUI_EVENTS);
+
 // Global state for GUI
 static bool s_gui_initialized = false;
 static lv_obj_t *s_main_screen = NULL;
@@ -55,8 +70,6 @@ static keyboard_stats_t s_keyboard_stats = {0};
 // Forward declarations
 static keyboard_info_gui_t* create_keyboard_info_gui(void);
 static nonleaf_item_gui_t* create_nonleaf_item_gui(void);
-static void destroy_keyboard_info_gui(keyboard_info_gui_t *gui);
-static void destroy_nonleaf_item_gui(nonleaf_item_gui_t *gui);
 static void update_keyboard_info_display(keyboard_info_gui_t *gui);
 static void update_nonleaf_item_display(nonleaf_item_gui_t *gui, struct menu_item *menu_item);
 static void keyboard_info_timer_cb(lv_timer_t *timer);
@@ -67,6 +80,52 @@ static esp_err_t prepare_keyboard_info_gui(struct menu_item *self);
 static esp_err_t post_keyboard_info_gui(struct menu_item *self);
 static esp_err_t prepare_nonleaf_item_gui(struct menu_item *self);
 static esp_err_t post_nonleaf_item_gui(struct menu_item *self);
+
+static void update_lvgl_timer_func(void *arg)
+{
+    esp_err_t ret = drv_loop_post_event(
+        KEYBOARD_GUI_EVENTS,
+        UPDATE_LVGL_EVENT,
+        NULL,
+        0,
+        UPDATE_LVGL_PERIOD_MS / 2 / portTICK_PERIOD_MS);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to post LVGL update event: %s", esp_err_to_name(ret));
+    }
+}
+
+static void update_lvgl_event_handler(void *arg, esp_event_base_t base, int32_t id, void *event_data)
+{
+    if (base == KEYBOARD_GUI_EVENTS && id == UPDATE_LVGL_EVENT) {
+        keyboard_gui_update();
+    }
+}
+
+static void gui_input_event_handler(void *arg, esp_event_base_t base, int32_t id, void *event_data)
+{
+    if (base == KEYBOARD_GUI_EVENTS && id == GUI_INPUT_EVENT) {
+        input_event_data_t* input_evt_data = ((input_event_data_t *)event_data);
+        menu_state_process_event(input_evt_data->input_event, input_evt_data->keycode);
+    }
+}
+
+static esp_err_t start_gui_routine_task(void)
+{
+    ESP_RETURN_ON_ERROR(drv_loop_register_handler(KEYBOARD_GUI_EVENTS, UPDATE_LVGL_EVENT, update_lvgl_event_handler, NULL), TAG, "Failed to register LVGL update event handler");
+
+    ESP_RETURN_ON_ERROR(drv_loop_register_handler(KEYBOARD_GUI_EVENTS, GUI_INPUT_EVENT, gui_input_event_handler, NULL), TAG, "Failed to register LVGL update event handler");
+
+    const esp_timer_create_args_t update_timer_args = {
+        .callback = &update_lvgl_timer_func,
+        .name = "update_lvgl_timer"
+    };
+
+    esp_timer_handle_t update_timer;
+    ESP_RETURN_ON_ERROR(esp_timer_create(&update_timer_args, &update_timer), TAG, "Failed to create LVGL update timer");
+    ESP_RETURN_ON_ERROR(esp_timer_start_periodic(update_timer, UPDATE_LVGL_PERIOD_MS * 1000), TAG, "Failed to start LVGL update timer");
+
+    return ESP_OK;
+}
 
 esp_err_t keyboard_gui_init(void)
 {
@@ -94,6 +153,8 @@ esp_err_t keyboard_gui_init(void)
     s_main_screen = lv_screen_active();
     lv_obj_set_style_bg_color(s_main_screen, lv_color_black(), 0);
 
+    ESP_RETURN_ON_ERROR(start_gui_routine_task(), TAG, "Failed to start periodic LVGL update task");
+
     s_gui_initialized = true;
 
     // Initialize display with keyboard information
@@ -120,20 +181,14 @@ void keyboard_gui_update(void)
     lv_timer_handler();
 }
 
-void keyboard_gui_handle_encoder(int direction)
+esp_err_t keyboard_gui_post_input_event_isr(input_event_e event, unsigned char keycode)
 {
-    input_event_t event = (direction > 0) ? INPUT_EVENT_ENCODER_CW : INPUT_EVENT_ENCODER_CCW;
-    menu_state_process_event(event);
-}
+    input_event_data_t input_evt_data = {
+        .input_event = event,
+        .keycode = keycode
+    };
 
-void keyboard_gui_handle_enter(void)
-{
-    menu_state_process_event(INPUT_EVENT_ENTER);
-}
-
-void keyboard_gui_handle_esc(void)
-{
-    menu_state_process_event(INPUT_EVENT_ESC);
+    return drv_loop_post_event_isr(KEYBOARD_GUI_EVENTS, GUI_INPUT_EVENT, &input_evt_data, sizeof(input_evt_data));
 }
 
 void keyboard_gui_update_stats(uint16_t keycode)
