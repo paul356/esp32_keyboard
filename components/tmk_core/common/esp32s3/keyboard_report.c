@@ -63,7 +63,7 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
         tud_hid_n_keyboard_report(0, 1, report_state[0], &report_state[2]);
     }
 
-    if (keyboard_q) {
+    if (is_ble_ready()) {
         ble_post_keyboard_event(report_state, REPORT_LEN);
     }
 

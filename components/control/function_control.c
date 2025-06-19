@@ -246,8 +246,6 @@ esp_err_t restore_saved_state(void)
     }
 
     log_memory_usage("After recover_persisted_config");
-    // comment out wifi to save memory
-    /*
     if (function_state.wifi.mode != WIFI_MODE_NULL) {
         ret = wifi_init(function_state.wifi.mode, function_state.wifi.ssid, function_state.wifi.passwd);
         if (ret != ESP_OK) {
@@ -255,7 +253,6 @@ esp_err_t restore_saved_state(void)
         }
     }
     log_memory_usage("After wifi_init");
-    */
 
     if (function_state.ble.enabled) {
         ret = halBLEInit(function_state.ble.name);

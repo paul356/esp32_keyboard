@@ -26,6 +26,7 @@
 extern "C" {
 #endif
 
+#define DEBUG_MEMORY
 #ifdef DEBUG_MEMORY
 /**
  * @brief Print detailed memory usage information

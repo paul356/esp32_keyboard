@@ -525,37 +525,6 @@ static char keycode_to_char(uint16_t keycode)
     return 0; // Non-printable
 }
 
-static void destroy_keyboard_info_gui(keyboard_info_gui_t *gui)
-{
-    if (!gui) {
-        return;
-    }
-
-    // Clean up timer
-    if (gui->update_timer) {
-        lv_timer_del(gui->update_timer);
-    }
-
-    if (gui->container) {
-        lv_obj_del(gui->container);
-    }
-
-    free(gui);
-}
-
-static void destroy_nonleaf_item_gui(nonleaf_item_gui_t *gui)
-{
-    if (!gui) {
-        return;
-    }
-
-    if (gui->container) {
-        lv_obj_del(gui->container);
-    }
-
-    free(gui);
-}
-
 // Public API functions for menu integration
 esp_err_t keyboard_gui_prepare_keyboard_info(struct menu_item *self)
 {

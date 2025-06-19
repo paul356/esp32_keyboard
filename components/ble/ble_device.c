@@ -33,15 +33,11 @@
 
 #define TAG "hal_ble"
 
-/// @brief Battery level monitor queue
-QueueHandle_t battery_q;
-/// @brief Input queue for sending keyboard reports
-QueueHandle_t keyboard_q;
-
 uint8_t battery_report[1] = { 0 };
 uint8_t key_report[REPORT_LEN] = { 0 };
 
 static esp_hidd_dev_t* hid_dev;
+static bool ble_ready = false;
 
 // Make hid_dev accessible to other BLE modules
 esp_hidd_dev_t* ble_get_hid_dev(void) {
@@ -248,9 +244,9 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
     return;
 }
 
-bool isBLERunning()
+bool is_ble_ready()
 {
-    return keyboard_q != NULL && hid_dev != NULL;
+    return ble_ready;
 }
 
 /**
@@ -282,10 +278,6 @@ void top_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
  * @see hid_ble */
 esp_err_t halBLEInit(const char* name)
 {
-	//initialise queues, even if they might not be used.
-	battery_q = xQueueCreate(32, 1* sizeof(uint8_t));
-	keyboard_q = xQueueCreate(32, REPORT_LEN * sizeof(uint8_t));
-
     ESP_LOGI(TAG, "setting hid gap, mode:%d", ESP_BT_MODE_BLE);
     esp_err_t ret = ble_gap_init(ESP_BT_MODE_BLE);
     ESP_ERROR_CHECK( ret );
@@ -331,6 +323,7 @@ esp_err_t halBLEInit(const char* name)
 
     //set log level according to define
     esp_log_level_set(TAG, ESP_LOG_INFO);
+    ble_ready = true;
 
     return ESP_OK;
 }

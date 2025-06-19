@@ -74,6 +74,7 @@ bool menu_state_process_event(input_event_t event)
     case INPUT_EVENT_ENCODER_CW:
         // Move to next child
         menu_focus_next_child(s_menu_context.current_menu);
+
         event_consumed = true;
         break;
 
@@ -341,6 +342,10 @@ static void menu_focus_next_child(struct menu_item *parent)
         }
     }
 
+    if (parent->prepare_gui_func) {
+        parent->prepare_gui_func(parent);
+    }
+
     ESP_LOGD(TAG, "Next child focused: %s", parent->focused_child ? parent->focused_child->text : "NULL");
 }
 
@@ -360,6 +365,10 @@ static void menu_focus_prev_child(struct menu_item *parent)
             // Wrap around to last child
             parent->focused_child = menu_get_last_child(parent);
         }
+    }
+
+    if (parent->prepare_gui_func) {
+        parent->prepare_gui_func(parent);
     }
 
     ESP_LOGD(TAG, "Previous child focused: %s", parent->focused_child ? parent->focused_child->text : "NULL");
@@ -473,8 +482,15 @@ bool menu_item_add_child(struct menu_item *parent, struct menu_item *child)
     // Set parent relationship
     child->parent = parent;
 
-    // Add to parent's children list
-    LIST_INSERT_HEAD(&parent->children, child, entry);
+    // Add to parent's children list (at the end)
+    if (LIST_EMPTY(&parent->children)) {
+        // First child - use INSERT_HEAD
+        LIST_INSERT_HEAD(&parent->children, child, entry);
+    } else {
+        // Find the last child and insert after it
+        struct menu_item *last_child = menu_get_last_child(parent);
+        LIST_INSERT_AFTER(last_child, child, entry);
+    }
 
     // If this is the first child, set it as focused
     if (!parent->focused_child) {

@@ -24,31 +24,13 @@
 #ifndef _HAL_BLE_H_
 #define _HAL_BLE_H_
 
-#include <freertos/FreeRTOS.h>
-#include <freertos/event_groups.h>
-#include <freertos/queue.h>
-#include <esp_log.h>
-
-#include "esp_bt.h"
-#include "esp_bt_defs.h"
-#include "esp_gap_ble_api.h"
-#include "esp_gatts_api.h"
-#include "esp_gatt_defs.h"
-#include "esp_bt_main.h"
-#include "esp_bt_device.h"
-
-/** @brief Queue for sending keyboard reports
- * @see keyboard_command_t */
-extern QueueHandle_t battery_q;
-
-/** @brief Queue for sending keyboard reports
- * @see keyboard_command_t */
-extern QueueHandle_t keyboard_q;
+#include <stdbool.h>
+#include <esp_err.h>
 
 /** @brief Main init function to start HID interface (C interface)
  * @see hid_ble */
 esp_err_t halBLEInit(const char* name);
 
-bool isBLERunning();
+bool is_ble_ready();
 
 #endif /* _HAL_BLE_H_ */

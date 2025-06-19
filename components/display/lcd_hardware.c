@@ -22,6 +22,7 @@
 #include "esp_log.h"
 #include "esp_check.h"
 #include "esp_timer.h"
+#include "esp_event.h"
 #include "driver/gpio.h"
 #include "driver/spi_master.h"
 #include "esp_lcd_panel_io.h"
@@ -29,6 +30,8 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lvgl_port.h"
 #include "lvgl.h"
+#include "drv_loop.h"
+#include "keyboard_gui.h"
 
 #define LCD_BIT_PER_PIXEL   16
 
@@ -46,6 +49,8 @@
 #define DRAW_BUFFER_SIZE    (LCD_WIDTH * LCD_HEIGHT * sizeof(lv_color16_t) / 10)
 #define SCREEN_OFFSET_X     20  // Offset for X coordinate, adjust as needed
 
+#define UPDATE_LVGL_PERIOD_MS  500  // Update LVGL every second
+
 /**
  * @brief LCD hardware interface structure
  */
@@ -56,7 +61,13 @@ typedef struct {
     bool initialized;
 } lcd_hardware_t;
 
-static const char *TAG = "lcd_hw_st7789";
+enum {
+    UPDATE_LVGL_EVENT = 0,  // Update LVGL display
+};
+
+ESP_EVENT_DEFINE_BASE(UPDATE_LVGL_EVENTS);
+
+static const char *TAG = "lcd_driver";
 
 static lcd_hardware_t s_lcd_hardware = {0};
 
@@ -71,6 +82,26 @@ static void lvgl_tick_func(void *arg)
 {
     (void)arg;
     lv_tick_inc(20);
+}
+
+static void update_lvgl_timer_func(void *arg)
+{
+    esp_err_t ret = drv_loop_post_event(
+        UPDATE_LVGL_EVENTS,
+        UPDATE_LVGL_EVENT,
+        NULL,
+        0,
+        UPDATE_LVGL_PERIOD_MS / 2 / portTICK_PERIOD_MS);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to post LVGL update event: %s", esp_err_to_name(ret));
+    }
+}
+
+static void update_lvgl_event_handler(void *arg, esp_event_base_t base, int32_t id, void *event_data)
+{
+    if (base == UPDATE_LVGL_EVENTS && id == UPDATE_LVGL_EVENT) {
+        keyboard_gui_update();
+    }
 }
 
 static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, unsigned char *px_map)
@@ -99,7 +130,7 @@ static esp_err_t init_lcd_panel(esp_lcd_panel_io_handle_t *io_handle, esp_lcd_pa
         .mode = GPIO_MODE_OUTPUT,
         .pin_bit_mask = 1ULL << LCD_PIN_BL
     };
-    ESP_ERROR_CHECK(gpio_config(&bk_gpio_config));
+    ESP_RETURN_ON_ERROR(gpio_config(&bk_gpio_config), TAG, "Failed to configure backlight GPIO");
 
     spi_bus_config_t buscfg = {
         .miso_io_num = GPIO_NUM_NC,  // MISO not used
@@ -109,7 +140,7 @@ static esp_err_t init_lcd_panel(esp_lcd_panel_io_handle_t *io_handle, esp_lcd_pa
         .quadhd_io_num = -1,
         .max_transfer_sz = DRAW_BUFFER_SIZE
     };
-    ESP_ERROR_CHECK(spi_bus_initialize(LCD_SPI_HOST, &buscfg, SPI_DMA_CH_AUTO));
+    ESP_RETURN_ON_ERROR(spi_bus_initialize(LCD_SPI_HOST, &buscfg, SPI_DMA_CH_AUTO), TAG, "Failed to initialize SPI bus");
 
     esp_lcd_panel_io_spi_config_t io_config = {
         .dc_gpio_num = LCD_PIN_DC,
@@ -121,7 +152,7 @@ static esp_err_t init_lcd_panel(esp_lcd_panel_io_handle_t *io_handle, esp_lcd_pa
         .lcd_param_bits = 8,
     };
 
-    ESP_ERROR_CHECK(esp_lcd_new_panel_io_spi(LCD_SPI_HOST, &io_config, io_handle));
+    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_spi(LCD_SPI_HOST, &io_config, io_handle), TAG, "Failed to create LCD panel IO");
 
     esp_lcd_panel_dev_config_t panel_config = {
         .reset_gpio_num = LCD_PIN_RST,
@@ -129,12 +160,12 @@ static esp_err_t init_lcd_panel(esp_lcd_panel_io_handle_t *io_handle, esp_lcd_pa
         .bits_per_pixel = 16,
     };
 
-    ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(*io_handle, &panel_config, panel_handle));
+    ESP_RETURN_ON_ERROR(esp_lcd_new_panel_st7789(*io_handle, &panel_config, panel_handle), TAG, "Failed to create LCD panel");
 
-    ESP_ERROR_CHECK(esp_lcd_panel_reset(*panel_handle));
-    ESP_ERROR_CHECK(esp_lcd_panel_init(*panel_handle));
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_reset(*panel_handle), TAG, "Failed to reset LCD panel");
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_init(*panel_handle), TAG, "Failed to initialize LCD panel");
 
-    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(*panel_handle, true));
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(*panel_handle, true), TAG, "Failed to turn on LCD panel");
 
     ESP_LOGI(TAG, "Turn on LCD backlight");
     gpio_set_level(LCD_PIN_BL, 1);
@@ -164,7 +195,7 @@ static esp_err_t init_lvgl(esp_lcd_panel_io_handle_t io_handle, void *user_data,
         .on_color_trans_done = lcd_flush_ready_callback,
     };
     /* Register done callback */
-    ESP_ERROR_CHECK(esp_lcd_panel_io_register_event_callbacks(io_handle, &trans_done_cb, disp));
+    ESP_RETURN_ON_ERROR(esp_lcd_panel_io_register_event_callbacks(io_handle, &trans_done_cb, disp), TAG, "Failed to register LCD IO event callbacks");
 
     // Create a timer to handle LVGL ticks
     const esp_timer_create_args_t lvgl_tick_timer_args = {
@@ -172,10 +203,26 @@ static esp_err_t init_lvgl(esp_lcd_panel_io_handle_t io_handle, void *user_data,
         .name = "lvgl_tick"};
 
     esp_timer_handle_t lvgl_tick_timer;
-    ESP_ERROR_CHECK(esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer));
-    ESP_ERROR_CHECK(esp_timer_start_periodic(lvgl_tick_timer, 20 * 1000));
+    ESP_RETURN_ON_ERROR(esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer), TAG, "Failed to create LVGL tick timer");
+    ESP_RETURN_ON_ERROR(esp_timer_start_periodic(lvgl_tick_timer, 20 * 1000), TAG, "Failed to start LVGL tick timer");
 
     *lv_disp = disp;
+    return ESP_OK;
+}
+
+static esp_err_t start_periodic_update_task(void)
+{
+    ESP_RETURN_ON_ERROR(drv_loop_register_handler(UPDATE_LVGL_EVENTS, UPDATE_LVGL_EVENT, update_lvgl_event_handler, NULL), TAG, "Failed to register LVGL update event handler");
+
+    const esp_timer_create_args_t update_timer_args = {
+        .callback = &update_lvgl_timer_func,
+        .name = "update_lvgl_timer"
+    };
+
+    esp_timer_handle_t update_timer;
+    ESP_RETURN_ON_ERROR(esp_timer_create(&update_timer_args, &update_timer), TAG, "Failed to create LVGL update timer");
+    ESP_RETURN_ON_ERROR(esp_timer_start_periodic(update_timer, UPDATE_LVGL_PERIOD_MS * 1000), TAG, "Failed to start LVGL update timer");
+
     return ESP_OK;
 }
 
@@ -186,17 +233,11 @@ esp_err_t lcd_hardware_init(void)
         return ESP_OK;
     }
 
-    esp_err_t err = init_lcd_panel(&s_lcd_hardware.io_handle, &s_lcd_hardware.panel_handle);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "LCD panel initialization failed");
-        return ESP_FAIL;
-    }
+    ESP_RETURN_ON_ERROR(init_lcd_panel(&s_lcd_hardware.io_handle, &s_lcd_hardware.panel_handle), TAG, "LCD panel initialization failed");
 
-    err = init_lvgl(s_lcd_hardware.io_handle, s_lcd_hardware.panel_handle, &s_lcd_hardware.lvgl_display);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "LVGL initialization failed");
-        return ESP_FAIL;
-    }
+    ESP_RETURN_ON_ERROR(init_lvgl(s_lcd_hardware.io_handle, s_lcd_hardware.panel_handle, &s_lcd_hardware.lvgl_display), TAG, "LVGL initialization failed");
+
+    ESP_RETURN_ON_ERROR(start_periodic_update_task(), TAG, "Failed to start periodic LVGL update task");
 
     s_lcd_hardware.initialized = true;
     ESP_LOGI(TAG, "LCD hardware initialization completed");

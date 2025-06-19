@@ -26,7 +26,6 @@
 #include "freertos/task.h"
 #include "freertos/event_groups.h"
 #include "esp_system.h"
-#include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
 #include "esp_err.h"
@@ -71,40 +70,6 @@ extern void rtc_matrix_deinit(void);
 #define KEYBOARD_TASK_PERIOD 5000 // 5ms
 
 bool DEEP_SLEEP = true; // flag to check if we need to go to deep sleep
-
-static void send_keys(void *pParam)
-{
-    static uint8_t keys[] = {4, 5, 6, 7, 8, 9};
-    static unsigned int count = 0;
-
-    TickType_t xLastWakeTime;
-    const TickType_t xFrequency = configTICK_RATE_HZ;
-
-    xLastWakeTime = xTaskGetTickCount();
-    bool state = true;
-    while (1) {
-        (void)xTaskDelayUntil(&xLastWakeTime, xFrequency);
-
-        // check interface readiness
-        //if (tud_hid_ready())
-        //    tud_hid_keyboard_report(1, 0, keycode);
-
-        ESP_LOGI (TAG, "send_keys func runs %lu", xLastWakeTime);
-
-        report_keyboard_t report = {0};
-        report.mods = 0;
-        report.reserved = 0;
-        if (state) {
-            report.keys[0] = keys[count % 6];
-            count++;
-        } else {
-            report.keys[3] = 0;
-        }
-        state = !state;
-
-        host_get_driver()->send_keyboard(&report);
-    }
-}
 
 /*If no key press has been recieved in SLEEP_MINS amount of minutes, put device into deep sleep
  *  wake up on touch on GPIO pin 2
@@ -237,52 +202,37 @@ void app_main()
     ESP_ERROR_CHECK(init_display());
     log_memory_usage("After init_display");
 
-    bool keyboard_inited = false;
-    while (true) {
-        if (/*tud_ready() && */!keyboard_inited) {
-            vTaskDelay(500 / portTICK_PERIOD_MS);
+    matrix_setup();
+    log_memory_usage("After matrix_setup");
 
-            matrix_setup();
-            log_memory_usage("After matrix_setup");
+    matrix_init();
+    log_memory_usage("After matrix_init");
 
-            matrix_init();
-            log_memory_usage("After matrix_init");
+    default_layer_set(0x1);
+    log_memory_usage("After default_layer_set");
 
-            default_layer_set(0x1);
-            log_memory_usage("After default_layer_set");
-
-            // Initialize NVS.
-            ret = nvs_flash_init();
-            if (ret == ESP_ERR_NVS_NO_FREE_PAGES) {
-                ESP_ERROR_CHECK (nvs_flash_erase());
-                ret = nvs_flash_init();
-            }
-            ESP_ERROR_CHECK(ret);
-            log_memory_usage("After NVS flash init");
-
-            // Load layouts from nvs (if found)
-            nvs_load_layouts();
-            log_memory_usage("After nvs_load_layouts");
-
-            start_keyboard_timer();
-            log_memory_usage("After start_keyboard_timer");
-
-            ESP_ERROR_CHECK(restore_saved_state());
-            log_memory_usage("After restore_saved_state");
-
-            //ESP_ERROR_CHECK(start_file_server());
-            //log_memory_usage("After start_file_server");
-
-            (void)update_display(0);
-
-            //xTaskCreatePinnedToCore(send_keys, "period send key", 4096, NULL, configMAX_PRIORITIES, NULL, 1);
-            keyboard_inited = true;
-            log_memory_usage("Keyboard initialization complete");
-        }
-
-        // Update GUI for menu handling and LVGL tasks
-        keyboard_gui_update();
-
-        vTaskDelay(500 / portTICK_PERIOD_MS);  // Reduced delay for better GUI responsiveness
+    // Initialize NVS.
+    ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES)
+    {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
     }
+    ESP_ERROR_CHECK(ret);
+    log_memory_usage("After NVS flash init");
+
+    // Load layouts from nvs (if found)
+    nvs_load_layouts();
+    log_memory_usage("After nvs_load_layouts");
+
+    start_keyboard_timer();
+    log_memory_usage("After start_keyboard_timer");
+
+    ESP_ERROR_CHECK(restore_saved_state());
+    log_memory_usage("After restore_saved_state");
+
+    ESP_ERROR_CHECK(start_file_server());
+    log_memory_usage("After start_file_server");
+
+    log_memory_usage("Keyboard initialization complete");
 }
