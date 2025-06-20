@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "hal_ble.h"
 #include "ble_events.h"  // Include BLE-specific events
+#include "keyboard_gui.h"
 
 static void send_keyboard_to_queue(report_keyboard_t*);
 static uint8_t keyboard_leds_status(void);
@@ -52,6 +53,11 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
         }
     }
 #endif
+
+    if (keyboard_gui_handle_key_input(report_state[0], &report_state[MOD_LED_BYTES], REPORT_COUNT_BYTES)) {
+        // If the GUI handled the key input, we don't need to send it further
+        return;
+    }
 
     // hardcoded HID interface 0, keyboard id 1
     if (tud_ready()) {

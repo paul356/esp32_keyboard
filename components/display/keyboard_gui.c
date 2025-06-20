@@ -33,13 +33,23 @@
 
 static const char *TAG = "keyboard_gui";
 
+/**
+ * @brief Keyboard statistics structure
+ */
+typedef struct {
+    uint32_t total_char_count;
+    uint32_t session_char_count;
+    uint32_t session_start_time;
+    uint8_t last_char_typed;
+} keyboard_stats_t;
+
 // GUI context structures for different menu types
 typedef struct {
     lv_obj_t *container;
     lv_obj_t *stats_label;
+    lv_obj_t *total_count_label;
     lv_obj_t *char_count_label;
-    lv_obj_t *key_count_label;
-    lv_obj_t *last_key_label;
+    lv_obj_t *last_char_label;
     lv_timer_t *update_timer;  // Timer for periodic updates
 } keyboard_info_gui_t;
 
@@ -73,7 +83,6 @@ static nonleaf_item_gui_t* create_nonleaf_item_gui(void);
 static void update_keyboard_info_display(keyboard_info_gui_t *gui);
 static void update_nonleaf_item_display(nonleaf_item_gui_t *gui, struct menu_item *menu_item);
 static void keyboard_info_timer_cb(lv_timer_t *timer);
-static char keycode_to_char(uint16_t keycode);
 
 // GUI setup and teardown functions for menu items
 static esp_err_t prepare_keyboard_info_gui(struct menu_item *self);
@@ -159,7 +168,7 @@ esp_err_t keyboard_gui_init(void)
 
     // Initialize display with keyboard information
     ESP_LOGI(TAG, "Displaying initial keyboard information");
-    menu_state_return_to_keyboard();
+    menu_state_process_event(INPUT_EVENT_TIMEOUT, 0);
 
     ESP_LOGI(TAG, "Keyboard GUI initialized successfully");
     return ESP_OK;
@@ -181,6 +190,47 @@ void keyboard_gui_update(void)
     lv_timer_handler();
 }
 
+static void keyboard_gui_update_stats(uint8_t keycode)
+{
+    s_keyboard_stats.total_char_count++;
+    s_keyboard_stats.session_char_count++;
+    s_keyboard_stats.last_char_typed = keycode;
+}
+
+bool keyboard_gui_handle_key_input(uint8_t mods, uint8_t *scan_code, int code_len)
+{
+    if (!s_gui_initialized) {
+        ESP_LOGW(TAG, "Keyboard GUI not initialized");
+        return false;
+    }
+
+    if (menu_state_accept_keys())
+    {
+        for (int i = 0; i < code_len; i++)
+        {
+            if (scan_code[i] == 0)
+            {
+                continue; // Skip null codes
+            }
+            keyboard_gui_post_input_event_isr(INPUT_EVENT_KEYCODE, scan_code[i]);
+        }
+        return true;
+    }
+    else
+    {
+        for (int i = 0; i < code_len; i++)
+        {
+            if (scan_code[i] == 0)
+            {
+                continue; // Skip null codes
+            }
+            keyboard_gui_update_stats(scan_code[i]);
+        }
+    }
+
+    return false;
+}
+
 esp_err_t keyboard_gui_post_input_event_isr(input_event_e event, unsigned char keycode)
 {
     input_event_data_t input_evt_data = {
@@ -191,33 +241,8 @@ esp_err_t keyboard_gui_post_input_event_isr(input_event_e event, unsigned char k
     return drv_loop_post_event_isr(KEYBOARD_GUI_EVENTS, GUI_INPUT_EVENT, &input_evt_data, sizeof(input_evt_data));
 }
 
-void keyboard_gui_update_stats(uint16_t keycode)
-{
-    s_keyboard_stats.total_key_count++;
-    s_keyboard_stats.session_key_count++;
-    s_keyboard_stats.last_key_pressed = keycode;
-    s_keyboard_stats.last_char_typed = keycode_to_char(keycode);
-
-    // Count characters for statistics
-    if (keycode >= 0x04 && keycode <= 0x1D) { // A-Z keys
-        s_keyboard_stats.session_char_count++;
-    } else if (keycode >= 0x1E && keycode <= 0x27) { // 1-0 keys
-        s_keyboard_stats.session_char_count++;
-    } else if (keycode == 0x2C) { // Space key
-        s_keyboard_stats.session_char_count++;
-    } else if (keycode == 0x28) { // Enter key
-        s_keyboard_stats.session_char_count++;
-    }
-}
-
-keyboard_stats_t* keyboard_gui_get_stats(void)
-{
-    return &s_keyboard_stats;
-}
-
 void keyboard_gui_reset_session_stats(void)
 {
-    s_keyboard_stats.session_key_count = 0;
     s_keyboard_stats.session_char_count = 0;
     s_keyboard_stats.session_start_time = esp_timer_get_time() / 1000;
     ESP_LOGI(TAG, "Session statistics reset");
@@ -280,26 +305,26 @@ static keyboard_info_gui_t* create_keyboard_info_gui(void)
     lv_obj_align(gui->stats_label, LV_ALIGN_TOP_LEFT, 0, 0);
     lv_label_set_text(gui->stats_label, "MK32 Keyboard");
 
+    // Total count label
+    gui->total_count_label = lv_label_create(gui->container);
+    lv_obj_set_style_text_color(gui->total_count_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->total_count_label, &lv_font_montserrat_12, 0);  // Changed to available font
+    lv_obj_align(gui->total_count_label, LV_ALIGN_TOP_LEFT, 0, 22);  // Position first
+    lv_label_set_text(gui->total_count_label, "Total: 0");
+
     // Char count label
     gui->char_count_label = lv_label_create(gui->container);
     lv_obj_set_style_text_color(gui->char_count_label, lv_color_white(), 0);
     lv_obj_set_style_text_font(gui->char_count_label, &lv_font_montserrat_12, 0);  // Changed to available font
-    lv_obj_align(gui->char_count_label, LV_ALIGN_TOP_LEFT, 0, 22);  // Adjusted spacing from 15 to 22
+    lv_obj_align(gui->char_count_label, LV_ALIGN_TOP_LEFT, 0, 42);  // Position below total count
     lv_label_set_text(gui->char_count_label, "Chars: 0");
 
-    // Key count label
-    gui->key_count_label = lv_label_create(gui->container);
-    lv_obj_set_style_text_color(gui->key_count_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->key_count_label, &lv_font_montserrat_12, 0);  // Changed to available font
-    lv_obj_align(gui->key_count_label, LV_ALIGN_TOP_LEFT, 0, 42);  // Adjusted spacing from 30 to 42
-    lv_label_set_text(gui->key_count_label, "Keys: 0/0");
-
     // Last key label
-    gui->last_key_label = lv_label_create(gui->container);
-    lv_obj_set_style_text_color(gui->last_key_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->last_key_label, &lv_font_montserrat_12, 0);  // Changed to available font
-    lv_obj_align(gui->last_key_label, LV_ALIGN_TOP_LEFT, 0, 62);  // Adjusted spacing from 45 to 62
-    lv_label_set_text(gui->last_key_label, "Last: -");
+    gui->last_char_label = lv_label_create(gui->container);
+    lv_obj_set_style_text_color(gui->last_char_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->last_char_label, &lv_font_montserrat_12, 0);  // Changed to available font
+    lv_obj_align(gui->last_char_label, LV_ALIGN_TOP_LEFT, 0, 82);  // Adjusted spacing to accommodate total count
+    lv_label_set_text(gui->last_char_label, "Last: -");
 
     // Instructions
     lv_obj_t *instruction_label = lv_label_create(gui->container);
@@ -382,25 +407,20 @@ static void update_keyboard_info_display(keyboard_info_gui_t *gui)
 
     char buffer[64];
 
+    // Update total count
+    snprintf(buffer, sizeof(buffer), "Total: %lu", s_keyboard_stats.total_char_count);
+    lv_label_set_text(gui->total_count_label, buffer);
+
     // Update character count
     snprintf(buffer, sizeof(buffer), "Chars: %lu", s_keyboard_stats.session_char_count);
     lv_label_set_text(gui->char_count_label, buffer);
 
-    // Update key counts
-    snprintf(buffer, sizeof(buffer), "Keys: %lu/%lu",
-             s_keyboard_stats.session_key_count,
-             s_keyboard_stats.total_key_count);
-    lv_label_set_text(gui->key_count_label, buffer);
-
     // Update last key
     if (s_keyboard_stats.last_char_typed != 0) {
-        snprintf(buffer, sizeof(buffer), "Last: %c (0x%02X)",
-                 s_keyboard_stats.last_char_typed,
-                 s_keyboard_stats.last_key_pressed);
-    } else {
-        snprintf(buffer, sizeof(buffer), "Last: 0x%02X", s_keyboard_stats.last_key_pressed);
+        snprintf(buffer, sizeof(buffer), "Last: %c",
+                 s_keyboard_stats.last_char_typed);
     }
-    lv_label_set_text(gui->last_key_label, buffer);
+    lv_label_set_text(gui->last_char_label, buffer);
 }
 
 static void update_nonleaf_item_display(nonleaf_item_gui_t *gui, struct menu_item *menu_item)
@@ -562,22 +582,6 @@ static esp_err_t post_nonleaf_item_gui(struct menu_item *self)
     ESP_LOGI(TAG, "Hidden nonleaf item container for: %s", self->text);
 
     return ESP_OK;
-}
-
-static char keycode_to_char(uint16_t keycode)
-{
-    // Basic USB HID keycode to ASCII conversion
-    if (keycode >= 0x04 && keycode <= 0x1D) { // A-Z
-        return 'A' + (keycode - 0x04);
-    } else if (keycode >= 0x1E && keycode <= 0x27) { // 1-0
-        if (keycode == 0x27) return '0';
-        return '1' + (keycode - 0x1E);
-    } else if (keycode == 0x2C) { // Space
-        return ' ';
-    } else if (keycode == 0x28) { // Enter
-        return '\n';
-    }
-    return 0; // Non-printable
 }
 
 // Public API functions for menu integration

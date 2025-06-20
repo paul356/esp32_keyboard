@@ -20,21 +20,10 @@
 
 #pragma once
 
-#include "esp_err.h"
-#include "menu_state_machine.h"
 #include <stdint.h>
-
-/**
- * @brief Keyboard statistics structure
- */
-typedef struct {
-    uint32_t total_key_count;
-    uint32_t session_key_count;
-    uint32_t session_char_count;
-    uint32_t session_start_time;
-    uint16_t last_key_pressed;
-    char last_char_typed;
-} keyboard_stats_t;
+#include <stdbool.h>
+#include "esp_err.h"
+#include "input_events.h"
 
 /**
  * @brief Initialize keyboard GUI
@@ -49,6 +38,16 @@ esp_err_t keyboard_gui_init(void);
 void keyboard_gui_update(void);
 
 /**
+ * @brief Handle key input from keyboard
+ * This function processes key input and updates the GUI accordingly.
+ * @param mods Modifier keys (e.g., Shift, Ctrl)
+ * @param scan_code Pointer to array of scan codes
+ * @param code_len Length of the scan code array
+ * @return bool true if the input was handled, false otherwise
+ */
+bool keyboard_gui_handle_key_input(uint8_t mods, uint8_t *scan_code, int code_len);
+
+/**
  * @brief Post input event from ISR
  * This function is called from ISR to post input events to the GUI
  * @param event The input event type
@@ -56,18 +55,6 @@ void keyboard_gui_update(void);
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t keyboard_gui_post_input_event_isr(input_event_e event, unsigned char keycode);
-
-/**
- * @brief Update keyboard statistics
- * @param keycode The keycode that was pressed
- */
-void keyboard_gui_update_stats(uint16_t keycode);
-
-/**
- * @brief Get current keyboard statistics
- * @return Pointer to keyboard statistics structure
- */
-keyboard_stats_t* keyboard_gui_get_stats(void);
 
 /**
  * @brief Reset session statistics
@@ -93,35 +80,3 @@ esp_err_t keyboard_gui_display_on_off(bool on);
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t keyboard_gui_deinit(void);
-
-/**
- * @brief Prepare keyboard info GUI function for menu items
- * Creates and shows keyboard info interface with periodic updates
- * @param self Menu item that displays keyboard statistics
- * @return esp_err_t ESP_OK on success
- */
-esp_err_t keyboard_gui_prepare_keyboard_info(struct menu_item *self);
-
-/**
- * @brief Post keyboard info GUI function for menu items
- * Cleanup function for keyboard info interface, stops periodic updates
- * @param self Menu item that displays keyboard statistics
- * @return esp_err_t ESP_OK on success
- */
-esp_err_t keyboard_gui_post_keyboard_info(struct menu_item *self);
-
-/**
- * @brief Prepare nonleaf item GUI function for menu items
- * Creates and shows menu interface for the given nonleaf menu item
- * @param self Menu item that needs menu interface
- * @return esp_err_t ESP_OK on success
- */
-esp_err_t keyboard_gui_prepare_nonleaf_item(struct menu_item *self);
-
-/**
- * @brief Post nonleaf item GUI function for menu items
- * Cleanup function for nonleaf item interface
- * @param self Menu item that had menu interface
- * @return esp_err_t ESP_OK on success
- */
-esp_err_t keyboard_gui_post_nonleaf_item(struct menu_item *self);

@@ -18,22 +18,16 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#ifndef KEYBOARD_CONFIG_H
-#define KEYBOARD_CONFIG_H
+#pragma once
 
-/*
- *---------------------------- Everything below here should not be modified for standard usage----------------------
- *
- * */
-#define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
-#define SET_BIT(var,pos) (var |= 1LLU << pos);
-
-#define MOD_LED_BYTES 2 //bytes for led status and modifiers
-#define REPORT_COUNT_BYTES (6)
-#define REPORT_LEN (MOD_LED_BYTES + REPORT_COUNT_BYTES) //size of hid reports with NKRO and room for 3 key macro
-
-#define LAYERS 3
-#define MAX_LAYOUT_NAME_LENGTH 15
-
-#endif
-//
+/**
+ * @brief Input events for menu navigation
+ */
+typedef enum {
+    INPUT_EVENT_NONE = 0,
+    INPUT_EVENT_ENCODER_CW,      // Rotate clockwise
+    INPUT_EVENT_ENCODER_CCW,     // Rotate counter-clockwise
+    INPUT_EVENT_KEYCODE,           // Press Enter
+    INPUT_EVENT_TIMEOUT,         // Timeout to return to keyboard mode
+    INPUT_EVENT_MAX
+} input_event_e;
