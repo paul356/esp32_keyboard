@@ -25,9 +25,17 @@
  */
 typedef enum {
     INPUT_EVENT_NONE = 0,
-    INPUT_EVENT_ENCODER_CW,      // Rotate clockwise
-    INPUT_EVENT_ENCODER_CCW,     // Rotate counter-clockwise
-    INPUT_EVENT_KEYCODE,           // Press Enter
-    INPUT_EVENT_TIMEOUT,         // Timeout to return to keyboard mode
+    INPUT_EVENT_ENCODER_CW,  // Rotate clockwise
+    INPUT_EVENT_ENCODER_CCW, // Rotate counter-clockwise
+    INPUT_EVENT_KEYCODE,     // Press Enter
+    INPUT_EVENT_TIMEOUT,     // Timeout to return to keyboard mode
+    INPUT_EVENT_ENTER,       // Enter key
+    INPUT_EVENT_ESC,         // Escape key
+    INPUT_EVENT_BACKSPACE,   // Backspace key
+    INPUT_EVENT_TAB,         // Tab key
+    INPUT_EVENT_RIGHT_ARROW, // Navigate right in menu
+    INPUT_EVENT_LEFT_ARROW,  // Navigate left in menu
+    INPUT_EVENT_DOWN_ARROW,  // Navigate up in menu
+    INPUT_EVENT_UP_ARROW,    // Navigate down in menu
     INPUT_EVENT_MAX
 } input_event_e;

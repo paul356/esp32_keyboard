@@ -94,7 +94,7 @@ const char* basic_key_codes[] = {
     "0",
     "Ent",
     "Esc",
-    "<--",
+    "Backspace",
     "TAB",
     "Space",
     "-",
@@ -696,4 +696,89 @@ esp_err_t parse_full_key_name(const char* full_name, uint16_t* keycode)
     }
 
     return ESP_OK;
+}
+
+input_event_e scancode_to_input_event(uint8_t scancode)
+{
+    // Map scancodes to input events
+    switch (scancode)
+    {
+    case SCAN_CODE_ENTER:
+        return INPUT_EVENT_ENTER;
+    case SCAN_CODE_ESC:
+        return INPUT_EVENT_ESC;
+    case SCAN_CODE_BACKSPACE:
+        return INPUT_EVENT_BACKSPACE;
+    case SCAN_CODE_TAB:
+        return INPUT_EVENT_TAB;
+    case SCAN_CODE_RIGHT:
+        return INPUT_EVENT_RIGHT_ARROW;
+    case SCAN_CODE_LEFT:
+        return INPUT_EVENT_LEFT_ARROW;
+    case SCAN_CODE_DOWN:
+        return INPUT_EVENT_DOWN_ARROW;
+    case SCAN_CODE_UP:
+        return INPUT_EVENT_UP_ARROW;
+    default:
+        return INPUT_EVENT_KEYCODE; // Unsupported scancode
+    }
+}
+
+static char shifted_number[] = "!@#$%^&*()";
+char scancode_to_printable_char(bool shifted, uint8_t scancode)
+{
+    // Handle uppercase letters based on modifier keys
+    if (scancode >= SCAN_CODE_A && scancode <= SCAN_CODE_Z) {
+        if (shifted) {
+            return 'A' + (scancode - SCAN_CODE_A);
+        } else {
+            return 'a' + (scancode - SCAN_CODE_A);
+        }
+    }
+
+    if (scancode >= SCAN_CODE_1 && scancode <= SCAN_CODE_0) {
+        if (shifted) {
+            return shifted_number[scancode - SCAN_CODE_1];
+        } else if (scancode >= SCAN_CODE_1 && scancode <= SCAN_CODE_0 - 1) {
+            return '1' + (scancode - SCAN_CODE_1);
+        } else {
+            // In ascii '0' comes before '1'
+            return '0';
+        }
+    }
+
+    // Handle other characters
+    switch (scancode)
+    {
+    case SCAN_CODE_SPACE:
+        return ' '; // Space key
+    case SCAN_CODE_MINUS:
+        return shifted ? '_' : '-'; // Minus key
+    case SCAN_CODE_EQUAL:
+        return shifted ? '+' : '='; // Equal key
+    case SCAN_CODE_LBRACKET:
+        return shifted ? '{' : '['; // Left bracket key
+    case SCAN_CODE_RBRACKET:
+        return shifted ? '}' : ']'; // Right bracket key
+    case SCAN_CODE_BACKSLASH:
+        return shifted ? '|' : '\\'; // Backslash key
+    case SCAN_CODE_HASH_EU:
+        return shifted ? '~' : '#'; // Non-US # key
+    case SCAN_CODE_SEMICOLON:
+        return shifted ? ':' : ';'; // Semicolon key
+    case SCAN_CODE_QUOTE:
+        return shifted ? '"' : '\''; // Quote key
+    case SCAN_CODE_GRAVE:
+        return shifted ? '~' : '`'; // Grave accent key
+    case SCAN_CODE_COMMA:
+        return shifted ? '<' : ','; // Comma key
+    case SCAN_CODE_DOT:
+        return shifted ? '>' : '.'; // Dot key
+    case SCAN_CODE_SLASH:
+        return shifted ? '?' : '/'; // Slash key
+    case SCAN_CODE_BACKSLASH_EU:
+        return shifted ? '|' : '\\'; // Non-US backslash key
+    default:
+        return '\0'; // Unsupported scancode
+    }
 }

@@ -28,6 +28,8 @@
 #include <string.h>
 #include <stdio.h>
 #include "drv_loop.h"
+#include "key_definitions.h"
+#include "action_code.h"
 
 #define UPDATE_LVGL_PERIOD_MS  250  // Update LVGL every second
 
@@ -40,7 +42,6 @@ typedef struct {
     uint32_t total_char_count;
     uint32_t session_char_count;
     uint32_t session_start_time;
-    uint8_t last_char_typed;
 } keyboard_stats_t;
 
 // GUI context structures for different menu types
@@ -49,7 +50,6 @@ typedef struct {
     lv_obj_t *stats_label;
     lv_obj_t *total_count_label;
     lv_obj_t *char_count_label;
-    lv_obj_t *last_char_label;
     lv_timer_t *update_timer;  // Timer for periodic updates
 } keyboard_info_gui_t;
 
@@ -62,7 +62,7 @@ typedef struct {
 
 typedef struct {
     int8_t input_event;
-    unsigned char keycode;  // Keycode of the pressed key
+    char keycode;  // Keycode of the pressed key
 } input_event_data_t;
 
 enum {
@@ -168,7 +168,7 @@ esp_err_t keyboard_gui_init(void)
 
     // Initialize display with keyboard information
     ESP_LOGI(TAG, "Displaying initial keyboard information");
-    menu_state_process_event(INPUT_EVENT_TIMEOUT, 0);
+    menu_return_to_keyboard_mode();
 
     ESP_LOGI(TAG, "Keyboard GUI initialized successfully");
     return ESP_OK;
@@ -190,11 +190,10 @@ void keyboard_gui_update(void)
     lv_timer_handler();
 }
 
-static void keyboard_gui_update_stats(uint8_t keycode)
+static void keyboard_gui_update_stats(uint32_t count)
 {
-    s_keyboard_stats.total_char_count++;
-    s_keyboard_stats.session_char_count++;
-    s_keyboard_stats.last_char_typed = keycode;
+    s_keyboard_stats.total_char_count += count;
+    s_keyboard_stats.session_char_count += count;
 }
 
 bool keyboard_gui_handle_key_input(uint8_t mods, uint8_t *scan_code, int code_len)
@@ -212,26 +211,43 @@ bool keyboard_gui_handle_key_input(uint8_t mods, uint8_t *scan_code, int code_le
             {
                 continue; // Skip null codes
             }
-            keyboard_gui_post_input_event_isr(INPUT_EVENT_KEYCODE, scan_code[i]);
+
+            input_event_e input_event = scancode_to_input_event(scan_code[i]);
+            if (input_event != INPUT_EVENT_KEYCODE)
+            {
+                keyboard_gui_post_input_event_isr(input_event, 0);
+            } else {
+                char keycode = scancode_to_printable_char(mods & MOD_LSFT, scan_code[i]);
+                if (keycode != '\0') {
+                    keyboard_gui_post_input_event_isr(INPUT_EVENT_KEYCODE, keycode);
+                }
+            }
         }
         return true;
     }
     else
     {
+        uint32_t count = 0;
         for (int i = 0; i < code_len; i++)
         {
             if (scan_code[i] == 0)
             {
                 continue; // Skip null codes
             }
-            keyboard_gui_update_stats(scan_code[i]);
+
+            input_event_e input_event = scancode_to_input_event(scan_code[i]);
+            if (input_event != INPUT_EVENT_KEYCODE) {
+                count++;
+            }
         }
+
+        keyboard_gui_update_stats(count);
     }
 
     return false;
 }
 
-esp_err_t keyboard_gui_post_input_event_isr(input_event_e event, unsigned char keycode)
+esp_err_t keyboard_gui_post_input_event_isr(input_event_e event, char keycode)
 {
     input_event_data_t input_evt_data = {
         .input_event = event,
@@ -318,13 +334,6 @@ static keyboard_info_gui_t* create_keyboard_info_gui(void)
     lv_obj_set_style_text_font(gui->char_count_label, &lv_font_montserrat_12, 0);  // Changed to available font
     lv_obj_align(gui->char_count_label, LV_ALIGN_TOP_LEFT, 0, 42);  // Position below total count
     lv_label_set_text(gui->char_count_label, "Chars: 0");
-
-    // Last key label
-    gui->last_char_label = lv_label_create(gui->container);
-    lv_obj_set_style_text_color(gui->last_char_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->last_char_label, &lv_font_montserrat_12, 0);  // Changed to available font
-    lv_obj_align(gui->last_char_label, LV_ALIGN_TOP_LEFT, 0, 82);  // Adjusted spacing to accommodate total count
-    lv_label_set_text(gui->last_char_label, "Last: -");
 
     // Instructions
     lv_obj_t *instruction_label = lv_label_create(gui->container);
@@ -414,13 +423,6 @@ static void update_keyboard_info_display(keyboard_info_gui_t *gui)
     // Update character count
     snprintf(buffer, sizeof(buffer), "Chars: %lu", s_keyboard_stats.session_char_count);
     lv_label_set_text(gui->char_count_label, buffer);
-
-    // Update last key
-    if (s_keyboard_stats.last_char_typed != 0) {
-        snprintf(buffer, sizeof(buffer), "Last: %c",
-                 s_keyboard_stats.last_char_typed);
-    }
-    lv_label_set_text(gui->last_char_label, buffer);
 }
 
 static void update_nonleaf_item_display(nonleaf_item_gui_t *gui, struct menu_item *menu_item)

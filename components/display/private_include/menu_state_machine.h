@@ -38,7 +38,7 @@ struct menu_item {
     lv_obj_t *icon;                                     // Optional icon (can be NULL)
     esp_err_t (*prepare_gui_func)(struct menu_item *self);  // Optional preparation function
     esp_err_t (*post_gui_func)(struct menu_item *self); // Optional long press action function
-    bool (*handle_input_key)(uint8_t key_code);         // Optional input key handler function
+    bool (*handle_input_key)(input_event_e input_event, char key_code);         // Optional input key handler function
     esp_err_t (*user_action)(struct menu_item *self);   // Optional user action function
     void *user_ctx;                                     // User context data
     struct menu_item *parent;                           // Parent menu item
@@ -96,6 +96,11 @@ void menu_state_update_timeout(void);
 void menu_state_set_timeout(uint32_t timeout_ms);
 
 /**
+ * @brief Return to keyboard mode
+ */
+void menu_return_to_keyboard_mode(void);
+
+/**
  * @brief Create a new menu item
  * @param text Display text for the menu item
  * @param prepare_func Optional preparation function called when entering this menu
@@ -107,7 +112,7 @@ void menu_state_set_timeout(uint32_t timeout_ms);
 struct menu_item* menu_item_create(const char *text,
                                   esp_err_t (*prepare_func)(struct menu_item *self),
                                   esp_err_t (*post_func)(struct menu_item *self),
-                                  bool (*handle_input_key)(uint8_t key_code),
+                                  bool (*handle_input_key)(input_event_e input_evt, char key_code),
                                   esp_err_t (*user_action)(struct menu_item *self));
 
 /**

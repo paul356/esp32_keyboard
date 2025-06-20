@@ -91,41 +91,50 @@ bool menu_state_process_event(input_event_e event, unsigned char ch)
         event_consumed = true;
         break;
 
-    case INPUT_EVENT_KEYCODE:
-        switch (ch)
+    case INPUT_EVENT_ENTER:
+        // Navigate down the tree or execute action
+        if (s_menu_context.current_menu->focused_child)
         {
-        case '\n': // Enter key
-            // Navigate down the tree or execute action
-            if (s_menu_context.current_menu->focused_child)
-            {
-                struct menu_item *target = s_menu_context.current_menu->focused_child;
+            struct menu_item *target = s_menu_context.current_menu->focused_child;
 
-                menu_navigate_to(target);
-            }
-            else if (s_menu_context.current_menu->user_action)
-            {
-                // Current menu item has an action
-                ESP_LOGI(TAG, "Executing action for current menu: %s", s_menu_context.current_menu->text);
-                s_menu_context.current_menu->user_action(s_menu_context.current_menu);
-            }
-            break;
-        case '\x1b': // Escape key
-            // Navigate up the tree or do nothing if at root
-            if (s_menu_context.current_menu->parent)
-            {
-                menu_navigate_to(s_menu_context.current_menu->parent);
-            }
-            break;
-        default:
-            ESP_LOGW(TAG, "Unhandled input key: %c", ch);
-            break;
+            menu_navigate_to(target);
+        }
+        else if (s_menu_context.current_menu->user_action)
+        {
+            // Current menu item has an action
+            ESP_LOGI(TAG, "Executing action for current menu: %s", s_menu_context.current_menu->text);
+            s_menu_context.current_menu->user_action(s_menu_context.current_menu);
+        }
+        event_consumed = true;
+        break;
+
+    case INPUT_EVENT_ESC:
+        // Navigate up the tree or do nothing if at root
+        if (s_menu_context.current_menu->parent)
+        {
+            menu_navigate_to(s_menu_context.current_menu->parent);
+        }
+        event_consumed = true;
+        break;
+
+    case INPUT_EVENT_KEYCODE:
+    case INPUT_EVENT_BACKSPACE:
+    case INPUT_EVENT_TAB:
+    case INPUT_EVENT_RIGHT_ARROW:
+    case INPUT_EVENT_LEFT_ARROW:
+    case INPUT_EVENT_DOWN_ARROW:
+    case INPUT_EVENT_UP_ARROW:
+        if (s_menu_context.current_menu->handle_input_key)
+        {
+            // Handle key input if defined
+            s_menu_context.current_menu->handle_input_key(event, ch);
         }
         event_consumed = true;
         break;
 
     case INPUT_EVENT_TIMEOUT:
         // Return to keyboard mode on timeout
-        menu_navigate_to(s_menu_context.keyboard_info);
+        menu_return_to_keyboard_mode();
         event_consumed = true;
         break;
 
@@ -266,7 +275,7 @@ static struct menu_item* menu_get_prev_sibling(struct menu_item *item)
 struct menu_item* menu_item_create(const char *text,
                                   esp_err_t (*prepare_gui_func)(struct menu_item *self),
                                   esp_err_t (*post_gui_func)(struct menu_item *self),
-                                  bool (*handle_input_key)(uint8_t key_code),
+                                  bool (*handle_input_key)(input_event_e input_evt, char key_code),
                                   esp_err_t (*user_action)(struct menu_item *self))
 {
     if (!text) {
@@ -372,6 +381,11 @@ static void menu_navigate_to(struct menu_item *target)
         s_menu_context.menu_active = false;
     }
     ESP_LOGI(TAG, "Navigated to menu item: %s", target->text);
+}
+
+void menu_return_to_keyboard_mode(void)
+{
+    menu_navigate_to(s_menu_context.keyboard_info);
 }
 
 void menu_item_destroy(struct menu_item *item)

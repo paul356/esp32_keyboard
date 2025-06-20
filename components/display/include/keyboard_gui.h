@@ -54,7 +54,7 @@ bool keyboard_gui_handle_key_input(uint8_t mods, uint8_t *scan_code, int code_le
  * @param keycode The keycode associated with the event
  * @return esp_err_t ESP_OK on success
  */
-esp_err_t keyboard_gui_post_input_event_isr(input_event_e event, unsigned char keycode);
+esp_err_t keyboard_gui_post_input_event_isr(input_event_e event, char keycode);
 
 /**
  * @brief Reset session statistics
