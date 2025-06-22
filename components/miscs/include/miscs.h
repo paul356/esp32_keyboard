@@ -33,33 +33,6 @@ esp_err_t miscs_init(void);
 esp_err_t miscs_deinit(void);
 
 /**
- * @brief Configure GPIO pin for miscellaneous hardware
- * 
- * @param gpio_num GPIO pin number
- * @param mode GPIO mode (input/output)
- * @param pull_mode GPIO pull mode
- * @return esp_err_t ESP_OK on success, error code otherwise
- */
-esp_err_t miscs_gpio_config(gpio_num_t gpio_num, gpio_mode_t mode, gpio_pull_mode_t pull_mode);
-
-/**
- * @brief Set GPIO pin level
- * 
- * @param gpio_num GPIO pin number
- * @param level GPIO level (0 or 1)
- * @return esp_err_t ESP_OK on success, error code otherwise
- */
-esp_err_t miscs_gpio_set_level(gpio_num_t gpio_num, uint32_t level);
-
-/**
- * @brief Get GPIO pin level
- * 
- * @param gpio_num GPIO pin number
- * @return int GPIO level (0 or 1), -1 on error
- */
-int miscs_gpio_get_level(gpio_num_t gpio_num);
-
-/**
  * @brief Check if device is powered by USB
  * 
  * @return true if USB power is detected (GPIO6 high), false if battery powered

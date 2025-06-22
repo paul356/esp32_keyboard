@@ -36,6 +36,7 @@ static volatile miscs_encoder_direction_t encoder_direction = MISCS_ENCODER_STOP
 static volatile uint8_t encoder_last_state = 0;
 
 static esp_err_t miscs_encoder_init(void);
+static esp_err_t miscs_gpio_config(gpio_num_t gpio_num, gpio_mode_t mode, gpio_pull_mode_t pull_mode);
 
 // Encoder interrupt handler
 static void IRAM_ATTR encoder_isr_handler(void* arg)
@@ -154,7 +155,7 @@ esp_err_t miscs_deinit(void)
     return ESP_OK;
 }
 
-esp_err_t miscs_gpio_config(gpio_num_t gpio_num, gpio_mode_t mode, gpio_pull_mode_t pull_mode)
+static esp_err_t miscs_gpio_config(gpio_num_t gpio_num, gpio_mode_t mode, gpio_pull_mode_t pull_mode)
 {
     gpio_config_t io_conf = {
         .pin_bit_mask = (1ULL << gpio_num),
@@ -170,26 +171,6 @@ esp_err_t miscs_gpio_config(gpio_num_t gpio_num, gpio_mode_t mode, gpio_pull_mod
     }
     
     return ret;
-}
-
-esp_err_t miscs_gpio_set_level(gpio_num_t gpio_num, uint32_t level)
-{
-    esp_err_t ret = gpio_set_level(gpio_num, level);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to set GPIO %d level: %s", gpio_num, esp_err_to_name(ret));
-    }
-    
-    return ret;
-}
-
-int miscs_gpio_get_level(gpio_num_t gpio_num)
-{
-    int level = gpio_get_level(gpio_num);
-    if (level < 0) {
-        ESP_LOGE(TAG, "Failed to get GPIO %d level", gpio_num);
-    }
-    
-    return level;
 }
 
 // USB Power Detection Functions
