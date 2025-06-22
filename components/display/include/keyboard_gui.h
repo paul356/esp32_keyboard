@@ -74,9 +74,3 @@ esp_err_t keyboard_gui_set_brightness(uint8_t brightness);
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t keyboard_gui_display_on_off(bool on);
-
-/**
- * @brief Deinitialize keyboard GUI
- * @return esp_err_t ESP_OK on success
- */
-esp_err_t keyboard_gui_deinit(void);

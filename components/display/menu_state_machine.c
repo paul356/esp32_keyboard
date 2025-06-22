@@ -24,7 +24,7 @@
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
 #include "menu_state_machine.h"
-#include "menu_item_funcs.h"
+#include "keyboard_gui_construct.h"
 
 static const char *TAG = "menu_state";
 
@@ -430,12 +430,16 @@ static void menu_setup_tree(void)
     struct menu_item *led_menu = menu_item_create("LED", keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
     struct menu_item *advanced_menu = menu_item_create("Advanced", keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
 
+    // Create About menu item (to be added to main menu)
+    struct menu_item *about = menu_item_create("About", NULL, NULL, NULL, NULL);
+
     // Add main menu children
     menu_item_add_child(s_menu_context.root_menu, keyboard_mode_menu);
     menu_item_add_child(s_menu_context.root_menu, bluetooth_menu);
     menu_item_add_child(s_menu_context.root_menu, wifi_menu);
     menu_item_add_child(s_menu_context.root_menu, led_menu);
     menu_item_add_child(s_menu_context.root_menu, advanced_menu);
+    menu_item_add_child(s_menu_context.root_menu, about);
 
     // Create Bluetooth submenu items
     struct menu_item *bt_toggle = menu_item_create("Toggle Bluetooth", NULL, NULL, NULL, NULL);
@@ -464,12 +468,10 @@ static void menu_setup_tree(void)
     struct menu_item *kb_lock = menu_item_create("Keyboard Lock", NULL, NULL, NULL, NULL);
     struct menu_item *input_log = menu_item_create("Input Logging", NULL, NULL, NULL, NULL);
     struct menu_item *standup_reminder = menu_item_create("Standup Reminder", NULL, NULL, NULL, NULL);
-    struct menu_item *about = menu_item_create("About", NULL, NULL, NULL, NULL);
 
     menu_item_add_child(advanced_menu, kb_lock);
     menu_item_add_child(advanced_menu, input_log);
     menu_item_add_child(advanced_menu, standup_reminder);
-    menu_item_add_child(advanced_menu, about);
 
     ESP_LOGI(TAG, "Menu tree structure setup complete");
 }

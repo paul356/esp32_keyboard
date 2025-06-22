@@ -23,6 +23,16 @@
 #include "menu_state_machine.h"
 
 /**
+ * @brief Update keyboard statistics
+ */
+void keyboard_gui_update_stats(uint32_t count);
+
+/**
+ * @brief Initialize keyboard statistics
+ */
+void keyboard_gui_init_keyboard_stats(void);
+
+/**
  * @brief Prepare keyboard info GUI function for menu items
  * Creates and shows keyboard info interface with periodic updates
  * @param self Menu item that displays keyboard statistics
