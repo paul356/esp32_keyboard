@@ -40,7 +40,7 @@
 #include "esp_sleep.h"
 #include "esp_pm.h"
 #include "tusb.h"
-#include "port_mgmt.h"
+#include "matrix_config.h"
 #include "function_control.h"
 #include "keyboard_gui.h"
 #include "hid_desc.h"

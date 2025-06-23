@@ -26,11 +26,12 @@
 #include "esp_rom_gpio.h"
 #include "esp_log.h"
 #include "config.h"
+#include "matrix_config.h"
 
 #define GPIO_TAG "gpio"
 
-const gpio_num_t rows[] = MATRIX_ROW_PINS;
-const gpio_num_t cols[] = MATRIX_COL_PINS;
+const gpio_num_t rows[MATRIX_ROWS] = MATRIX_ROW_PINS;
+const gpio_num_t cols[MATRIX_COLS] = MATRIX_COL_PINS;
 
 // deinitializing rtc matrix pins on  deep sleep wake up
 void rtc_matrix_deinit(void) {
