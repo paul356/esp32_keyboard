@@ -56,6 +56,7 @@
 #include "miscs.h"
 #include "memory_debug.h"
 #include "drv_loop.h"
+#include "led_ctrl.h"
 
 extern esp_err_t start_file_server();
 extern void wifi_init_softap(void);
@@ -192,10 +193,15 @@ void app_main()
     // Initialize miscs
     ret = miscs_init();
     if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to initialize miscs: %s", esp_err_to_name(ret));
-        return;
+        ESP_LOGW(TAG, "Failed to initialize miscs: %s", esp_err_to_name(ret));
     }
     log_memory_usage("After miscs_init");
+
+    ret = led_ctrl_init();
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to initialize led ctrl: %s", esp_err_to_name(ret));
+    }
+    log_memory_usage("After led_ctrl_init");
 
     ESP_ERROR_CHECK(keyboard_gui_init());
     log_memory_usage("After keyboard_gui_init");

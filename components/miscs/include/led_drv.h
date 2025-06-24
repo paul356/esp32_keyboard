@@ -46,10 +46,8 @@ esp_err_t led_drv_deinit(void);
  * @brief Clear all LEDs (turn them off)
  * 
  * This function turns off all LEDs in the strip by setting them to black (0,0,0).
- * 
- * @return esp_err_t ESP_OK on success, error code otherwise
  */
-esp_err_t led_drv_clear(void);
+void led_drv_clear(void);
 
 /**
  * @brief Set a single LED color
@@ -72,16 +70,6 @@ esp_err_t led_drv_set_led(uint16_t index, led_drv_color_t color);
  * @return esp_err_t ESP_OK on success, error code otherwise
  */
 esp_err_t led_drv_update(void);
-
-/**
- * @brief Set all LEDs to the same color
- * 
- * This function sets all LEDs in the strip to the same color and updates the strip.
- * 
- * @param color Color to set for all LEDs
- * @return esp_err_t ESP_OK on success, error code otherwise
- */
-esp_err_t led_drv_set_all(led_drv_color_t color);
 
 #ifdef __cplusplus
 }

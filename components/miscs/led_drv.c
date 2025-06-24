@@ -205,11 +205,7 @@ esp_err_t led_drv_init(void)
     memset(led_buffer, 0, sizeof(led_buffer));
     
     // Clear the strip initially
-    ret = led_drv_clear();
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to clear LED strip during initialization");
-        return ret;
-    }
+    led_drv_clear();
     
     ESP_LOGI(TAG, "LED strip driver initialized successfully");
     return ESP_OK;
@@ -281,10 +277,9 @@ cleanup:
     return ret;
 }
 
-esp_err_t led_drv_clear(void)
+void led_drv_clear(void)
 {
-    led_drv_color_t black = {0, 0, 0};
-    return led_drv_set_all(black);
+    memset(led_buffer, 0, sizeof(led_buffer)); // Set all LEDs to black (off)
 }
 
 esp_err_t led_drv_set_led(uint16_t index, led_drv_color_t color)
@@ -301,16 +296,4 @@ esp_err_t led_drv_set_led(uint16_t index, led_drv_color_t color)
 esp_err_t led_drv_update(void)
 {
     return led_drv_write(led_buffer, LED_DRV_NUM_LEDS);
-}
-
-esp_err_t led_drv_set_all(led_drv_color_t color)
-{
-    led_drv_color_t led_data[LED_DRV_NUM_LEDS];
-    
-    // Fill array with the same color
-    for (int i = 0; i < LED_DRV_NUM_LEDS; i++) {
-        led_data[i] = color;
-    }
-    
-    return led_drv_write(led_data, LED_DRV_NUM_LEDS);
 }

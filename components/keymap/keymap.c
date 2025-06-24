@@ -27,6 +27,7 @@
 #include "macros.h"
 #include "function_key.h"
 #include "quantum.h"
+#include "led_ctrl.h"
 
 // A bit different from QMK, default returns you to the first layer, LOWER and raise increase/lower layer by order.
 #define DEFAULT 0x100
@@ -78,6 +79,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         process_function_key(keycode);
         return false;  // Prevent further processing of this keycode
     }
+
+    led_ctrl_keystroke(record->event.key.row, record->event.key.col, record->event.pressed);
 
     return true;
 }
