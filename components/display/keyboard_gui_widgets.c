@@ -25,7 +25,7 @@
 #include "lvgl.h"
 #include "lcd_hardware.h"
 #include "menu_state_machine.h"
-#include "keyboard_gui_construct.h"
+#include "keyboard_gui_widgets.h"
 
 #define TAG "keyboard_gui_construct"
 

@@ -29,7 +29,7 @@
 #include "keyboard_gui.h"
 #include "lcd_hardware.h"
 #include "menu_state_machine.h"
-#include "keyboard_gui_construct.h"
+#include "keyboard_gui_widgets.h"
 
 #define UPDATE_LVGL_PERIOD_MS  250  // Update LVGL every second
 
