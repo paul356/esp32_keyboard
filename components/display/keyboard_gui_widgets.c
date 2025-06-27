@@ -19,6 +19,7 @@
  */
 
 #include <string.h>
+#include <stdlib.h>
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -28,6 +29,14 @@
 #include "keyboard_gui_widgets.h"
 
 #define TAG "keyboard_gui_construct"
+
+// Horizontal menu layout constants
+#define MENU_ICON_WIDTH         48      // Width of each menu icon
+#define MENU_ICON_HEIGHT        48      // Height of each menu icon
+#define MENU_ICON_SPACING       8       // Spacing between icons
+#define MENU_TEXT_HEIGHT        12      // Height for text below icons
+#define MENU_CONTAINER_PADDING  4       // Padding around menu container
+#define MAX_VISIBLE_ITEMS       ((LCD_WIDTH - 2 * MENU_CONTAINER_PADDING) / (MENU_ICON_WIDTH + MENU_ICON_SPACING))
 
 /**
  * @brief Keyboard statistics structure
@@ -50,8 +59,12 @@ typedef struct {
 typedef struct {
     lv_obj_t *container;
     lv_obj_t *menu_title_label;
-    lv_obj_t *menu_items_list;
-    lv_obj_t *current_selection_bar;
+    lv_obj_t *menu_items_container;
+    lv_obj_t **menu_icons;          // Array of icon containers
+    lv_obj_t **menu_labels;         // Array of text labels
+    int visible_items_count;        // Number of currently visible items
+    int first_visible_index;        // Index of first visible item
+    int total_items_count;          // Total number of menu items
 } nonleaf_item_gui_t;
 
 static lv_obj_t *s_main_screen = NULL;
@@ -62,6 +75,10 @@ static nonleaf_item_gui_t* create_nonleaf_item_gui(void);
 static void update_keyboard_info_display(keyboard_info_gui_t *gui);
 static void update_nonleaf_item_display(nonleaf_item_gui_t *gui, struct menu_item *menu_item);
 static void keyboard_info_timer_cb(lv_timer_t *timer);
+static lv_obj_t* create_menu_icon(lv_obj_t *parent, const char *text, bool is_focused);
+static void update_horizontal_menu_display(nonleaf_item_gui_t *gui, struct menu_item *menu_item);
+static int count_menu_children(struct menu_item *menu_item);
+static void calculate_visible_items(nonleaf_item_gui_t *gui, struct menu_item *menu_item);
 
 // GUI setup and teardown functions for menu items
 static esp_err_t prepare_keyboard_info_gui(struct menu_item *self);
@@ -155,6 +172,203 @@ static void keyboard_info_timer_cb(lv_timer_t *timer)
     }
 }
 
+static lv_obj_t* create_menu_icon(lv_obj_t *parent, const char *text, bool is_focused)
+{
+    // Create icon container
+    lv_obj_t *icon_container = lv_obj_create(parent);
+    lv_obj_set_size(icon_container, MENU_ICON_WIDTH, MENU_ICON_HEIGHT);
+    lv_obj_set_style_radius(icon_container, 8, 0);
+    
+    // Set background color based on focus state
+    if (is_focused) {
+        lv_obj_set_style_bg_color(icon_container, lv_color_hex(0x404040), 0);
+        lv_obj_set_style_border_width(icon_container, 2, 0);
+        lv_obj_set_style_border_color(icon_container, lv_color_white(), 0);
+    } else {
+        lv_obj_set_style_bg_color(icon_container, lv_color_hex(0x202020), 0);
+        lv_obj_set_style_border_width(icon_container, 1, 0);
+        lv_obj_set_style_border_color(icon_container, lv_color_hex(0x404040), 0);
+    }
+
+    // Create text label inside icon - use first 3 characters or abbreviation
+    lv_obj_t *icon_label = lv_label_create(icon_container);
+    lv_obj_set_style_text_color(icon_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(icon_label, &lv_font_montserrat_10, 0);
+    lv_obj_center(icon_label);
+    
+    // Create abbreviated text for icon
+    char abbreviated_text[4] = {0};
+    if (text) {
+        if (strcmp(text, "Keyboard Mode") == 0) {
+            strcpy(abbreviated_text, "KB");
+        } else if (strcmp(text, "Bluetooth") == 0) {
+            strcpy(abbreviated_text, "BT");
+        } else if (strcmp(text, "WiFi") == 0) {
+            strcpy(abbreviated_text, "WF");
+        } else if (strcmp(text, "LED") == 0) {
+            strcpy(abbreviated_text, "LED");
+        } else if (strcmp(text, "Advanced") == 0) {
+            strcpy(abbreviated_text, "ADV");
+        } else if (strcmp(text, "About") == 0) {
+            strcpy(abbreviated_text, "?");
+        } else {
+            // Use first 3 characters for other items
+            strncpy(abbreviated_text, text, 3);
+            abbreviated_text[3] = '\0';
+        }
+    }
+    lv_label_set_text(icon_label, abbreviated_text);
+
+    return icon_container;
+}
+
+static int count_menu_children(struct menu_item *menu_item)
+{
+    if (!menu_item || LIST_EMPTY(&menu_item->children)) {
+        return 0;
+    }
+    
+    int count = 0;
+    struct menu_item *child;
+    LIST_FOREACH(child, &menu_item->children, entry) {
+        count++;
+    }
+    return count;
+}
+
+static void calculate_visible_items(nonleaf_item_gui_t *gui, struct menu_item *menu_item)
+{
+    if (!gui || !menu_item) {
+        return;
+    }
+    
+    gui->total_items_count = count_menu_children(menu_item);
+    gui->visible_items_count = (gui->total_items_count < MAX_VISIBLE_ITEMS) ? 
+                               gui->total_items_count : MAX_VISIBLE_ITEMS;
+    
+    // Find focused child index
+    int focused_index = 0;
+    if (menu_item->focused_child) {
+        struct menu_item *child;
+        int index = 0;
+        LIST_FOREACH(child, &menu_item->children, entry) {
+            if (child == menu_item->focused_child) {
+                focused_index = index;
+                break;
+            }
+            index++;
+        }
+    }
+    
+    // Calculate first visible index to center the focused item when possible
+    if (gui->total_items_count <= MAX_VISIBLE_ITEMS) {
+        gui->first_visible_index = 0;
+    } else {
+        gui->first_visible_index = focused_index - (MAX_VISIBLE_ITEMS / 2);
+        if (gui->first_visible_index < 0) {
+            gui->first_visible_index = 0;
+        } else if (gui->first_visible_index + MAX_VISIBLE_ITEMS > gui->total_items_count) {
+            gui->first_visible_index = gui->total_items_count - MAX_VISIBLE_ITEMS;
+        }
+    }
+}
+
+static void update_horizontal_menu_display(nonleaf_item_gui_t *gui, struct menu_item *menu_item)
+{
+    if (!gui || !menu_item) {
+        return;
+    }
+
+    // Clear existing items
+    lv_obj_clean(gui->menu_items_container);
+    
+    // Calculate visible items
+    calculate_visible_items(gui, menu_item);
+    
+    if (gui->total_items_count == 0) {
+        // No children - show message
+        lv_obj_t *info_label = lv_label_create(gui->menu_items_container);
+        lv_obj_set_style_text_color(info_label, lv_color_hex(0x808080), 0);
+        lv_obj_set_style_text_font(info_label, &lv_font_montserrat_10, 0);
+        lv_obj_center(info_label);
+        lv_label_set_text(info_label, "Press ENTER to execute");
+        return;
+    }
+    
+    // Create horizontal menu items
+    struct menu_item *child;
+    int current_index = 0;
+    int visible_item_index = 0;
+    
+    LIST_FOREACH(child, &menu_item->children, entry) {
+        // Skip items before first visible
+        if (current_index < gui->first_visible_index) {
+            current_index++;
+            continue;
+        }
+        
+        // Stop if we've shown enough visible items
+        if (visible_item_index >= gui->visible_items_count) {
+            break;
+        }
+        
+        // Create icon for this menu item
+        bool is_focused = (child == menu_item->focused_child);
+        lv_obj_t *icon = create_menu_icon(gui->menu_items_container, child->text, is_focused);
+        
+        // Position icon horizontally
+        int x_pos = visible_item_index * (MENU_ICON_WIDTH + MENU_ICON_SPACING);
+        lv_obj_set_pos(icon, x_pos, 0);
+        
+        // Create text label below icon
+        lv_obj_t *text_label = lv_label_create(gui->menu_items_container);
+        lv_obj_set_style_text_color(text_label, is_focused ? lv_color_white() : lv_color_hex(0x808080), 0);
+        lv_obj_set_style_text_font(text_label, &lv_font_montserrat_8, 0);
+        lv_obj_set_pos(text_label, x_pos, MENU_ICON_HEIGHT + 2);
+        lv_obj_set_width(text_label, MENU_ICON_WIDTH);
+        lv_obj_set_style_text_align(text_label, LV_TEXT_ALIGN_CENTER, 0);
+        
+        // Truncate long text
+        char truncated_text[9] = {0};
+        if (strlen(child->text) > 8) {
+            strncpy(truncated_text, child->text, 7);
+            strcat(truncated_text, ".");
+        } else {
+            strcpy(truncated_text, child->text);
+        }
+        lv_label_set_text(text_label, truncated_text);
+        
+        // Store references
+        gui->menu_icons[visible_item_index] = icon;
+        gui->menu_labels[visible_item_index] = text_label;
+        
+        current_index++;
+        visible_item_index++;
+    }
+    
+    // Show scroll indicators if needed
+    if (gui->total_items_count > MAX_VISIBLE_ITEMS) {
+        // Left scroll indicator
+        if (gui->first_visible_index > 0) {
+            lv_obj_t *left_arrow = lv_label_create(gui->menu_items_container);
+            lv_obj_set_style_text_color(left_arrow, lv_color_white(), 0);
+            lv_obj_set_style_text_font(left_arrow, &lv_font_montserrat_12, 0);
+            lv_obj_set_pos(left_arrow, -15, MENU_ICON_HEIGHT / 2 - 6);
+            lv_label_set_text(left_arrow, "<");
+        }
+        
+        // Right scroll indicator
+        if (gui->first_visible_index + gui->visible_items_count < gui->total_items_count) {
+            lv_obj_t *right_arrow = lv_label_create(gui->menu_items_container);
+            lv_obj_set_style_text_color(right_arrow, lv_color_white(), 0);
+            lv_obj_set_style_text_font(right_arrow, &lv_font_montserrat_12, 0);
+            lv_obj_set_pos(right_arrow, gui->visible_items_count * (MENU_ICON_WIDTH + MENU_ICON_SPACING), 
+                          MENU_ICON_HEIGHT / 2 - 6);
+            lv_label_set_text(right_arrow, ">");
+        }
+    }
+}
+
 static nonleaf_item_gui_t* create_nonleaf_item_gui(void)
 {
     nonleaf_item_gui_t *gui = malloc(sizeof(nonleaf_item_gui_t));
@@ -163,13 +377,16 @@ static nonleaf_item_gui_t* create_nonleaf_item_gui(void)
         return NULL;
     }
 
+    // Initialize all pointers
+    memset(gui, 0, sizeof(nonleaf_item_gui_t));
+
     // Create container for nonleaf item
     gui->container = lv_obj_create(s_main_screen);
     lv_obj_set_size(gui->container, LCD_WIDTH, LCD_HEIGHT);
     lv_obj_set_pos(gui->container, 0, 0);
     lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
     lv_obj_set_style_border_width(gui->container, 0, 0);
-    lv_obj_set_style_pad_all(gui->container, 2, 0);
+    lv_obj_set_style_pad_all(gui->container, MENU_CONTAINER_PADDING, 0);
 
     // Hide container initially - will be shown when prepare_gui_func is called
     lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
@@ -181,27 +398,39 @@ static nonleaf_item_gui_t* create_nonleaf_item_gui(void)
     lv_obj_align(gui->menu_title_label, LV_ALIGN_TOP_MID, 0, 0);
     lv_label_set_text(gui->menu_title_label, "Menu");
 
-    // Menu items container
-    gui->menu_items_list = lv_obj_create(gui->container);
-    lv_obj_set_size(gui->menu_items_list, LCD_WIDTH - 4, LCD_HEIGHT - 30);
-    lv_obj_set_pos(gui->menu_items_list, 2, 15);
-    lv_obj_set_style_bg_color(gui->menu_items_list, lv_color_black(), 0);
-    lv_obj_set_style_border_width(gui->menu_items_list, 0, 0);
-    lv_obj_set_style_pad_all(gui->menu_items_list, 2, 0);
+    // Horizontal menu items container
+    gui->menu_items_container = lv_obj_create(gui->container);
+    lv_obj_set_size(gui->menu_items_container, LCD_WIDTH - 2 * MENU_CONTAINER_PADDING, 
+                    MENU_ICON_HEIGHT + MENU_TEXT_HEIGHT + 8);
+    lv_obj_set_pos(gui->menu_items_container, 0, 20);
+    lv_obj_set_style_bg_color(gui->menu_items_container, lv_color_black(), 0);
+    lv_obj_set_style_border_width(gui->menu_items_container, 0, 0);
+    lv_obj_set_style_pad_all(gui->menu_items_container, 0, 0);
 
-    // Selection highlight bar
-    gui->current_selection_bar = lv_obj_create(gui->menu_items_list);
-    lv_obj_set_size(gui->current_selection_bar, LCD_WIDTH - 8, 12);
-    lv_obj_set_style_bg_color(gui->current_selection_bar, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_border_width(gui->current_selection_bar, 1, 0);
-    lv_obj_set_style_border_color(gui->current_selection_bar, lv_color_white(), 0);
+    // Allocate arrays for maximum possible visible items
+    gui->menu_icons = malloc(MAX_VISIBLE_ITEMS * sizeof(lv_obj_t*));
+    gui->menu_labels = malloc(MAX_VISIBLE_ITEMS * sizeof(lv_obj_t*));
+    
+    if (!gui->menu_icons || !gui->menu_labels) {
+        ESP_LOGE(TAG, "Failed to allocate memory for menu arrays");
+        if (gui->menu_icons) free(gui->menu_icons);
+        if (gui->menu_labels) free(gui->menu_labels);
+        free(gui);
+        return NULL;
+    }
+
+    // Initialize arrays
+    for (int i = 0; i < MAX_VISIBLE_ITEMS; i++) {
+        gui->menu_icons[i] = NULL;
+        gui->menu_labels[i] = NULL;
+    }
 
     // Instructions
     lv_obj_t *instruction_label = lv_label_create(gui->container);
     lv_obj_set_style_text_color(instruction_label, lv_color_hex(0x808080), 0);
     lv_obj_set_style_text_font(instruction_label, &lv_font_montserrat_8, 0);
     lv_obj_align(instruction_label, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_label_set_text(instruction_label, "Enter=Select ESC=Back");
+    lv_label_set_text(instruction_label, "Rotate=Navigate Enter=Select ESC=Back");
 
     return gui;
 }
@@ -232,54 +461,8 @@ static void update_nonleaf_item_display(nonleaf_item_gui_t *gui, struct menu_ite
     // Update menu title
     lv_label_set_text(gui->menu_title_label, menu_item->text);
 
-    // Clear existing menu items
-    lv_obj_clean(gui->menu_items_list);
-
-    // Recreate selection bar
-    gui->current_selection_bar = lv_obj_create(gui->menu_items_list);
-    lv_obj_set_size(gui->current_selection_bar, LCD_WIDTH - 8, 12);
-    lv_obj_set_style_bg_color(gui->current_selection_bar, lv_color_hex(0x333333), 0);
-    lv_obj_set_style_border_width(gui->current_selection_bar, 1, 0);
-    lv_obj_set_style_border_color(gui->current_selection_bar, lv_color_white(), 0);
-
-    // Add menu items (children of current menu)
-    struct menu_item *child;
-    int y_pos = 0;
-    int item_index = 0;
-
-    LIST_FOREACH(child, &menu_item->children, entry) {
-        if (y_pos >= LCD_HEIGHT - 35) {
-            break; // Don't overflow the display
-        }
-
-        lv_obj_t *item_label = lv_label_create(gui->menu_items_list);
-        lv_obj_set_style_text_color(item_label, lv_color_white(), 0);
-        lv_obj_set_style_text_font(item_label, &lv_font_montserrat_10, 0);
-        lv_obj_set_pos(item_label, 2, y_pos);
-        lv_label_set_text(item_label, child->text);
-
-        // Highlight current selection
-        if (child == menu_item->focused_child) {
-            lv_obj_set_pos(gui->current_selection_bar, 0, y_pos - 1);
-        }
-
-        y_pos += 12;
-        item_index++;
-    }
-
-    // If no children, show that this is a leaf menu
-    if (LIST_EMPTY(&menu_item->children)) {
-        lv_obj_t *info_label = lv_label_create(gui->menu_items_list);
-        lv_obj_set_style_text_color(info_label, lv_color_hex(0x808080), 0);
-        lv_obj_set_style_text_font(info_label, &lv_font_montserrat_10, 0);
-        lv_obj_set_pos(info_label, 2, 0);
-        lv_label_set_text(info_label, "Press ENTER to execute");
-
-        // Hide selection bar for leaf menus
-        lv_obj_add_flag(gui->current_selection_bar, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_remove_flag(gui->current_selection_bar, LV_OBJ_FLAG_HIDDEN);
-    }
+    // Update horizontal menu display
+    update_horizontal_menu_display(gui, menu_item);
 }
 
 // GUI setup and teardown functions for menu items
@@ -379,7 +562,41 @@ static esp_err_t post_nonleaf_item_gui(struct menu_item *self)
 
     // Hide the nonleaf item container
     lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
-    ESP_LOGI(TAG, "Hidden nonleaf item container for: %s", self->text);
+
+    // Clean up horizontal menu icon and label arrays
+    if (gui->menu_icons) {
+        for (int i = 0; i < MAX_VISIBLE_ITEMS; i++) {
+            if (gui->menu_icons[i]) {
+                lv_obj_delete(gui->menu_icons[i]);
+                gui->menu_icons[i] = NULL;
+            }
+        }
+        free(gui->menu_icons);
+        gui->menu_icons = NULL;
+    }
+
+    if (gui->menu_labels) {
+        for (int i = 0; i < MAX_VISIBLE_ITEMS; i++) {
+            if (gui->menu_labels[i]) {
+                lv_obj_delete(gui->menu_labels[i]);
+                gui->menu_labels[i] = NULL;
+            }
+        }
+        free(gui->menu_labels);
+        gui->menu_labels = NULL;
+    }
+
+    // Clean up the main container and GUI structure
+    if (gui->container) {
+        lv_obj_delete(gui->container);
+        gui->container = NULL;
+    }
+
+    // Free the GUI structure itself
+    free(gui);
+    self->user_ctx = NULL;
+
+    ESP_LOGI(TAG, "Completed cleanup for nonleaf item container: %s", self->text);
 
     return ESP_OK;
 }
