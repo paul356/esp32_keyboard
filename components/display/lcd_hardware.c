@@ -80,11 +80,13 @@ static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, unsigned ch
     esp_lcd_panel_handle_t panel_handle = lv_display_get_user_data(disp);
     esp_lcd_panel_swap_xy(panel_handle, true);
     esp_lcd_panel_mirror(panel_handle, true, false);
+
     int offsetx1 = area->x1;
     int offsetx2 = area->x2;
     int offsety1 = area->y1;
     int offsety2 = area->y2;
-    // because SPI LCD is big-endian, we need o swap the RGB bytes order
+
+    esp_lcd_panel_invert_color(panel_handle, true);
     lv_draw_sw_rgb565_swap(px_map, (offsetx2 + 1 - offsetx1) * (offsety2 + 1 - offsety1));
     // copy a buffer's content to a specific area of the display
     offsetx1 += SCREEN_OFFSET_X;
@@ -137,6 +139,7 @@ static esp_err_t init_lcd_panel(esp_lcd_panel_io_handle_t *io_handle, esp_lcd_pa
 
     ESP_RETURN_ON_ERROR(esp_lcd_panel_disp_on_off(*panel_handle, true), TAG, "Failed to turn on LCD panel");
 
+    esp_lcd_panel_invert_color(*panel_handle, true);
     ESP_LOGI(TAG, "Turn on LCD backlight");
     gpio_set_level(LCD_PIN_BL, 1);
 

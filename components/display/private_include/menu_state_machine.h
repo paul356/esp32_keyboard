@@ -35,7 +35,6 @@ typedef struct _lv_obj_t lv_obj_t;
  */
 struct menu_item {
     char *text;                                         // Display text for this menu item (dynamically allocated)
-    lv_obj_t *icon;                                     // Optional icon (can be NULL)
     esp_err_t (*prepare_gui_func)(struct menu_item *self);  // Optional preparation function
     esp_err_t (*post_gui_func)(struct menu_item *self); // Optional long press action function
     bool (*handle_input_key)(input_event_e input_event, char key_code);         // Optional input key handler function
@@ -122,13 +121,6 @@ struct menu_item* menu_item_create(const char *text,
  * @return true on success, false on failure
  */
 bool menu_item_add_child(struct menu_item *parent, struct menu_item *child);
-
-/**
- * @brief Set an icon for a menu item
- * @param item Menu item to set icon for
- * @param icon LVGL object representing the icon
- */
-void menu_item_set_icon(struct menu_item *item, lv_obj_t *icon);
 
 /**
  * @brief Free memory allocated for a menu item and its children recursively

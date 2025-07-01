@@ -299,7 +299,6 @@ struct menu_item* menu_item_create(const char *text,
     strcpy(item->text, text);
 
     // Initialize fields
-    item->icon = NULL;
     item->prepare_gui_func = prepare_gui_func;
     item->post_gui_func = post_gui_func;
     item->handle_input_key = handle_input_key;
@@ -347,14 +346,6 @@ bool menu_item_add_child(struct menu_item *parent, struct menu_item *child)
 
     ESP_LOGD(TAG, "Added child '%s' to parent '%s'", child->text, parent->text);
     return true;
-}
-
-void menu_item_set_icon(struct menu_item *item, lv_obj_t *icon)
-{
-    if (item) {
-        item->icon = icon;
-        ESP_LOGD(TAG, "Set icon for menu item: %s", item->text);
-    }
 }
 
 static void menu_navigate_to(struct menu_item *target)
