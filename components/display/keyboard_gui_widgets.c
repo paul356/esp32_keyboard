@@ -190,11 +190,11 @@ static lv_obj_t* create_menu_icon(lv_obj_t *parent, const char *text, bool is_fo
     // Set background color based on focus state
     if (is_focused) {
         lv_obj_set_style_bg_color(icon_container, lv_color_hex(0x404040), 0);
-        lv_obj_set_style_border_width(icon_container, 2, 0);
+        lv_obj_set_style_border_width(icon_container, 1, 0);
         lv_obj_set_style_border_color(icon_container, lv_color_white(), 0);
     } else {
         lv_obj_set_style_bg_color(icon_container, lv_color_hex(0x202020), 0);
-        lv_obj_set_style_border_width(icon_container, 1, 0);
+        lv_obj_set_style_border_width(icon_container, 0, 0);
         lv_obj_set_style_border_color(icon_container, lv_color_hex(0x404040), 0);
     }
 
@@ -375,6 +375,9 @@ static void update_horizontal_menu_display(nonleaf_item_gui_t *gui, struct menu_
 
         // Create icon for this menu item
         bool is_focused = (child == menu_item->focused_child);
+        if (is_focused) {
+            ESP_LOGI(TAG, "Focused child: %s", child->text);
+        }
         lv_obj_t *icon = create_menu_icon(gui->menu_items_container, child->text, is_focused);
 
         // Position icon horizontally - centered within container
@@ -402,25 +405,6 @@ static void update_horizontal_menu_display(nonleaf_item_gui_t *gui, struct menu_
         // Store references
         gui->menu_icons[visible_item_index] = icon;
         gui->menu_labels[visible_item_index] = text_label;
-    }
-
-    // Show scroll indicators only if there are more items than can be displayed
-    // For circular menu, we always show indicators when there are hidden items
-    if (gui->total_items_count > MAX_VISIBLE_ITEMS) {
-        // Left scroll indicator
-        lv_obj_t *left_arrow = lv_label_create(gui->menu_items_container);
-        lv_obj_set_style_text_color(left_arrow, lv_color_white(), 0);
-        lv_obj_set_style_text_font(left_arrow, &lv_font_montserrat_12, 0);
-        lv_obj_set_pos(left_arrow, icons_start_x - 15, MENU_ICON_HEIGHT / 2 - 6);
-        lv_label_set_text(left_arrow, "<");
-
-        // Right scroll indicator
-        lv_obj_t *right_arrow = lv_label_create(gui->menu_items_container);
-        lv_obj_set_style_text_color(right_arrow, lv_color_white(), 0);
-        lv_obj_set_style_text_font(right_arrow, &lv_font_montserrat_12, 0);
-        lv_obj_set_pos(right_arrow, icons_start_x + gui->visible_items_count * (MENU_ICON_WIDTH + MENU_ICON_SPACING),
-                      MENU_ICON_HEIGHT / 2 - 6);
-        lv_label_set_text(right_arrow, ">");
     }
 }
 
