@@ -17,6 +17,8 @@ idf_component_register(SRCS "lcd_hardware.c"
                               "icons/wifi_setting_icon.c"
                               "icons/keyboard_meter_icon.c"
                               "icons/keyboard_reset_meter_icon.c"
+                              "icons/keyboard_meter_A.c"
+                              "icons/keyboard_meter_B.c"
                        INCLUDE_DIRS "include"
                        PRIV_INCLUDE_DIRS "private_include"
                        REQUIRES esp_lcd esp_driver_gpio esp_driver_spi esp_lvgl_port

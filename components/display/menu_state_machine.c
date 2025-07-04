@@ -80,15 +80,24 @@ bool menu_state_process_event(input_event_e event, unsigned char ch)
     switch (event)
     {
     case INPUT_EVENT_ENCODER_CW:
-        // Move to next child
-        menu_focus_next_child(s_menu_context.current_menu);
-
+        if (s_menu_context.menu_active) {
+            // If menu is active, focus next child
+            menu_focus_next_child(s_menu_context.current_menu);
+        } else {
+            // If not active, return to root
+            menu_navigate_to(s_menu_context.root_menu);
+        }
         event_consumed = true;
         break;
 
     case INPUT_EVENT_ENCODER_CCW:
-        // Move to previous child
-        menu_focus_prev_child(s_menu_context.current_menu);
+        if (s_menu_context.menu_active) {
+            // If menu is active, focus previous child
+            menu_focus_prev_child(s_menu_context.current_menu);
+        } else {
+            // If not active, return to root
+            menu_navigate_to(s_menu_context.root_menu);
+        }
         event_consumed = true;
         break;
 
@@ -373,6 +382,8 @@ static void menu_navigate_to(struct menu_item *target)
     if (s_menu_context.current_menu == s_menu_context.keyboard_info)
     {
         s_menu_context.menu_active = false;
+    } else {
+        s_menu_context.menu_active = true;
     }
     ESP_LOGI(TAG, "Navigated to menu item: %s", target->text);
 }

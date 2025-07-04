@@ -51,8 +51,9 @@ typedef struct {
 // GUI context structures for different menu types
 typedef struct {
     lv_obj_t *container;
-    lv_obj_t *stats_label;
+    lv_obj_t *total_count_icon;     // Icon for total char count
     lv_obj_t *total_count_label;
+    lv_obj_t *session_count_icon;   // Icon for session char count
     lv_obj_t *char_count_label;
     lv_timer_t *update_timer;  // Timer for periodic updates
 } keyboard_info_gui_t;
@@ -125,7 +126,7 @@ static keyboard_info_gui_t* create_keyboard_info_gui(void)
     lv_obj_set_pos(gui->container, 0, 0);
     lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
     lv_obj_set_style_border_width(gui->container, 0, 0);
-    lv_obj_set_style_pad_all(gui->container, 20, 0);  // Increased padding from 2 to 20
+    lv_obj_set_style_pad_all(gui->container, 20, 0);
 
     // Disable scrollbars for keyboard info container
     lv_obj_clear_flag(gui->container, LV_OBJ_FLAG_SCROLLABLE);
@@ -133,33 +134,34 @@ static keyboard_info_gui_t* create_keyboard_info_gui(void)
     // Hide container initially - will be shown when prepare_gui_func is called
     lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
 
-    // Main stats label
-    gui->stats_label = lv_label_create(gui->container);
-    lv_obj_set_style_text_color(gui->stats_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->stats_label, &lv_font_montserrat_14, 0);  // Changed to available font
-    lv_obj_align(gui->stats_label, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_label_set_text(gui->stats_label, "MK32 Keyboard");
+    // Set horizontal flex layout for the container - all elements in a row
+    lv_obj_set_flex_flow(gui->container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(gui->container, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    // Total count label
+    // Total count icon - directly in main container
+    gui->total_count_icon = lv_image_create(gui->container);
+    lv_image_set_src(gui->total_count_icon, &keyboard_meter_A);
+    lv_obj_set_style_margin_right(gui->total_count_icon, 8, 0);  // Small gap to count label
+
+    // Total count label - directly in main container
     gui->total_count_label = lv_label_create(gui->container);
     lv_obj_set_style_text_color(gui->total_count_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->total_count_label, &lv_font_montserrat_12, 0);  // Changed to available font
-    lv_obj_align(gui->total_count_label, LV_ALIGN_TOP_LEFT, 0, 22);  // Position first
-    lv_label_set_text(gui->total_count_label, "Total: 0");
+    lv_obj_set_style_text_font(gui->total_count_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_align(gui->total_count_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_margin_right(gui->total_count_label, 30, 0);  // Gap between total and session
+    lv_label_set_text(gui->total_count_label, "0");
 
-    // Char count label
+    // Session count icon - directly in main container
+    gui->session_count_icon = lv_image_create(gui->container);
+    lv_image_set_src(gui->session_count_icon, &keyboard_meter_B);
+    lv_obj_set_style_margin_right(gui->session_count_icon, 8, 0);  // Small gap to count label
+
+    // Session count label - directly in main container
     gui->char_count_label = lv_label_create(gui->container);
     lv_obj_set_style_text_color(gui->char_count_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->char_count_label, &lv_font_montserrat_12, 0);  // Changed to available font
-    lv_obj_align(gui->char_count_label, LV_ALIGN_TOP_LEFT, 0, 42);  // Position below total count
-    lv_label_set_text(gui->char_count_label, "Chars: 0");
-
-    // Instructions
-    lv_obj_t *instruction_label = lv_label_create(gui->container);
-    lv_obj_set_style_text_color(instruction_label, lv_color_hex(0x808080), 0);
-    lv_obj_set_style_text_font(instruction_label, &lv_font_montserrat_10, 0);  // Increased from 8 to 10
-    lv_obj_align(instruction_label, LV_ALIGN_BOTTOM_LEFT, 0, 0);
-    lv_label_set_text(instruction_label, "Rotate encoder for menu");
+    lv_obj_set_style_text_font(gui->char_count_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_align(gui->char_count_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_label_set_text(gui->char_count_label, "0");
 
     // Create timer for periodic updates (100ms interval)
     gui->update_timer = lv_timer_create(keyboard_info_timer_cb, 100, gui);
@@ -459,14 +461,14 @@ static void update_keyboard_info_display(keyboard_info_gui_t *gui)
         return;
     }
 
-    char buffer[64];
+    char buffer[32];
 
-    // Update total count
-    snprintf(buffer, sizeof(buffer), "Total: %lu", s_keyboard_stats.total_char_count);
+    // Update total count - just show the number without "Total:" prefix
+    snprintf(buffer, sizeof(buffer), "%lu", s_keyboard_stats.total_char_count);
     lv_label_set_text(gui->total_count_label, buffer);
 
-    // Update character count
-    snprintf(buffer, sizeof(buffer), "Chars: %lu", s_keyboard_stats.session_char_count);
+    // Update session character count - just show the number without "Chars:" prefix
+    snprintf(buffer, sizeof(buffer), "%lu", s_keyboard_stats.session_char_count);
     lv_label_set_text(gui->char_count_label, buffer);
 }
 
