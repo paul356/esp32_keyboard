@@ -24,6 +24,8 @@ extern const lv_image_dsc_t keyboard_lock_icon;
 extern const lv_image_dsc_t keyboard_logging_icon;
 extern const lv_image_dsc_t led_pattern_icon;
 extern const lv_image_dsc_t wifi_setting_icon;
+extern const lv_image_dsc_t keyboard_meter_icon;
+extern const lv_image_dsc_t keyboard_meter_reset_icon;
 
 #ifdef __cplusplus
 }

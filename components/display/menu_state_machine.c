@@ -411,14 +411,11 @@ static void menu_setup_tree(void)
 {
     ESP_LOGI(TAG, "Setting up menu tree structure");
 
-    // Create keyboard mode (default state) - shows keyboard info
-    s_menu_context.keyboard_info = menu_item_create("Keyboard Mode", &keyboard_icon, keyboard_gui_prepare_keyboard_info, keyboard_gui_post_keyboard_info, NULL, NULL);
-
     // Create root menu (main menu) - nonleaf item that shows menu interface
     s_menu_context.root_menu = menu_item_create("Main Menu", NULL, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
 
     // Create main menu children: Keyboard Mode, Bluetooth, WiFi, LED, Advanced
-    struct menu_item *keyboard_mode_menu = s_menu_context.keyboard_info;
+    struct menu_item *keyboard_mode_menu = menu_item_create("Keyboard Mode", &keyboard_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
     struct menu_item *bluetooth_menu = menu_item_create("Bluetooth", &bluetooth_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
     struct menu_item *wifi_menu = menu_item_create("WiFi", &wifi_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
     struct menu_item *led_menu = menu_item_create("LED", &led_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
@@ -434,6 +431,13 @@ static void menu_setup_tree(void)
     menu_item_add_child(s_menu_context.root_menu, led_menu);
     menu_item_add_child(s_menu_context.root_menu, advanced_menu);
     menu_item_add_child(s_menu_context.root_menu, about);
+
+    // Create keyboard mode submenu items
+    struct menu_item *keyboard_reset_meter = menu_item_create("Reset Meter", &keyboard_meter_reset_icon, NULL, NULL, NULL, NULL);
+    // Create keyboard mode (default state) - shows keyboard info
+    s_menu_context.keyboard_info = menu_item_create("Keyboard Meter", &keyboard_meter_icon, keyboard_gui_prepare_keyboard_info, keyboard_gui_post_keyboard_info, NULL, NULL);
+    menu_item_add_child(keyboard_mode_menu, s_menu_context.keyboard_info);
+    menu_item_add_child(keyboard_mode_menu, keyboard_reset_meter);
 
     // Create Bluetooth submenu items
     struct menu_item *bt_toggle = menu_item_create("Toggle Bluetooth", &switch_icon, NULL, NULL, NULL, NULL);
