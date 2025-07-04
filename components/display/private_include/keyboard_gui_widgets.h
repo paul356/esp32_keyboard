@@ -63,3 +63,27 @@ esp_err_t keyboard_gui_prepare_nonleaf_item(struct menu_item *self);
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t keyboard_gui_post_nonleaf_item(struct menu_item *self);
+
+/**
+ * @brief Prepare reset meter GUI function for menu items
+ * Creates and shows reset meter interface with banner and reset functionality
+ * @param self Menu item that handles reset meter function
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_prepare_reset_meter(struct menu_item *self);
+
+/**
+ * @brief Post reset meter GUI function for menu items
+ * Cleanup function for reset meter interface
+ * @param self Menu item that had reset meter interface
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_post_reset_meter(struct menu_item *self);
+
+/**
+ * @brief Reset meter user action function
+ * This function is called when the user presses Enter on the reset meter menu item
+ * @param self Menu item that triggered the action
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_reset_meter_action(struct menu_item *self);

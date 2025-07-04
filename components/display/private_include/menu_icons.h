@@ -28,6 +28,7 @@ extern const lv_image_dsc_t keyboard_meter_icon;
 extern const lv_image_dsc_t keyboard_meter_reset_icon;
 extern const lv_image_dsc_t keyboard_meter_A;
 extern const lv_image_dsc_t keyboard_meter_B;
+extern const lv_image_dsc_t keyboard_reset_meter_banner;
 
 #ifdef __cplusplus
 }

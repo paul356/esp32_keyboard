@@ -444,7 +444,7 @@ static void menu_setup_tree(void)
     menu_item_add_child(s_menu_context.root_menu, about);
 
     // Create keyboard mode submenu items
-    struct menu_item *keyboard_reset_meter = menu_item_create("Reset Meter", &keyboard_meter_reset_icon, NULL, NULL, NULL, NULL);
+    struct menu_item *keyboard_reset_meter = menu_item_create("Reset Meter", &keyboard_meter_reset_icon, keyboard_gui_prepare_reset_meter, keyboard_gui_post_reset_meter, NULL, keyboard_gui_reset_meter_action);
     // Create keyboard mode (default state) - shows keyboard info
     s_menu_context.keyboard_info = menu_item_create("Keyboard Meter", &keyboard_meter_icon, keyboard_gui_prepare_keyboard_info, keyboard_gui_post_keyboard_info, NULL, NULL);
     menu_item_add_child(keyboard_mode_menu, s_menu_context.keyboard_info);

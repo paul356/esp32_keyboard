@@ -19,6 +19,7 @@ idf_component_register(SRCS "lcd_hardware.c"
                               "icons/keyboard_reset_meter_icon.c"
                               "icons/keyboard_meter_A.c"
                               "icons/keyboard_meter_B.c"
+                              "icons/keyboard_reset_meter_banner.c"
                        INCLUDE_DIRS "include"
                        PRIV_INCLUDE_DIRS "private_include"
                        REQUIRES esp_lcd esp_driver_gpio esp_driver_spi esp_lvgl_port

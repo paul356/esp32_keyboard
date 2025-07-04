@@ -57,7 +57,7 @@ static void update_lvgl_timer_func(void *arg)
         UPDATE_LVGL_EVENT,
         NULL,
         0,
-        UPDATE_LVGL_PERIOD_MS / 2 / portTICK_PERIOD_MS);
+        0);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to post LVGL update event: %s", esp_err_to_name(ret));
     }
