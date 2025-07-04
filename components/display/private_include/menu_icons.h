@@ -16,6 +16,15 @@ extern const lv_image_dsc_t led_icon;
 extern const lv_image_dsc_t advanced_icon;
 extern const lv_image_dsc_t info_icon;
 
+// New submenu icons
+extern const lv_image_dsc_t switch_icon;
+extern const lv_image_dsc_t bluetooth_pc_pair;
+extern const lv_image_dsc_t bluetooth_phone_pair;
+extern const lv_image_dsc_t keyboard_lock_icon;
+extern const lv_image_dsc_t keyboard_logging_icon;
+extern const lv_image_dsc_t led_pattern_icon;
+extern const lv_image_dsc_t wifi_setting_icon;
+
 #ifdef __cplusplus
 }
 #endif

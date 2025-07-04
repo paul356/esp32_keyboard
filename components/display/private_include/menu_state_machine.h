@@ -25,6 +25,7 @@
 #include <sys/queue.h>
 #include "esp_err.h"
 #include "input_events.h"
+#include "lvgl.h"
 
 // Forward declare LVGL object type to avoid including LVGL headers
 typedef struct _lv_obj_t lv_obj_t;
@@ -34,6 +35,7 @@ typedef struct _lv_obj_t lv_obj_t;
  * Each menu_item represents a state in the state machine
  */
 struct menu_item {
+    const lv_image_dsc_t *icon;                         // Icon descriptor for this menu item
     char *text;                                         // Display text for this menu item (dynamically allocated)
     esp_err_t (*prepare_gui_func)(struct menu_item *self);  // Optional preparation function
     esp_err_t (*post_gui_func)(struct menu_item *self); // Optional long press action function
@@ -102,6 +104,7 @@ void menu_return_to_keyboard_mode(void);
 /**
  * @brief Create a new menu item
  * @param text Display text for the menu item
+ * @param icon Icon for the menu item (can be NULL)
  * @param prepare_func Optional preparation function called when entering this menu
  * @param post_func Optional cleanup function called when leaving this menu
  * @param handle_input_key Optional input key handler function
@@ -109,6 +112,7 @@ void menu_return_to_keyboard_mode(void);
  * @return Pointer to created menu item, NULL on failure
  */
 struct menu_item* menu_item_create(const char *text,
+                                  const lv_image_dsc_t *icon,
                                   esp_err_t (*prepare_func)(struct menu_item *self),
                                   esp_err_t (*post_func)(struct menu_item *self),
                                   bool (*handle_input_key)(input_event_e input_evt, char key_code),

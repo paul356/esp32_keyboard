@@ -76,11 +76,10 @@ static nonleaf_item_gui_t* create_nonleaf_item_gui(void);
 static void update_keyboard_info_display(keyboard_info_gui_t *gui);
 static void update_nonleaf_item_display(nonleaf_item_gui_t *gui, struct menu_item *menu_item);
 static void keyboard_info_timer_cb(lv_timer_t *timer);
-static lv_obj_t* create_menu_icon(lv_obj_t *parent, const char *text, bool is_focused);
+static lv_obj_t* create_menu_icon(lv_obj_t *parent, struct menu_item *menu_item, bool is_focused);
 static void update_horizontal_menu_display(nonleaf_item_gui_t *gui, struct menu_item *menu_item);
 static int count_menu_children(struct menu_item *menu_item);
 static void calculate_visible_items(nonleaf_item_gui_t *gui, struct menu_item *menu_item);
-static const lv_image_dsc_t* get_menu_icon(const char *text);
 
 // GUI setup and teardown functions for menu items
 static esp_err_t prepare_keyboard_info_gui(struct menu_item *self);
@@ -177,8 +176,14 @@ static void keyboard_info_timer_cb(lv_timer_t *timer)
     }
 }
 
-static lv_obj_t* create_menu_icon(lv_obj_t *parent, const char *text, bool is_focused)
+static lv_obj_t* create_menu_icon(lv_obj_t *parent, struct menu_item *menu_item, bool is_focused)
 {
+    if (!menu_item) {
+        return NULL;
+    }
+
+    const char *text = menu_item->text;
+
     // Create icon container
     lv_obj_t *icon_container = lv_obj_create(parent);
     lv_obj_set_size(icon_container, MENU_ICON_WIDTH, MENU_ICON_HEIGHT);
@@ -198,8 +203,8 @@ static lv_obj_t* create_menu_icon(lv_obj_t *parent, const char *text, bool is_fo
         lv_obj_set_style_border_color(icon_container, lv_color_hex(0x404040), 0);
     }
 
-    // Try to get image icon first
-    const lv_image_dsc_t *icon_img = get_menu_icon(text);
+    // Try to get image icon from menu item
+    const lv_image_dsc_t *icon_img = menu_item->icon;
 
     if (icon_img) {
         // Create image widget
@@ -222,53 +227,16 @@ static lv_obj_t* create_menu_icon(lv_obj_t *parent, const char *text, bool is_fo
         lv_obj_set_style_text_font(icon_label, &lv_font_montserrat_10, 0);
         lv_obj_center(icon_label);
 
-        // Create abbreviated text for icon
+        // Create abbreviated text for icon - use first 3 characters
         char abbreviated_text[4] = {0};
         if (text) {
-            if (strcmp(text, "Keyboard Mode") == 0) {
-                strcpy(abbreviated_text, "KB");
-            } else if (strcmp(text, "Bluetooth") == 0) {
-                strcpy(abbreviated_text, "BT");
-            } else if (strcmp(text, "WiFi") == 0) {
-                strcpy(abbreviated_text, "WF");
-            } else if (strcmp(text, "LED") == 0) {
-                strcpy(abbreviated_text, "LED");
-            } else if (strcmp(text, "Advanced") == 0) {
-                strcpy(abbreviated_text, "ADV");
-            } else if (strcmp(text, "About") == 0) {
-                strcpy(abbreviated_text, "ABT");
-            } else {
-                // Use first 3 characters for other items
-                strncpy(abbreviated_text, text, 3);
-                abbreviated_text[3] = '\0';
-            }
+            strncpy(abbreviated_text, text, 3);
+            abbreviated_text[3] = '\0';
         }
         lv_label_set_text(icon_label, abbreviated_text);
     }
 
     return icon_container;
-}
-
-// Function to get icon for menu item
-static const lv_image_dsc_t* get_menu_icon(const char *text)
-{
-    if (!text) return NULL;
-
-    if (strcmp(text, "Keyboard Mode") == 0) {
-        return &keyboard_icon;
-    } else if (strcmp(text, "Bluetooth") == 0) {
-        return &bluetooth_icon;
-    } else if (strcmp(text, "WiFi") == 0) {
-        return &wifi_icon;
-    } else if (strcmp(text, "LED") == 0) {
-        return &led_icon;
-    } else if (strcmp(text, "Advanced") == 0) {
-        return &advanced_icon;
-    } else if (strcmp(text, "About") == 0) {
-        return &info_icon;
-    }
-
-    return NULL;  // Use text fallback
 }
 
 static int count_menu_children(struct menu_item *menu_item)
@@ -378,7 +346,7 @@ static void update_horizontal_menu_display(nonleaf_item_gui_t *gui, struct menu_
         if (is_focused) {
             ESP_LOGI(TAG, "Focused child: %s", child->text);
         }
-        lv_obj_t *icon = create_menu_icon(gui->menu_items_container, child->text, is_focused);
+        lv_obj_t *icon = create_menu_icon(gui->menu_items_container, child, is_focused);
 
         // Position icon horizontally - centered within container
         int x_pos = icons_start_x + visible_item_index * (MENU_ICON_WIDTH + MENU_ICON_SPACING);

@@ -25,6 +25,7 @@
 #include "esp_heap_caps.h"
 #include "menu_state_machine.h"
 #include "keyboard_gui_widgets.h"
+#include "menu_icons.h"
 
 static const char *TAG = "menu_state";
 
@@ -273,6 +274,7 @@ static struct menu_item* menu_get_prev_sibling(struct menu_item *item)
 
 // Public functions for menu item management
 struct menu_item* menu_item_create(const char *text,
+                                  const lv_image_dsc_t *icon,
                                   esp_err_t (*prepare_gui_func)(struct menu_item *self),
                                   esp_err_t (*post_gui_func)(struct menu_item *self),
                                   bool (*handle_input_key)(input_event_e input_evt, char key_code),
@@ -299,6 +301,7 @@ struct menu_item* menu_item_create(const char *text,
     strcpy(item->text, text);
 
     // Initialize fields
+    item->icon = icon;  // Store the icon descriptor
     item->prepare_gui_func = prepare_gui_func;
     item->post_gui_func = post_gui_func;
     item->handle_input_key = handle_input_key;
@@ -409,20 +412,20 @@ static void menu_setup_tree(void)
     ESP_LOGI(TAG, "Setting up menu tree structure");
 
     // Create keyboard mode (default state) - shows keyboard info
-    s_menu_context.keyboard_info = menu_item_create("Keyboard Mode", keyboard_gui_prepare_keyboard_info, keyboard_gui_post_keyboard_info, NULL, NULL);
+    s_menu_context.keyboard_info = menu_item_create("Keyboard Mode", &keyboard_icon, keyboard_gui_prepare_keyboard_info, keyboard_gui_post_keyboard_info, NULL, NULL);
 
     // Create root menu (main menu) - nonleaf item that shows menu interface
-    s_menu_context.root_menu = menu_item_create("Main Menu", keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
+    s_menu_context.root_menu = menu_item_create("Main Menu", NULL, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
 
     // Create main menu children: Keyboard Mode, Bluetooth, WiFi, LED, Advanced
     struct menu_item *keyboard_mode_menu = s_menu_context.keyboard_info;
-    struct menu_item *bluetooth_menu = menu_item_create("Bluetooth", keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
-    struct menu_item *wifi_menu = menu_item_create("WiFi", keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
-    struct menu_item *led_menu = menu_item_create("LED", keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
-    struct menu_item *advanced_menu = menu_item_create("Advanced", keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
+    struct menu_item *bluetooth_menu = menu_item_create("Bluetooth", &bluetooth_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
+    struct menu_item *wifi_menu = menu_item_create("WiFi", &wifi_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
+    struct menu_item *led_menu = menu_item_create("LED", &led_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
+    struct menu_item *advanced_menu = menu_item_create("Advanced", &advanced_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
 
     // Create About menu item (to be added to main menu)
-    struct menu_item *about = menu_item_create("About", NULL, NULL, NULL, NULL);
+    struct menu_item *about = menu_item_create("About", &info_icon, NULL, NULL, NULL, NULL);
 
     // Add main menu children
     menu_item_add_child(s_menu_context.root_menu, keyboard_mode_menu);
@@ -433,36 +436,34 @@ static void menu_setup_tree(void)
     menu_item_add_child(s_menu_context.root_menu, about);
 
     // Create Bluetooth submenu items
-    struct menu_item *bt_toggle = menu_item_create("Toggle Bluetooth", NULL, NULL, NULL, NULL);
-    struct menu_item *bt_pair_kb = menu_item_create("Pair Keyboard", NULL, NULL, NULL, NULL);
-    struct menu_item *bt_pair_admin = menu_item_create("Pair Admin Device", NULL, NULL, NULL, NULL);
+    struct menu_item *bt_toggle = menu_item_create("Toggle Bluetooth", &switch_icon, NULL, NULL, NULL, NULL);
+    struct menu_item *bt_pair_kb = menu_item_create("Pair Keyboard", &bluetooth_pc_pair, NULL, NULL, NULL, NULL);
+    struct menu_item *bt_pair_admin = menu_item_create("Pair Admin Device", &bluetooth_phone_pair, NULL, NULL, NULL, NULL);
 
     menu_item_add_child(bluetooth_menu, bt_toggle);
     menu_item_add_child(bluetooth_menu, bt_pair_kb);
     menu_item_add_child(bluetooth_menu, bt_pair_admin);
 
     // Create WiFi submenu items
-    struct menu_item *wifi_toggle = menu_item_create("Toggle WiFi", NULL, NULL, NULL, NULL);
-    struct menu_item *wifi_settings = menu_item_create("WiFi Settings", NULL, NULL, NULL, NULL);
+    struct menu_item *wifi_toggle = menu_item_create("Toggle WiFi", &switch_icon, NULL, NULL, NULL, NULL);
+    struct menu_item *wifi_settings = menu_item_create("WiFi Settings", &wifi_setting_icon, NULL, NULL, NULL, NULL);
 
     menu_item_add_child(wifi_menu, wifi_toggle);
     menu_item_add_child(wifi_menu, wifi_settings);
 
     // Create LED submenu items
-    struct menu_item *led_toggle = menu_item_create("Toggle LED", NULL, NULL, NULL, NULL);
-    struct menu_item *led_pattern = menu_item_create("LED Pattern", NULL, NULL, NULL, NULL);
+    struct menu_item *led_toggle = menu_item_create("Toggle LED", &switch_icon, NULL, NULL, NULL, NULL);
+    struct menu_item *led_pattern = menu_item_create("LED Pattern", &led_pattern_icon, NULL, NULL, NULL, NULL);
 
     menu_item_add_child(led_menu, led_toggle);
     menu_item_add_child(led_menu, led_pattern);
 
     // Create Advanced submenu items
-    struct menu_item *kb_lock = menu_item_create("Keyboard Lock", NULL, NULL, NULL, NULL);
-    struct menu_item *input_log = menu_item_create("Input Logging", NULL, NULL, NULL, NULL);
-    struct menu_item *standup_reminder = menu_item_create("Standup Reminder", NULL, NULL, NULL, NULL);
+    struct menu_item *kb_lock = menu_item_create("Keyboard Lock", &keyboard_lock_icon, NULL, NULL, NULL, NULL);
+    struct menu_item *input_log = menu_item_create("Input Logging", &keyboard_logging_icon, NULL, NULL, NULL, NULL);
 
     menu_item_add_child(advanced_menu, kb_lock);
     menu_item_add_child(advanced_menu, input_log);
-    menu_item_add_child(advanced_menu, standup_reminder);
 
     ESP_LOGI(TAG, "Menu tree structure setup complete");
 }
