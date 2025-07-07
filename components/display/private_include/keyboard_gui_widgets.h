@@ -87,3 +87,19 @@ esp_err_t keyboard_gui_post_reset_meter(struct menu_item *self);
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t keyboard_gui_reset_meter_action(struct menu_item *self);
+
+/**
+ * @brief Prepare bt_toggle GUI function for menu items
+ * Creates and shows Bluetooth toggle interface with icon and dynamic label
+ * @param self Menu item that displays Bluetooth toggle functionality
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_prepare_bt_toggle(struct menu_item *self);
+
+/**
+ * @brief Post bt_toggle GUI function for menu items
+ * Cleanup function for Bluetooth toggle interface
+ * @param self Menu item that had Bluetooth toggle interface
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_post_bt_toggle(struct menu_item *self);

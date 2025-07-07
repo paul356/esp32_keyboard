@@ -451,7 +451,7 @@ static void menu_setup_tree(void)
     menu_item_add_child(keyboard_mode_menu, keyboard_reset_meter);
 
     // Create Bluetooth submenu items
-    struct menu_item *bt_toggle = menu_item_create("Toggle Bluetooth", &switch_icon, NULL, NULL, NULL, NULL);
+    struct menu_item *bt_toggle = menu_item_create("Toggle Bluetooth", &switch_icon, keyboard_gui_prepare_bt_toggle, keyboard_gui_post_bt_toggle, NULL, NULL);
     struct menu_item *bt_pair_kb = menu_item_create("Pair Keyboard", &bluetooth_pc_pair, NULL, NULL, NULL, NULL);
     struct menu_item *bt_pair_admin = menu_item_create("Pair Admin Device", &bluetooth_phone_pair, NULL, NULL, NULL, NULL);
 

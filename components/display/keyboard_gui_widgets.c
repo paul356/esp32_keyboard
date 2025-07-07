@@ -31,6 +31,7 @@
 #include "drv_loop.h"
 #include "nvs_io.h"
 #include "nvs.h"
+#include "function_control.h"
 
 #define TAG "keyboard_gui_construct"
 
@@ -84,12 +85,19 @@ typedef struct {
     int total_items_count;          // Total number of menu items
 } nonleaf_item_gui_t;
 
+typedef struct {
+    lv_obj_t *container;
+    lv_obj_t *bluetooth_icon;       // Bluetooth icon
+    lv_obj_t *status_label;         // Label showing "Open" or "Close"
+} bt_toggle_gui_t;
+
 static lv_obj_t *s_main_screen = NULL;
 static keyboard_stats_t s_keyboard_stats = {0};
 static esp_timer_handle_t s_save_total_count_timer = NULL;
 
 static keyboard_info_gui_t* create_keyboard_info_gui(void);
 static nonleaf_item_gui_t* create_nonleaf_item_gui(void);
+static bt_toggle_gui_t* create_bt_toggle_gui(void);
 static void update_keyboard_info_display(keyboard_info_gui_t *gui);
 static void update_nonleaf_item_display(nonleaf_item_gui_t *gui, struct menu_item *menu_item);
 static void keyboard_info_timer_cb(lv_timer_t *timer);
@@ -109,6 +117,8 @@ static esp_err_t prepare_keyboard_info_gui(struct menu_item *self);
 static esp_err_t post_keyboard_info_gui(struct menu_item *self);
 static esp_err_t prepare_nonleaf_item_gui(struct menu_item *self);
 static esp_err_t post_nonleaf_item_gui(struct menu_item *self);
+static esp_err_t prepare_bt_toggle_gui(struct menu_item *self);
+static esp_err_t post_bt_toggle_gui(struct menu_item *self);
 
 void keyboard_gui_init_keyboard_stats(void)
 {
@@ -511,6 +521,58 @@ static nonleaf_item_gui_t* create_nonleaf_item_gui(void)
     return gui;
 }
 
+static bt_toggle_gui_t* create_bt_toggle_gui(void)
+{
+    bt_toggle_gui_t *gui = malloc(sizeof(bt_toggle_gui_t));
+    if (!gui) {
+        ESP_LOGE(TAG, "Failed to allocate bt_toggle GUI");
+        return NULL;
+    }
+
+    // Create container for bt_toggle interface
+    gui->container = lv_obj_create(s_main_screen);
+    lv_obj_set_size(gui->container, LCD_WIDTH, LCD_HEIGHT);
+    lv_obj_set_pos(gui->container, 0, 0);
+    lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
+    lv_obj_set_style_border_width(gui->container, 0, 0);
+    lv_obj_set_style_pad_all(gui->container, 20, 0);
+
+    // Disable scrollbars for bt_toggle container
+    lv_obj_clear_flag(gui->container, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Hide container initially - will be shown when prepare_gui_func is called
+    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+
+    // Set horizontal flex layout for the container - label and icon in a row
+    lv_obj_set_flex_flow(gui->container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(gui->container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    // Status label (place before icon)
+    gui->status_label = lv_label_create(gui->container);
+    lv_obj_set_style_text_color(gui->status_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->status_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_align(gui->status_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_margin_right(gui->status_label, 20, 0);  // Gap between label and icon
+
+    // Bluetooth icon
+    gui->bluetooth_icon = lv_image_create(gui->container);
+    lv_image_set_src(gui->bluetooth_icon, &bluetooth_icon);
+
+    // Set initial label text and icon appearance based on current Bluetooth state
+    if (is_ble_enabled()) {
+        lv_label_set_text(gui->status_label, "Close");
+        // Icon is colored normally when BT is enabled
+        lv_obj_set_style_image_recolor_opa(gui->bluetooth_icon, LV_OPA_TRANSP, 0);
+    } else {
+        lv_label_set_text(gui->status_label, "Open");
+        // Grey out the icon when BT is disabled
+        lv_obj_set_style_image_recolor_opa(gui->bluetooth_icon, LV_OPA_50, 0);
+        lv_obj_set_style_image_recolor(gui->bluetooth_icon, lv_color_hex(0x808080), 0);
+    }
+
+    return gui;
+}
+
 static void update_keyboard_info_display(keyboard_info_gui_t *gui)
 {
     if (!gui) {
@@ -677,6 +739,62 @@ static esp_err_t post_nonleaf_item_gui(struct menu_item *self)
     return ESP_OK;
 }
 
+static esp_err_t prepare_bt_toggle_gui(struct menu_item *self)
+{
+    ESP_LOGI(TAG, "Preparing Bluetooth toggle GUI");
+
+    if (!self) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Create Bluetooth toggle GUI if not already created
+    if (!self->user_ctx) {
+        self->user_ctx = create_bt_toggle_gui();
+        if (!self->user_ctx) {
+            ESP_LOGE(TAG, "Failed to create Bluetooth toggle GUI");
+            return ESP_ERR_NO_MEM;
+        }
+        ESP_LOGI(TAG, "Created new Bluetooth toggle GUI");
+    }
+
+    bt_toggle_gui_t *gui = (bt_toggle_gui_t *)self->user_ctx;
+
+    // Update label text and icon appearance based on current Bluetooth state
+    if (is_ble_enabled()) {
+        lv_label_set_text(gui->status_label, "Close");
+        // Icon is colored normally when BT is enabled
+        lv_obj_set_style_image_recolor_opa(gui->bluetooth_icon, LV_OPA_TRANSP, 0);
+    } else {
+        lv_label_set_text(gui->status_label, "Open");
+        // Grey out the icon when BT is disabled
+        lv_obj_set_style_image_recolor_opa(gui->bluetooth_icon, LV_OPA_50, 0);
+        lv_obj_set_style_image_recolor(gui->bluetooth_icon, lv_color_hex(0x808080), 0);
+    }
+
+    // Show the Bluetooth toggle container
+    lv_obj_remove_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+    ESP_LOGI(TAG, "Showed Bluetooth toggle container");
+
+    return ESP_OK;
+}
+
+static esp_err_t post_bt_toggle_gui(struct menu_item *self)
+{
+    ESP_LOGD(TAG, "Post Bluetooth toggle GUI cleanup");
+
+    if (!self || !self->user_ctx) {
+        return ESP_OK;
+    }
+
+    bt_toggle_gui_t *gui = (bt_toggle_gui_t *)self->user_ctx;
+
+    // Hide the Bluetooth toggle container
+    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+    ESP_LOGI(TAG, "Hidden Bluetooth toggle container");
+
+    return ESP_OK;
+}
+
 // NVS save functions
 static void save_total_count_timer_func(void *arg)
 {
@@ -819,4 +937,14 @@ esp_err_t keyboard_gui_post_reset_meter(struct menu_item *self)
     ESP_LOGI(TAG, "Hidden reset meter container");
 
     return ESP_OK;
+}
+
+esp_err_t keyboard_gui_prepare_bt_toggle(struct menu_item *self)
+{
+    return prepare_bt_toggle_gui(self);
+}
+
+esp_err_t keyboard_gui_post_bt_toggle(struct menu_item *self)
+{
+    return post_bt_toggle_gui(self);
 }
