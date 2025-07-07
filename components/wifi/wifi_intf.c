@@ -202,17 +202,7 @@ static esp_err_t start_wifi(wifi_mode_t mode, const char* ssid, const char* pass
     }
 }
 
-esp_err_t wifi_update(wifi_mode_t mode, const char* new_ssid, const char* new_passwd)
-{
-    esp_err_t ret = wifi_stop();
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "stop wifi failed");
-    }
-
-    return start_wifi(mode, new_ssid, new_passwd);
-}
-
-esp_err_t wifi_init(wifi_mode_t mode, const char* ssid, const char* passwd)
+esp_err_t wifi_update(wifi_mode_t mode, const char* ssid, const char* passwd)
 {
     esp_err_t ret;
 
@@ -257,6 +247,12 @@ esp_err_t wifi_init(wifi_mode_t mode, const char* ssid, const char* passwd)
 
         // mark flag
         netif_inited = true;
+    } else {
+        esp_err_t ret = wifi_stop();
+        if (ret != ESP_OK)
+        {
+            ESP_LOGW(TAG, "stop wifi failed");
+        }
     }
 
     return start_wifi(mode, ssid, passwd);

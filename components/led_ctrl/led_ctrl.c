@@ -33,7 +33,7 @@ ESP_EVENT_DEFINE_BASE(LED_CTRL_EVENTS);
 
 // Current pattern configuration
 static led_pattern_config_t s_current_pattern = {
-    .type = LED_PATTERN_OFF,
+    .pattern = LED_PATTERN_OFF,
     .primary_color = {0, 0, 0},
     .secondary_color = {0, 0, 0},
     .brightness = 128,
@@ -81,8 +81,8 @@ esp_err_t led_ctrl_set_pattern(led_pattern_type_t pattern_type, uint32_t param1,
     if (!s_initialized) {
         return ESP_ERR_INVALID_STATE;
     }
-    
-    s_current_pattern.type = pattern_type;
+
+    s_current_pattern.pattern = pattern_type;
     return ESP_OK;
 }
 
@@ -94,6 +94,11 @@ esp_err_t led_ctrl_keystroke(uint8_t row, uint8_t col, bool pressed) {
     if (!pressed)
     {
         // only handle key press events now
+        return ESP_OK;
+    }
+
+    if (s_current_pattern.pattern == LED_PATTERN_OFF) {
+        // If the current pattern is OFF, we can just ignore the keystroke
         return ESP_OK;
     }
     

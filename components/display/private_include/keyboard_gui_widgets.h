@@ -103,3 +103,53 @@ esp_err_t keyboard_gui_prepare_bt_toggle(struct menu_item *self);
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t keyboard_gui_post_bt_toggle(struct menu_item *self);
+
+/**
+ * @brief Prepare wifi_toggle GUI function for menu items
+ * Creates and shows WiFi toggle interface with icon and dynamic label
+ * @param self Menu item that displays WiFi toggle functionality
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_prepare_wifi_toggle(struct menu_item *self);
+
+/**
+ * @brief Post wifi_toggle GUI function for menu items
+ * Cleanup function for WiFi toggle interface
+ * @param self Menu item that had WiFi toggle interface
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_post_wifi_toggle(struct menu_item *self);
+
+/**
+ * @brief WiFi toggle user action function
+ * This function is called when the user presses Enter on the WiFi toggle menu item
+ * Toggles WiFi on/off and updates the display accordingly
+ * @param self Menu item that triggered the action
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_wifi_toggle_action(struct menu_item *self);
+
+/**
+ * @brief Prepare led_toggle GUI function for menu items
+ * Creates and shows LED toggle interface with icon and dynamic label
+ * @param self Menu item that displays LED toggle functionality
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_prepare_led_toggle(struct menu_item *self);
+
+/**
+ * @brief Post led_toggle GUI function for menu items
+ * Cleanup function for LED toggle interface
+ * @param self Menu item that had LED toggle interface
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_post_led_toggle(struct menu_item *self);
+
+/**
+ * @brief LED toggle user action function
+ * This function is called when the user presses Enter on the LED toggle menu item
+ * Toggles LED on/off and updates the display accordingly
+ * @param self Menu item that triggered the action
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_led_toggle_action(struct menu_item *self);

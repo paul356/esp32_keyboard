@@ -28,6 +28,7 @@
 #include "hal_ble.h"
 #include "wifi_intf.h"
 #include "memory_debug.h"
+#include "led_ctrl.h"
 
 #define TAG "FUNC_CTRL"
 #define FUNCTION_CTRL_NAMESPACE "FUNC_CTRL"
@@ -58,11 +59,13 @@ typedef enum _function_control_e {
     WIFI,
     BLE,
     USB,
+    LED,
     FUNCTION_BUTT
 } function_control_e;
 
 typedef struct _control_state_t {
     struct {
+        bool enabled;
         wifi_mode_t mode;
         char ssid[MAX_CONFIG_VALUE_LEN];
         char passwd[MAX_CONFIG_VALUE_LEN];
@@ -74,6 +77,10 @@ typedef struct _control_state_t {
     struct {
         bool enabled;
     } usb;
+    struct {
+        bool enabled;
+        led_pattern_type_t pattern;
+    } led;
 } control_state_t;
 
 typedef esp_err_t (*read_item_func)(function_control_e function, const char* item_name, control_state_t* config);
@@ -92,24 +99,31 @@ typedef struct _function_config_t {
     const config_item_t* config_items;
 } function_config_t;
 
+static void set_default_wifi_enabled(control_state_t* config);
 static void set_default_wifi_mode(control_state_t* config);
 static void set_default_wifi_ssid(control_state_t* config);
 static void set_default_wifi_passwd(control_state_t* config);
 static void set_default_ble_enabled(control_state_t* config);
 static void set_default_ble_name(control_state_t* config);
-static void set_default_usb_values(control_state_t* config);
+static void set_default_usb_enabled(control_state_t* config);
+static void set_default_led_enabled(control_state_t* config);
+static void set_default_led_pattern(control_state_t* config);
 
 static esp_err_t load_config_value(function_control_e function, const char* item_name, void* config_value, size_t* len);
 static esp_err_t save_config_value(function_control_e function, const char* item_name, const void* config_value, size_t len);
 
+CONFIG_VALUE_GETTER_SETTER(wifi, enabled)
 CONFIG_VALUE_GETTER_SETTER(wifi, mode)
 CONFIG_VALUE_GETTER_SETTER(wifi, ssid)
 CONFIG_VALUE_GETTER_SETTER(wifi, passwd)
 CONFIG_VALUE_GETTER_SETTER(ble, enabled)
 CONFIG_VALUE_GETTER_SETTER(ble, name)
 CONFIG_VALUE_GETTER_SETTER(usb, enabled)
+CONFIG_VALUE_GETTER_SETTER(led, enabled)
+CONFIG_VALUE_GETTER_SETTER(led, pattern)
 
 static config_item_t wifi_config[] = {
+    {"enabled", &load_wifi_enabled, &save_wifi_enabled, set_default_wifi_enabled},
     {"mode",    &load_wifi_mode,    &save_wifi_mode,    set_default_wifi_mode},
     {"ssid",    &load_wifi_ssid,    &save_wifi_ssid,    set_default_wifi_ssid},
     {"passwd",  &load_wifi_passwd,  &save_wifi_passwd,  set_default_wifi_passwd}
@@ -121,7 +135,12 @@ static config_item_t ble_config[] = {
 };
 
 static config_item_t usb_config[] = {
-    {"enabled", &load_usb_enabled,  &save_usb_enabled, set_default_usb_values}
+    {"enabled", &load_usb_enabled,  &save_usb_enabled, set_default_usb_enabled}
+};
+
+static config_item_t led_config[] = {
+    {"enabled", &load_led_enabled,  &save_led_enabled, set_default_led_enabled},
+    {"pattern", &load_led_pattern,  &save_led_pattern, set_default_led_pattern}
 };
 
 static function_config_t function_config_entries[] = {
@@ -133,12 +152,15 @@ static function_config_t function_config_entries[] = {
     },
     {
         ARRAY_LEN(usb_config), usb_config
+    },
+    {
+        ARRAY_LEN(led_config), led_config
     }
 };
 
 static control_state_t function_state;
 
-static const char* function_config_prefix[] = {"WIFI_", "BLE_", "USB_"};
+static const char* function_config_prefix[] = {"WIFI_", "BLE_", "USB_", "LED_"};
 
 esp_err_t load_config_value(
     function_control_e function,
@@ -175,9 +197,13 @@ static unsigned long get_default_device_id(void)
     return random_id;
 }
 
+void set_default_wifi_enabled(control_state_t* state)
+{
+    state->wifi.enabled = false;
+}
 void set_default_wifi_mode(control_state_t* state)
 {
-    state->wifi.mode = WIFI_MODE_NULL;
+    state->wifi.mode = WIFI_MODE_AP;
 }
 void set_default_wifi_ssid(control_state_t* state)
 {
@@ -197,9 +223,19 @@ void set_default_ble_name(control_state_t* state)
     snprintf(state->ble.name, sizeof(state->ble.name), BLE_NAME_INIT_TEMPLATE, get_default_device_id());
 }
 
-void set_default_usb_values(control_state_t* state)
+void set_default_usb_enabled(control_state_t* state)
 {
     state->usb.enabled = true;
+}
+
+void set_default_led_enabled(control_state_t* state)
+{
+    state->led.enabled = true;
+}
+
+void set_default_led_pattern(control_state_t* state)
+{
+    state->led.pattern = LED_PATTERN_HIT_KEY;
 }
 
 static esp_err_t recover_persisted_config()
@@ -246,8 +282,8 @@ esp_err_t restore_saved_state(void)
     }
 
     log_memory_usage("After recover_persisted_config");
-    if (function_state.wifi.mode != WIFI_MODE_NULL) {
-        ret = wifi_init(function_state.wifi.mode, function_state.wifi.ssid, function_state.wifi.passwd);
+    if (function_state.wifi.enabled) {
+        ret = wifi_update(function_state.wifi.mode, function_state.wifi.ssid, function_state.wifi.passwd);
         if (ret != ESP_OK) {
             return ret;
         }
@@ -265,7 +301,26 @@ esp_err_t restore_saved_state(void)
     return ESP_OK;
 }
 
-esp_err_t update_wifi_state(wifi_mode_t mode, const char* ssid, const char* passwd)
+esp_err_t update_wifi_switch(bool flag)
+{
+    function_state.wifi.enabled = flag;
+
+    esp_err_t err;
+    if (flag) {
+        err = wifi_update(function_state.wifi.mode, function_state.wifi.ssid, function_state.wifi.passwd);
+    } else {
+        err = wifi_stop();
+    }
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "fail to %s wifi", flag ? "enable" : "disable");
+        return err;
+    }
+
+    return update_persisted_config(WIFI);
+}
+
+esp_err_t update_wifi_mode(wifi_mode_t mode, const char* ssid, const char* passwd)
 {
     esp_err_t err;
     function_state.wifi.mode = mode;
@@ -284,7 +339,14 @@ esp_err_t update_wifi_state(wifi_mode_t mode, const char* ssid, const char* pass
         return ESP_ERR_INVALID_ARG;
     }
 
-    if (mode != WIFI_MODE_NULL) {
+    if (mode == WIFI_MODE_NULL) {
+        // If the mode is set to NULL, we stop the wifi service
+        function_state.wifi.enabled = false;
+    } else {
+        function_state.wifi.enabled = true;
+    }
+
+    if (function_state.wifi.enabled) {
         err = wifi_update(mode, function_state.wifi.ssid, function_state.wifi.passwd);
     } else {
         err = wifi_stop();
@@ -356,5 +418,48 @@ const char* get_ble_name(void)
 bool is_usb_enabled(void)
 {
     return function_state.usb.enabled;
+}
+
+esp_err_t update_led_switch(bool flag)
+{
+    function_state.led.enabled = flag;
+
+    if (flag) {
+        led_ctrl_set_pattern(function_state.led.pattern, 0, 0);
+    } else {
+        led_ctrl_set_pattern(LED_PATTERN_OFF, 0, 0);
+    }
+
+    return update_persisted_config(LED);
+}
+
+esp_err_t update_led_pattern(led_pattern_type_t pattern)
+{
+    if (pattern < LED_PATTERN_OFF || pattern >= LED_PATTERN_MAX) {
+        ESP_LOGE(TAG, "Invalid LED pattern: %d", pattern);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (pattern == LED_PATTERN_OFF) {
+        // If the pattern is OFF, we can just disable the LED
+        function_state.led.enabled = false;
+    } else {
+        function_state.led.enabled = true;
+    }
+
+    function_state.led.pattern = pattern;
+    led_ctrl_set_pattern(pattern, 0, 0);
+
+    return update_persisted_config(LED);
+}
+
+bool is_led_enabled(void)
+{
+    return function_state.led.enabled;
+}
+
+led_pattern_type_t get_led_pattern(void)
+{
+    return function_state.led.pattern;
 }
 

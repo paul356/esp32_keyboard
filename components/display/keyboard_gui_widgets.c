@@ -91,6 +91,18 @@ typedef struct {
     lv_obj_t *status_label;         // Label showing "Open" or "Close"
 } bt_toggle_gui_t;
 
+typedef struct {
+    lv_obj_t *container;
+    lv_obj_t *wifi_icon;            // WiFi icon
+    lv_obj_t *status_label;         // Label showing "Open" or "Close"
+} wifi_toggle_gui_t;
+
+typedef struct {
+    lv_obj_t *container;
+    lv_obj_t *led_icon;
+    lv_obj_t *status_label;
+} led_toggle_gui_t;
+
 static lv_obj_t *s_main_screen = NULL;
 static keyboard_stats_t s_keyboard_stats = {0};
 static esp_timer_handle_t s_save_total_count_timer = NULL;
@@ -98,6 +110,8 @@ static esp_timer_handle_t s_save_total_count_timer = NULL;
 static keyboard_info_gui_t* create_keyboard_info_gui(void);
 static nonleaf_item_gui_t* create_nonleaf_item_gui(void);
 static bt_toggle_gui_t* create_bt_toggle_gui(void);
+static wifi_toggle_gui_t* create_wifi_toggle_gui(void);
+static led_toggle_gui_t* create_led_toggle_gui(void);
 static void update_keyboard_info_display(keyboard_info_gui_t *gui);
 static void update_nonleaf_item_display(nonleaf_item_gui_t *gui, struct menu_item *menu_item);
 static void keyboard_info_timer_cb(lv_timer_t *timer);
@@ -119,6 +133,10 @@ static esp_err_t prepare_nonleaf_item_gui(struct menu_item *self);
 static esp_err_t post_nonleaf_item_gui(struct menu_item *self);
 static esp_err_t prepare_bt_toggle_gui(struct menu_item *self);
 static esp_err_t post_bt_toggle_gui(struct menu_item *self);
+static esp_err_t prepare_wifi_toggle_gui(struct menu_item *self);
+static esp_err_t post_wifi_toggle_gui(struct menu_item *self);
+static esp_err_t prepare_led_toggle_gui(struct menu_item *self);
+static esp_err_t post_led_toggle_gui(struct menu_item *self);
 
 void keyboard_gui_init_keyboard_stats(void)
 {
@@ -573,6 +591,103 @@ static bt_toggle_gui_t* create_bt_toggle_gui(void)
     return gui;
 }
 
+static wifi_toggle_gui_t* create_wifi_toggle_gui(void)
+{
+    wifi_toggle_gui_t *gui = malloc(sizeof(wifi_toggle_gui_t));
+    if (!gui) {
+        ESP_LOGE(TAG, "Failed to allocate wifi_toggle GUI");
+        return NULL;
+    }
+
+    // Create container for wifi_toggle interface
+    gui->container = lv_obj_create(s_main_screen);
+    lv_obj_set_size(gui->container, LCD_WIDTH, LCD_HEIGHT);
+    lv_obj_set_pos(gui->container, 0, 0);
+    lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
+    lv_obj_set_style_border_width(gui->container, 0, 0);
+    lv_obj_set_style_pad_all(gui->container, 20, 0);
+
+    // Disable scrollbars for wifi_toggle container
+    lv_obj_clear_flag(gui->container, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Hide container initially - will be shown when prepare_gui_func is called
+    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+
+    // Set horizontal flex layout for the container - label and icon in a row
+    lv_obj_set_flex_flow(gui->container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(gui->container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    // Status label (place before icon)
+    gui->status_label = lv_label_create(gui->container);
+    lv_obj_set_style_text_color(gui->status_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->status_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_align(gui->status_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_margin_right(gui->status_label, 20, 0);  // Gap between label and icon
+
+    // WiFi icon
+    gui->wifi_icon = lv_image_create(gui->container);
+    lv_image_set_src(gui->wifi_icon, &wifi_icon);
+
+    // Set initial label text and icon appearance based on current WiFi state
+    if (get_wifi_mode() != WIFI_MODE_NULL) {
+        lv_label_set_text(gui->status_label, "Close");
+        // Icon is colored normally when WiFi is enabled
+        lv_obj_set_style_image_recolor_opa(gui->wifi_icon, LV_OPA_TRANSP, 0);
+    } else {
+        lv_label_set_text(gui->status_label, "Open");
+        // Grey out the icon when WiFi is disabled
+        lv_obj_set_style_image_recolor_opa(gui->wifi_icon, LV_OPA_50, 0);
+        lv_obj_set_style_image_recolor(gui->wifi_icon, lv_color_hex(0x808080), 0);
+    }
+
+    return gui;
+}
+
+static led_toggle_gui_t* create_led_toggle_gui(void)
+{
+    led_toggle_gui_t *gui = malloc(sizeof(led_toggle_gui_t));
+    if (!gui) {
+        ESP_LOGE(TAG, "Failed to allocate memory for LED toggle GUI");
+        return NULL;
+    }
+
+    // Create container for led_toggle interface
+    gui->container = lv_obj_create(s_main_screen);
+    lv_obj_set_size(gui->container, LCD_WIDTH, LCD_HEIGHT);
+    lv_obj_set_pos(gui->container, 0, 0);
+    lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
+    lv_obj_set_style_border_width(gui->container, 0, 0);
+    lv_obj_set_style_pad_all(gui->container, 20, 0);
+
+    // Disable scrollbars for led_toggle container
+    lv_obj_clear_flag(gui->container, LV_OBJ_FLAG_SCROLLABLE);
+
+    // Hide container initially - will be shown when prepare_gui_func is called
+    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+
+    // Set horizontal flex layout for the container - label and icon in a row
+    lv_obj_set_flex_flow(gui->container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(gui->container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    // Status label (place before icon)
+    gui->status_label = lv_label_create(gui->container);
+    lv_obj_set_style_text_color(gui->status_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->status_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_align(gui->status_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_margin_right(gui->status_label, 20, 0);  // Gap between label and icon
+
+    // LED icon - using the switch icon
+    gui->led_icon = lv_image_create(gui->container);
+    lv_image_set_src(gui->led_icon, &switch_icon);
+
+    // Set initial label text and icon appearance based on LED state (assuming ON for now)
+    lv_label_set_text(gui->status_label, "Close");
+    // LED is ON, so show normal icon color
+    lv_obj_set_style_image_recolor_opa(gui->led_icon, LV_OPA_TRANSP, 0);
+
+    return gui;
+}
+
 static void update_keyboard_info_display(keyboard_info_gui_t *gui)
 {
     if (!gui) {
@@ -848,7 +963,118 @@ static esp_err_t save_total_count_to_nvs(void)
     return ESP_OK;
 }
 
+static esp_err_t prepare_wifi_toggle_gui(struct menu_item *self)
+{
+    ESP_LOGI(TAG, "Preparing WiFi toggle GUI");
+
+    if (!self) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Create WiFi toggle GUI if not already created
+    if (!self->user_ctx) {
+        self->user_ctx = create_wifi_toggle_gui();
+        if (!self->user_ctx) {
+            ESP_LOGE(TAG, "Failed to create WiFi toggle GUI");
+            return ESP_ERR_NO_MEM;
+        }
+        ESP_LOGI(TAG, "Created new WiFi toggle GUI");
+    }
+
+    wifi_toggle_gui_t *gui = (wifi_toggle_gui_t *)self->user_ctx;
+
+    // Update label text and icon appearance based on current WiFi state
+    if (get_wifi_mode() != WIFI_MODE_NULL) {
+        lv_label_set_text(gui->status_label, "Close");
+        // Icon is colored normally when WiFi is enabled
+        lv_obj_set_style_image_recolor_opa(gui->wifi_icon, LV_OPA_TRANSP, 0);
+    } else {
+        lv_label_set_text(gui->status_label, "Open");
+        // Grey out the icon when WiFi is disabled
+        lv_obj_set_style_image_recolor_opa(gui->wifi_icon, LV_OPA_50, 0);
+        lv_obj_set_style_image_recolor(gui->wifi_icon, lv_color_hex(0x808080), 0);
+    }
+
+    // Show the WiFi toggle container
+    lv_obj_remove_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+    ESP_LOGI(TAG, "Showed WiFi toggle container");
+
+    return ESP_OK;
+}
+
+static esp_err_t post_wifi_toggle_gui(struct menu_item *self)
+{
+    ESP_LOGD(TAG, "Post WiFi toggle GUI cleanup");
+
+    if (!self || !self->user_ctx) {
+        return ESP_OK;
+    }
+
+    wifi_toggle_gui_t *gui = (wifi_toggle_gui_t *)self->user_ctx;
+
+    // Hide the WiFi toggle container
+    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+    ESP_LOGI(TAG, "Hidden WiFi toggle container");
+
+    return ESP_OK;
+}
+
+// ============================================================================
+// LED Toggle GUI Implementation Functions
+// ============================================================================
+
+static esp_err_t prepare_led_toggle_gui(struct menu_item *self)
+{
+    if (!self) {
+        ESP_LOGE(TAG, "Cannot prepare LED toggle GUI: menu item is NULL");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_LOGI(TAG, "Preparing LED toggle GUI");
+
+    // Create GUI if it doesn't exist
+    if (!self->user_ctx) {
+        self->user_ctx = create_led_toggle_gui();
+        if (!self->user_ctx) {
+            ESP_LOGE(TAG, "Failed to create LED toggle GUI");
+            return ESP_ERR_NO_MEM;
+        }
+    }
+
+    led_toggle_gui_t *gui = (led_toggle_gui_t *)self->user_ctx;
+
+    // Update LED status display (assuming LED is ON for now)
+    lv_label_set_text(gui->status_label, "Close");
+    lv_obj_set_style_image_recolor_opa(gui->led_icon, LV_OPA_TRANSP, 0);
+
+    // Show the GUI
+    lv_obj_clear_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+
+    ESP_LOGI(TAG, "LED toggle GUI prepared and displayed");
+    return ESP_OK;
+}
+
+static esp_err_t post_led_toggle_gui(struct menu_item *self)
+{
+    if (!self || !self->user_ctx) {
+        ESP_LOGE(TAG, "Cannot cleanup LED toggle GUI: invalid context");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_LOGI(TAG, "Cleaning up LED toggle GUI");
+
+    led_toggle_gui_t *gui = (led_toggle_gui_t *)self->user_ctx;
+
+    // Hide the GUI
+    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+
+    return ESP_OK;
+}
+
+// ============================================================================
 // Public API functions for menu integration
+// ============================================================================
+
 esp_err_t keyboard_gui_prepare_keyboard_info(struct menu_item *self)
 {
     return prepare_keyboard_info_gui(self);
@@ -947,4 +1173,106 @@ esp_err_t keyboard_gui_prepare_bt_toggle(struct menu_item *self)
 esp_err_t keyboard_gui_post_bt_toggle(struct menu_item *self)
 {
     return post_bt_toggle_gui(self);
+}
+
+esp_err_t keyboard_gui_prepare_wifi_toggle(struct menu_item *self)
+{
+    return prepare_wifi_toggle_gui(self);
+}
+
+esp_err_t keyboard_gui_post_wifi_toggle(struct menu_item *self)
+{
+    return post_wifi_toggle_gui(self);
+}
+
+esp_err_t keyboard_gui_prepare_led_toggle(struct menu_item *self)
+{
+    return prepare_led_toggle_gui(self);
+}
+
+esp_err_t keyboard_gui_post_led_toggle(struct menu_item *self)
+{
+    return post_led_toggle_gui(self);
+}
+
+esp_err_t keyboard_gui_wifi_toggle_action(struct menu_item *self)
+{
+    ESP_LOGI(TAG, "WiFi toggle action triggered");
+
+    if (!self || !self->user_ctx) {
+        ESP_LOGE(TAG, "Invalid WiFi toggle menu item or context");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    wifi_toggle_gui_t *gui = (wifi_toggle_gui_t *)self->user_ctx;
+
+    // Toggle WiFi state
+    if (get_wifi_mode() != WIFI_MODE_NULL) {
+        // WiFi is currently enabled, disable it
+        ESP_LOGI(TAG, "Disabling WiFi");
+        /*esp_err_t ret = update_wifi_state(WIFI_MODE_NULL, "", "");
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to disable WiFi: %s", esp_err_to_name(ret));
+            return ret;
+        }*/
+
+        // Update GUI to reflect disabled state
+        lv_label_set_text(gui->status_label, "Open");
+        lv_obj_set_style_image_recolor_opa(gui->wifi_icon, LV_OPA_50, 0);
+        lv_obj_set_style_image_recolor(gui->wifi_icon, lv_color_hex(0x808080), 0);
+    } else {
+        // WiFi is currently disabled, enable it
+        ESP_LOGI(TAG, "Enabling WiFi");
+        // Enable WiFi in station mode by default - you may want to make this configurable
+        /*esp_err_t ret = update_wifi_state(WIFI_MODE_STA, "default_ssid", "default_password");
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to enable WiFi: %s", esp_err_to_name(ret));
+            return ret;
+        }*/
+
+        // Update GUI to reflect enabled state
+        lv_label_set_text(gui->status_label, "Close");
+        lv_obj_set_style_image_recolor_opa(gui->wifi_icon, LV_OPA_TRANSP, 0);
+    }
+
+    ESP_LOGI(TAG, "WiFi toggle action completed successfully");
+    return ESP_OK;
+}
+
+esp_err_t keyboard_gui_led_toggle_action(struct menu_item *self)
+{
+    ESP_LOGI(TAG, "LED toggle action triggered");
+
+    if (!self || !self->user_ctx) {
+        ESP_LOGE(TAG, "Invalid LED toggle menu item or context");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    led_toggle_gui_t *gui = (led_toggle_gui_t *)self->user_ctx;
+
+    // For now, we'll just toggle the display between "Close" and "Open"
+    // In a real implementation, you would check actual LED hardware status
+    const char *current_text = lv_label_get_text(gui->status_label);
+
+    if (strcmp(current_text, "Close") == 0) {
+        // Currently ON, turn OFF
+        ESP_LOGI(TAG, "Turning LED OFF");
+        lv_label_set_text(gui->status_label, "Open");
+        // Gray out the icon to indicate OFF state
+        lv_obj_set_style_image_recolor_opa(gui->led_icon, LV_OPA_50, 0);
+        lv_obj_set_style_image_recolor(gui->led_icon, lv_color_hex(0x808080), 0);
+
+        update_led_switch(false);
+    } else {
+        // Currently OFF, turn ON
+        ESP_LOGI(TAG, "Turning LED ON");
+        lv_label_set_text(gui->status_label, "Close");
+        // Restore normal icon color
+        lv_obj_set_style_image_recolor_opa(gui->led_icon, LV_OPA_TRANSP, 0);
+
+        update_led_switch(true);
+    }
+
+    ESP_LOGI(TAG, "LED toggle action completed successfully");
+    return ESP_OK;
 }

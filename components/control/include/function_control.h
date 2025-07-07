@@ -24,8 +24,10 @@
 #include <stdbool.h>
 #include "esp_err.h"
 #include "esp_wifi.h"
+#include "led_ctrl.h"
 
-esp_err_t update_wifi_state(wifi_mode_t mode, const char* ssid, const char* passwd);
+esp_err_t update_wifi_switch(bool flag);
+esp_err_t update_wifi_mode(wifi_mode_t mode, const char* ssid, const char* passwd);
 wifi_mode_t get_wifi_mode(void);
 const char* get_wifi_ssid(void);
 
@@ -38,6 +40,11 @@ const char* get_ble_name(void);
 
 esp_err_t update_usb_state(bool enabled);
 bool is_usb_enabled(void);
+
+esp_err_t update_led_switch(bool flag);
+esp_err_t update_led_pattern(led_pattern_type_t pattern);
+bool is_led_enabled(void);
+led_pattern_type_t get_led_pattern(void);
 
 esp_err_t restore_saved_state(void);
 

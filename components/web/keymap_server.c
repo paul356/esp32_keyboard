@@ -392,7 +392,7 @@ static esp_err_t modify_functions(httpd_req_t* req)
             goto err_out;
         }
 
-        ESP_GOTO_ON_ERROR(update_wifi_state(str_to_wifi_mode(mode), ssid, passwd), err_out, TAG, "fail to update wifi state");
+        ESP_GOTO_ON_ERROR(update_wifi_mode(str_to_wifi_mode(mode), ssid, passwd), err_out, TAG, "fail to update wifi state");
     } else if (strcmp(last_token, "BLE") == 0) {
         cJSON_bool enabled = false;
         const char* name = NULL;

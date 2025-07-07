@@ -23,7 +23,7 @@ typedef enum {
  * Pattern configuration structure
  */
 typedef struct {
-    led_pattern_type_t type;        // Pattern type
+    led_pattern_type_t pattern;     // Pattern type
     led_drv_color_t primary_color;  // Primary color for pattern
     led_drv_color_t secondary_color; // Secondary color (for gradients, etc.)
     uint8_t brightness;             // Overall brightness (0-255)

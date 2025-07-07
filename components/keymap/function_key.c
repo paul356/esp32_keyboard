@@ -19,10 +19,13 @@
  */
 
 #include <string.h>
+#include <esp_log.h>
 #include "function_key.h"
 #include "quantum.h"
 #include "wifi_intf.h"
 #include "function_control.h"
+
+#define TAG "FunctionKey"
 
 // need a string for each function key code
 const char* function_key_strs[FUNCTION_KEY_NUM] = {
@@ -138,7 +141,13 @@ static esp_err_t print_help_info()
 
 static esp_err_t turn_on_hotspot(void)
 {
-    return update_wifi_state(WIFI_MODE_AP, "esp32_keyboard", "1234567890");
+    esp_err_t ret = update_wifi_mode(WIFI_MODE_AP, "esp32_keyboard", "1234567890");
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set wifi mode: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    return ESP_OK;
 }
 
 esp_err_t process_function_key(uint16_t keycode)

@@ -460,14 +460,14 @@ static void menu_setup_tree(void)
     menu_item_add_child(bluetooth_menu, bt_pair_admin);
 
     // Create WiFi submenu items
-    struct menu_item *wifi_toggle = menu_item_create("Toggle WiFi", &switch_icon, NULL, NULL, NULL, NULL);
+    struct menu_item *wifi_toggle = menu_item_create("Toggle WiFi", &switch_icon, keyboard_gui_prepare_wifi_toggle, keyboard_gui_post_wifi_toggle, NULL, keyboard_gui_wifi_toggle_action);
     struct menu_item *wifi_settings = menu_item_create("WiFi Settings", &wifi_setting_icon, NULL, NULL, NULL, NULL);
 
     menu_item_add_child(wifi_menu, wifi_toggle);
     menu_item_add_child(wifi_menu, wifi_settings);
 
     // Create LED submenu items
-    struct menu_item *led_toggle = menu_item_create("Toggle LED", &switch_icon, NULL, NULL, NULL, NULL);
+    struct menu_item *led_toggle = menu_item_create("Toggle LED", &switch_icon, keyboard_gui_prepare_led_toggle, keyboard_gui_post_led_toggle, NULL, keyboard_gui_led_toggle_action);
     struct menu_item *led_pattern = menu_item_create("LED Pattern", &led_pattern_icon, NULL, NULL, NULL, NULL);
 
     menu_item_add_child(led_menu, led_toggle);
