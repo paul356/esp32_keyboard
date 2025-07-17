@@ -20,6 +20,7 @@
 
 #pragma once
 
+#include "hal_ble.h"
 #include "menu_state_machine.h"
 
 /**
@@ -83,10 +84,10 @@ esp_err_t keyboard_gui_post_reset_meter(struct menu_item *self);
 /**
  * @brief Reset meter user action function
  * This function is called when the user presses Enter on the reset meter menu item
- * @param self Menu item that triggered the action
+ * @param user_ctx User context data for the action
  * @return esp_err_t ESP_OK on success
  */
-esp_err_t keyboard_gui_reset_meter_action(struct menu_item *self);
+esp_err_t keyboard_gui_reset_meter_action(void *user_ctx);
 
 /**
  * @brief Prepare bt_toggle GUI function for menu items
@@ -124,10 +125,10 @@ esp_err_t keyboard_gui_post_wifi_toggle(struct menu_item *self);
  * @brief WiFi toggle user action function
  * This function is called when the user presses Enter on the WiFi toggle menu item
  * Toggles WiFi on/off and updates the display accordingly
- * @param self Menu item that triggered the action
+ * @param user_ctx User context data for the action
  * @return esp_err_t ESP_OK on success
  */
-esp_err_t keyboard_gui_wifi_toggle_action(struct menu_item *self);
+esp_err_t keyboard_gui_wifi_toggle_action(void *user_ctx);
 
 /**
  * @brief Prepare led_toggle GUI function for menu items
@@ -149,7 +150,38 @@ esp_err_t keyboard_gui_post_led_toggle(struct menu_item *self);
  * @brief LED toggle user action function
  * This function is called when the user presses Enter on the LED toggle menu item
  * Toggles LED on/off and updates the display accordingly
- * @param self Menu item that triggered the action
+ * @param user_ctx User context data for the action
  * @return esp_err_t ESP_OK on success
  */
-esp_err_t keyboard_gui_led_toggle_action(struct menu_item *self);
+esp_err_t keyboard_gui_led_toggle_action(void *user_ctx);
+
+/**
+ * @brief Prepare bt_pair_kb GUI function for menu items
+ * Creates and shows Bluetooth pair keyboard interface with BLE name and icon
+ * @param self Menu item that displays Bluetooth pair keyboard functionality
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_prepare_bt_pair_kb(struct menu_item *self);
+
+/**
+ * @brief Post bt_pair_kb GUI function for menu items
+ * Cleanup function for Bluetooth pair keyboard interface
+ * @param self Menu item that had Bluetooth pair keyboard interface
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_post_bt_pair_kb(struct menu_item *self);
+
+/**
+ * @brief Input handler for bt_pair_kb menu item
+ * Handles numeric input for Bluetooth keyboard pairing PIN entry
+ * @param user_ctx User context data for the input handler
+ * @param input_event Type of input event
+ * @param key_code Key code for the input
+ * @return bool true if input was handled, false otherwise
+ */
+bool keyboard_gui_bt_pair_kb_handle_input(void *user_ctx, input_event_e input_event, char key_code);
+
+void keyboard_gui_bt_pair_kb_prompt_for_passkey(struct menu_item *self, enum passkey_event_e event, esp_bd_addr_t bd_addr);
+
+// Action function to send passkey reply using esp_ble_passkey_reply
+esp_err_t keyboard_gui_bt_pair_kb_action(void *user_ctx);

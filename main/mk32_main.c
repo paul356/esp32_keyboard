@@ -184,6 +184,16 @@ void app_main()
 
     ESP_ERROR_CHECK(drv_loop_init());
 
+    // Initialize NVS.
+    ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES)
+    {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+    log_memory_usage("After NVS flash init");
+
     (void)register_keyboard_reporter();
     log_memory_usage("After keyboard reporter registration");
 
@@ -215,16 +225,6 @@ void app_main()
     default_layer_set(0x1);
     log_memory_usage("After default_layer_set");
 
-    // Initialize NVS.
-    ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES)
-    {
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
-    log_memory_usage("After NVS flash init");
-
     // Load layouts from nvs (if found)
     nvs_load_layouts();
     log_memory_usage("After nvs_load_layouts");
@@ -235,8 +235,11 @@ void app_main()
     ESP_ERROR_CHECK(restore_saved_state());
     log_memory_usage("After restore_saved_state");
 
-    ESP_ERROR_CHECK(start_file_server());
-    log_memory_usage("After start_file_server");
+    if (is_wifi_enabled())
+    {
+        ESP_ERROR_CHECK(start_file_server());
+        log_memory_usage("After start_file_server");
+    }
 
     log_memory_usage("Keyboard initialization complete");
 }

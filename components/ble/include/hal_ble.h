@@ -26,10 +26,24 @@
 
 #include <stdbool.h>
 #include <esp_err.h>
+#include "esp_gap_ble_api.h"
+
+
+enum passkey_event_e {
+    PASSKEY_CHALLENGE = 0,  // Passkey challenge event
+    PASSKEY_FAILURE,        // Passkey failure event
+    PASSKEY_SUCCESS,        // Passkey success event
+};
+
+typedef void (*ble_passkey_callback)(void* arg, enum passkey_event_e event, esp_bd_addr_t bd_addr);
 
 /** @brief Main init function to start HID interface (C interface)
  * @see hid_ble */
-esp_err_t halBLEInit(const char* name);
+esp_err_t halBLEInit(const char *adv_name);
+
+esp_err_t ble_gap_adv_to_any(const char* adv_name);
+
+void ble_gap_set_passkey_callback(ble_passkey_callback callback, void* arg);
 
 bool is_ble_ready();
 

@@ -21,6 +21,8 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_check.h"
+#include "esp_gap_ble_api.h"
+#include <string.h>
 #include "lvgl.h"
 #include <stdio.h>
 #include "drv_loop.h"
@@ -40,9 +42,16 @@ typedef struct {
     char keycode;  // Keycode of the pressed key
 } input_event_data_t;
 
+typedef struct {
+    struct menu_item *menu_item;  // Menu item associated with the event
+    enum passkey_event_e input_event;    // Passkey event type
+    esp_bd_addr_t bd_addr;       // Hardware address of the device being paired
+} passkey_event_data_t;
+
 enum {
     UPDATE_LVGL_EVENT = 0,  // Update LVGL display
     GUI_INPUT_EVENT,
+    PROMPT_FOR_PASSKEY_EVENT,
 };
 
 ESP_EVENT_DEFINE_BASE(KEYBOARD_GUI_EVENTS);
@@ -78,11 +87,21 @@ static void gui_input_event_handler(void *arg, esp_event_base_t base, int32_t id
     }
 }
 
+static void prompt_for_passkey_event_handler(void *arg, esp_event_base_t base, int32_t id, void *event_data)
+{
+    if (base == KEYBOARD_GUI_EVENTS && id == PROMPT_FOR_PASSKEY_EVENT) {
+        passkey_event_data_t* passkey_evt_data = (passkey_event_data_t *)event_data;
+        keyboard_gui_bt_pair_kb_prompt_for_passkey(passkey_evt_data->menu_item, passkey_evt_data->input_event, passkey_evt_data->bd_addr);
+    }
+}
+
 static esp_err_t start_gui_routine_task(void)
 {
     ESP_RETURN_ON_ERROR(drv_loop_register_handler(KEYBOARD_GUI_EVENTS, UPDATE_LVGL_EVENT, update_lvgl_event_handler, NULL), TAG, "Failed to register LVGL update event handler");
 
-    ESP_RETURN_ON_ERROR(drv_loop_register_handler(KEYBOARD_GUI_EVENTS, GUI_INPUT_EVENT, gui_input_event_handler, NULL), TAG, "Failed to register LVGL update event handler");
+    ESP_RETURN_ON_ERROR(drv_loop_register_handler(KEYBOARD_GUI_EVENTS, GUI_INPUT_EVENT, gui_input_event_handler, NULL), TAG, "Failed to register gui input event handler");
+
+    ESP_RETURN_ON_ERROR(drv_loop_register_handler(KEYBOARD_GUI_EVENTS, PROMPT_FOR_PASSKEY_EVENT, prompt_for_passkey_event_handler, NULL), TAG, "Failed to register prompt for passkey event handler");
 
     const esp_timer_create_args_t update_timer_args = {
         .callback = &update_lvgl_timer_func,
@@ -203,6 +222,20 @@ esp_err_t keyboard_gui_post_input_event_isr(input_event_e event, char keycode)
     };
 
     return drv_loop_post_event_isr(KEYBOARD_GUI_EVENTS, GUI_INPUT_EVENT, &input_evt_data, sizeof(input_evt_data));
+}
+
+esp_err_t keyboard_gui_post_prompt_for_passkey_event(struct menu_item *bt_pair_pc,
+                                                     enum passkey_event_e event,
+                                                     esp_bd_addr_t bd_addr)
+{
+    passkey_event_data_t passkey_evt_data = {
+        .menu_item = bt_pair_pc,
+        .input_event = event
+    };
+
+    memcpy(passkey_evt_data.bd_addr, bd_addr, sizeof(esp_bd_addr_t));
+
+    return drv_loop_post_event_isr(KEYBOARD_GUI_EVENTS, PROMPT_FOR_PASSKEY_EVENT, &passkey_evt_data, sizeof(passkey_event_data_t));
 }
 
 esp_err_t keyboard_gui_set_brightness(uint8_t brightness)

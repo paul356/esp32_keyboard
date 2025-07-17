@@ -28,6 +28,7 @@
 
 esp_err_t update_wifi_switch(bool flag);
 esp_err_t update_wifi_mode(wifi_mode_t mode, const char* ssid, const char* passwd);
+bool is_wifi_enabled(void);
 wifi_mode_t get_wifi_mode(void);
 const char* get_wifi_ssid(void);
 

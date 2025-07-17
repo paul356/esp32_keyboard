@@ -10,7 +10,6 @@ idf_component_register(SRCS "lcd_hardware.c"
                               "icons/info_icon.c"
                               "icons/switch_icon.c"
                               "icons/bluetooth_pc_pair_icon.c"
-                              "icons/bluetooth_phone_pair_icon.c"
                               "icons/keyboard_lock_icon.c"
                               "icons/keyboard_logging_icon.c"
                               "icons/led_pattern_icon.c"
@@ -23,4 +22,4 @@ idf_component_register(SRCS "lcd_hardware.c"
                        INCLUDE_DIRS "include"
                        PRIV_INCLUDE_DIRS "private_include"
                        REQUIRES esp_lcd esp_driver_gpio esp_driver_spi esp_lvgl_port
-                       PRIV_REQUIRES driver drv_loop keymap)
+                       PRIV_REQUIRES driver drv_loop keymap ble)

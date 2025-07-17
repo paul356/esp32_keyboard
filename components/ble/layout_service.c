@@ -68,8 +68,6 @@ static uint16_t layout_update_char_handle = 0;  // New handle for layout update 
 
 // GATTS profile interface
 static esp_gatt_if_t layout_service_gatts_if = 0;
-static uint16_t layout_service_conn_id = 0;
-static bool layout_service_connected = false;
 static uint16_t layout_service_mtu = BLE_DEFAULT_MTU_SIZE; // Store the negotiated MTU
 
 // JSON data buffers
@@ -340,15 +338,6 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
         {
             ESP_LOGE(TAG, "Add characteristic failed, status %d", param->add_char.status);
         }
-        break;
-
-    case ESP_GATTS_CONNECT_EVT:
-        layout_service_conn_id = param->connect.conn_id;
-        layout_service_connected = true;
-        break;
-
-    case ESP_GATTS_DISCONNECT_EVT:
-        layout_service_connected = false;
         break;
 
     case ESP_GATTS_MTU_EVT:

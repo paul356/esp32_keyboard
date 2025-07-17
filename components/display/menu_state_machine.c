@@ -23,11 +23,25 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "esp_heap_caps.h"
+#include "hal_ble.h"
 #include "menu_state_machine.h"
 #include "keyboard_gui_widgets.h"
+#include "keyboard_gui_internal.h"
 #include "menu_icons.h"
 
 static const char *TAG = "menu_state";
+
+/**
+ * @brief Menu state machine context
+ */
+typedef struct {
+    struct menu_item *root_menu;        // Root menu item (top level)
+    struct menu_item *current_menu;     // Current active menu item
+    struct menu_item *keyboard_info;    // Keyboard mode menu item (default state)
+    uint32_t last_activity_time;        // Last activity timestamp
+    uint32_t timeout_ms;                // Timeout in milliseconds
+    bool menu_active;                   // Flag indicating if menu is active
+} menu_context_t;
 
 static menu_context_t s_menu_context = {0};
 
@@ -113,7 +127,7 @@ bool menu_state_process_event(input_event_e event, unsigned char ch)
         {
             // Current menu item has an action
             ESP_LOGI(TAG, "Executing action for current menu: %s", s_menu_context.current_menu->text);
-            s_menu_context.current_menu->user_action(s_menu_context.current_menu);
+            s_menu_context.current_menu->user_action(s_menu_context.current_menu->user_ctx);
         }
         event_consumed = true;
         break;
@@ -137,7 +151,7 @@ bool menu_state_process_event(input_event_e event, unsigned char ch)
         if (s_menu_context.current_menu->handle_input_key)
         {
             // Handle key input if defined
-            s_menu_context.current_menu->handle_input_key(event, ch);
+            s_menu_context.current_menu->handle_input_key(s_menu_context.current_menu->user_ctx, event, ch);
         }
         event_consumed = true;
         break;
@@ -155,9 +169,19 @@ bool menu_state_process_event(input_event_e event, unsigned char ch)
     return event_consumed;
 }
 
-struct menu_item* menu_state_get_current(void)
+struct menu_item* menu_state_get_current_menu(void)
 {
     return s_menu_context.current_menu;
+}
+
+uint32_t menu_state_get_timeout_ms(void)
+{
+    return s_menu_context.timeout_ms;
+}
+
+void menu_state_set_timeout_ms(uint32_t timeout_ms)
+{
+    s_menu_context.timeout_ms = timeout_ms;
 }
 
 void menu_state_update_timeout(void)
@@ -171,12 +195,6 @@ void menu_state_update_timeout(void)
     if (current_time - s_menu_context.last_activity_time > s_menu_context.timeout_ms) {
         menu_state_process_event(INPUT_EVENT_TIMEOUT, 0);
     }
-}
-
-void menu_state_set_timeout(uint32_t timeout_ms)
-{
-    s_menu_context.timeout_ms = timeout_ms;
-    ESP_LOGI(TAG, "Menu timeout set to %lu ms", timeout_ms);
 }
 
 // Helper functions for menu navigation
@@ -286,8 +304,8 @@ struct menu_item* menu_item_create(const char *text,
                                   const lv_image_dsc_t *icon,
                                   esp_err_t (*prepare_gui_func)(struct menu_item *self),
                                   esp_err_t (*post_gui_func)(struct menu_item *self),
-                                  bool (*handle_input_key)(input_event_e input_evt, char key_code),
-                                  esp_err_t (*user_action)(struct menu_item *self))
+                                  bool (*handle_input_key)(void *user_ctx, input_event_e input_event, char key_code),
+                                  esp_err_t (*user_action)(void *user_ctx))
 {
     if (!text) {
         ESP_LOGE(TAG, "Cannot create menu item with NULL text");
@@ -417,6 +435,14 @@ void menu_item_destroy(struct menu_item *item)
     heap_caps_free(item);
 }
 
+static void prompt_for_passkey_callback(void *arg, enum passkey_event_e event, esp_bd_addr_t bd_addr)
+{
+    ESP_LOGI(TAG, "Passkey event: %d", event);
+
+    // post a event to update the gui
+    keyboard_gui_post_prompt_for_passkey_event((struct menu_item *)arg, event, bd_addr);
+}
+
 // Setup the complete menu tree structure
 static void menu_setup_tree(void)
 {
@@ -452,12 +478,12 @@ static void menu_setup_tree(void)
 
     // Create Bluetooth submenu items
     struct menu_item *bt_toggle = menu_item_create("Toggle Bluetooth", &switch_icon, keyboard_gui_prepare_bt_toggle, keyboard_gui_post_bt_toggle, NULL, NULL);
-    struct menu_item *bt_pair_kb = menu_item_create("Pair Keyboard", &bluetooth_pc_pair, NULL, NULL, NULL, NULL);
-    struct menu_item *bt_pair_admin = menu_item_create("Pair Admin Device", &bluetooth_phone_pair, NULL, NULL, NULL, NULL);
+    struct menu_item *bt_pair_kb = menu_item_create("Pair Keyboard", &bluetooth_pc_pair, keyboard_gui_prepare_bt_pair_kb, keyboard_gui_post_bt_pair_kb, keyboard_gui_bt_pair_kb_handle_input, keyboard_gui_bt_pair_kb_action);
 
     menu_item_add_child(bluetooth_menu, bt_toggle);
     menu_item_add_child(bluetooth_menu, bt_pair_kb);
-    menu_item_add_child(bluetooth_menu, bt_pair_admin);
+
+    ble_gap_set_passkey_callback(&prompt_for_passkey_callback, bt_pair_kb);
 
     // Create WiFi submenu items
     struct menu_item *wifi_toggle = menu_item_create("Toggle WiFi", &switch_icon, keyboard_gui_prepare_wifi_toggle, keyboard_gui_post_wifi_toggle, NULL, keyboard_gui_wifi_toggle_action);

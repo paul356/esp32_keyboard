@@ -28,9 +28,9 @@
 extern "C" {
 #endif
 
-esp_err_t ble_gap_init(uint8_t mode);
-esp_err_t ble_gap_adv_init(uint16_t appearance, const char *device_name);
-esp_err_t ble_gap_adv_start(void);
+esp_err_t ble_gap_set_sec_params(void);
+void ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
+
 
 #ifdef __cplusplus
 }

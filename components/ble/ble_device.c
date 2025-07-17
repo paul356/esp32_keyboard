@@ -30,8 +30,13 @@
 #include "layout_service.h"  // Include the layout service header
 #include "ble_device.h"
 #include "ble_events_prv.h"
+#include "nvs_io.h"  // For NVS operations
+#include "nvs.h"
+#include "function_control.h"
 
 #define TAG "hal_ble"
+
+#define NVS_NAMESPACE "ble_device"
 
 uint8_t battery_report[1] = { 0 };
 uint8_t key_report[REPORT_LEN] = { 0 };
@@ -193,7 +198,7 @@ static esp_hid_device_config_t ble_hid_config = {
     .vendor_id          = 0x16C0,
     .product_id         = 0x05DF,
     .version            = 0x0100,
-    .device_name        = "ESP BLE HID3",
+    .device_name        = "smart_keyboard",
     .manufacturer_name  = "Paradise Lab",
     .serial_number      = "1234567890",
     .report_maps        = ble_report_maps,
@@ -255,14 +260,19 @@ bool is_ble_ready()
  */
 void top_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
-    if (event == ESP_GATTS_CONNECT_EVT) {
-        ble_gap_adv_start();
-    }
-
     // Check if this is a registration event for our custom service
     if ((event == ESP_GATTS_REG_EVT && param->reg.app_id == LAYOUT_SERVICE_UUID) ||
         (event != ESP_GATTS_REG_EVT && gatts_if != ESP_GATT_IF_NONE && gatts_if == layout_service_get_gatts_if()))
     {
+        if (event == ESP_GATTS_CONNECT_EVT)
+        {
+            const char* ble_name = get_ble_name();
+            esp_err_t ret = ble_gap_adv_to_any(ble_name);
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to start advertising for bonded devices: %s", esp_err_to_name(ret));
+            }
+        }
+
         // Pass to our layout service handler
         ESP_LOGI(TAG, "GATTS event: %d, GATTS interface: %d, to custom", event, gatts_if);
         layout_service_event_handler(event, gatts_if, param);
@@ -274,20 +284,67 @@ void top_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
     esp_hidd_gatts_event_handler(event, gatts_if, param);
 }
 
+/*
+ * CONTROLLER INIT
+ * */
+
+static esp_err_t init_bt_controller(uint8_t mode)
+{
+    esp_err_t ret;
+    esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
+#if CONFIG_IDF_TARGET_ESP32
+    bt_cfg.mode = mode;
+#endif
+    {
+        ret = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+        if (ret) {
+            ESP_LOGE(TAG, "esp_bt_controller_mem_release failed: %d", ret);
+            return ret;
+        }
+    }
+    ret = esp_bt_controller_init(&bt_cfg);
+    if (ret) {
+        ESP_LOGE(TAG, "esp_bt_controller_init failed: %d", ret);
+        return ret;
+    }
+
+    ret = esp_bt_controller_enable(mode);
+    if (ret) {
+        ESP_LOGE(TAG, "esp_bt_controller_enable failed: %d", ret);
+        return ret;
+    }
+
+    esp_bluedroid_config_t bluedroid_cfg = BT_BLUEDROID_INIT_CONFIG_DEFAULT();
+#if (CONFIG_EXAMPLE_SSP_ENABLED == false)
+    bluedroid_cfg.ssp_en = false;
+#endif
+    ret = esp_bluedroid_init_with_cfg(&bluedroid_cfg);
+    if (ret) {
+        ESP_LOGE(TAG, "esp_bluedroid_init failed: %d", ret);
+        return ret;
+    }
+
+    ret = esp_bluedroid_enable();
+    if (ret) {
+        ESP_LOGE(TAG, "esp_bluedroid_enable failed: %d", ret);
+        return ret;
+    }
+
+    return ret;
+}
+
 /** @brief Main init function to start HID interface (C interface)
  * @see hid_ble */
-esp_err_t halBLEInit(const char* name)
+esp_err_t halBLEInit(const char *adv_name)
 {
     ESP_LOGI(TAG, "setting hid gap, mode:%d", ESP_BT_MODE_BLE);
-    esp_err_t ret = ble_gap_init(ESP_BT_MODE_BLE);
+    esp_err_t ret = init_bt_controller(ESP_BT_MODE_BLE);
     ESP_ERROR_CHECK( ret );
 
-    const char* dup_name = strdup(name);
-    ESP_RETURN_ON_FALSE(dup_name, ESP_ERR_NO_MEM, TAG, "no memory");
-
-    ble_hid_config.device_name = dup_name;
-    ret = ble_gap_adv_init(ESP_HID_APPEARANCE_KEYBOARD, ble_hid_config.device_name);
-    ESP_ERROR_CHECK( ret );
+    if ((ret = esp_ble_gap_register_callback(ble_gap_event_handler)) != ESP_OK) {
+        ESP_LOGE(TAG, "esp_ble_gap_register_callback failed: %d", ret);
+        return ret;
+    }
 
     // Register our intermediary GATTS event handler instead of ESP-IDF's handler directly
     if ((ret = esp_ble_gatts_register_callback(top_gatts_event_handler)) != ESP_OK) {
@@ -307,16 +364,22 @@ esp_err_t halBLEInit(const char* name)
         return ret;
     }
 
-    ret = ble_gap_adv_start();
-    if (ret != ESP_OK) {
-        ESP_LOGW(TAG, "BLE adv start failed: %d", ret);
-    }
-
     // Initialize BLE-specific events and register handlers
     ret = ble_events_init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize BLE events: %s", esp_err_to_name(ret));
         return ret;
+    }
+
+    ret = ble_gap_set_sec_params();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to set BLE security parameters: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ret = ble_gap_adv_to_any(adv_name);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "GAP adv_start failed: %d", ret);
     }
 
     ESP_LOGI(TAG, "BLE event handlers registered");

@@ -291,8 +291,10 @@ esp_err_t restore_saved_state(void)
     log_memory_usage("After wifi_init");
 
     if (function_state.ble.enabled) {
+        // Init BLE anyway
         ret = halBLEInit(function_state.ble.name);
-        if (ret != ESP_OK) {
+        if (ret != ESP_OK)
+        {
             return ret;
         }
     }
@@ -359,17 +361,16 @@ esp_err_t update_wifi_mode(wifi_mode_t mode, const char* ssid, const char* passw
     return update_persisted_config(WIFI);
 }
 
-esp_err_t update_ble_state(bool enabled, const char* name)
-{
-    // TODO: it is to be implemented.
-    return ESP_FAIL;
-}
-
 esp_err_t update_usb_state(bool enabled)
 {
     function_state.usb.enabled = enabled;
 
     return update_persisted_config(USB);
+}
+
+bool is_wifi_enabled(void)
+{
+    return function_state.wifi.enabled;
 }
 
 wifi_mode_t get_wifi_mode(void)
@@ -403,6 +404,38 @@ wifi_mode_t str_to_wifi_mode(const char* str)
     } else {
         return WIFI_MODE_AP;
     }
+}
+
+esp_err_t update_ble_state(bool enabled, const char* name)
+{
+    bool last_enabled = function_state.ble.enabled;
+    function_state.ble.enabled = enabled;
+
+    if (name && strlen(name) > 0) {
+        snprintf(function_state.ble.name, sizeof(function_state.ble.name), "%s", name);
+    }
+
+    esp_err_t ret = update_persisted_config(BLE);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "fail to update BLE state, err=%d", ret);
+        return ret;
+    }
+
+    if (function_state.ble.enabled && !last_enabled) {
+        ret = halBLEInit(function_state.ble.name);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "fail to init BLE, err=%d", ret);
+            return ret;
+        }
+    }
+
+    if (last_enabled && !function_state.ble.enabled) {
+        // reboot to get a clean state
+        vTaskDelay(1500 / portTICK_PERIOD_MS);
+        esp_restart();
+    }
+
+    return ESP_OK;
 }
 
 bool is_ble_enabled(void)
