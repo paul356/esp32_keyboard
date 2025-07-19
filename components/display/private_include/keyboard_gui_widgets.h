@@ -185,3 +185,38 @@ void keyboard_gui_bt_pair_kb_prompt_for_passkey(struct menu_item *self, enum pas
 
 // Action function to send passkey reply using esp_ble_passkey_reply
 esp_err_t keyboard_gui_bt_pair_kb_action(void *user_ctx);
+
+/**
+ * @brief Prepare WiFi settings GUI function for menu items
+ * Creates and shows WiFi settings interface with mode selector, SSID and password fields
+ * @param self Menu item that displays WiFi settings
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_prepare_wifi_settings(struct menu_item *self);
+
+/**
+ * @brief Post WiFi settings GUI function for menu items
+ * Cleanup function for WiFi settings interface
+ * @param self Menu item that displays WiFi settings
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_post_wifi_settings(struct menu_item *self);
+
+/**
+ * @brief Handle input events for WiFi settings GUI
+ * Processes TAB navigation, text input, cursor movement
+ * @param user_ctx WiFi settings GUI context
+ * @param input_event Input event type
+ * @param key_code Character code for text input
+ * @return bool true if event was handled, false otherwise
+ */
+bool keyboard_gui_wifi_settings_handle_input(void *user_ctx, input_event_e input_event, char key_code);
+
+/**
+ * @brief WiFi settings action function
+ * This function is called when the user presses Enter on the WiFi settings menu item
+ * Applies the configured WiFi settings (mode, SSID, password)
+ * @param user_ctx WiFi settings GUI context
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_wifi_settings_action(void *user_ctx);
