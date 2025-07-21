@@ -254,3 +254,19 @@ bool keyboard_gui_wifi_settings_handle_input(void *user_ctx, input_event_e input
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t keyboard_gui_wifi_settings_action(void *user_ctx);
+
+/**
+ * @brief Prepare About GUI function for menu items
+ * Creates and shows About screen with keyboard information displayed in the center
+ * @param self Menu item that displays About information
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_prepare_about(struct menu_item *self);
+
+/**
+ * @brief Post About GUI function for menu items
+ * Cleanup function for About screen interface
+ * @param self Menu item that had About interface
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_post_about(struct menu_item *self);

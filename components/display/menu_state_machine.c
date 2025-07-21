@@ -459,14 +459,14 @@ static void menu_setup_tree(void)
     struct menu_item *advanced_menu = menu_item_create("Advanced", &advanced_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
 
     // Create About menu item (to be added to main menu)
-    struct menu_item *about = menu_item_create("About", &info_icon, NULL, NULL, NULL, NULL);
+    struct menu_item *about = menu_item_create("About", &info_icon, keyboard_gui_prepare_about, keyboard_gui_post_about, NULL, NULL);
 
     // Add main menu children
     menu_item_add_child(s_menu_context.root_menu, keyboard_mode_menu);
     menu_item_add_child(s_menu_context.root_menu, bluetooth_menu);
     menu_item_add_child(s_menu_context.root_menu, wifi_menu);
     menu_item_add_child(s_menu_context.root_menu, led_menu);
-    menu_item_add_child(s_menu_context.root_menu, advanced_menu);
+    //menu_item_add_child(s_menu_context.root_menu, advanced_menu);
     menu_item_add_child(s_menu_context.root_menu, about);
 
     // Create keyboard mode submenu items
@@ -499,12 +499,12 @@ static void menu_setup_tree(void)
     menu_item_add_child(led_menu, led_toggle);
     menu_item_add_child(led_menu, led_pattern);
 
-    // Create Advanced submenu items
-    struct menu_item *kb_lock = menu_item_create("Keyboard Lock", &keyboard_lock_icon, NULL, NULL, NULL, NULL);
-    struct menu_item *input_log = menu_item_create("Input Logging", &keyboard_logging_icon, NULL, NULL, NULL, NULL);
+    // Implement advanced function later
+    //struct menu_item *kb_lock = menu_item_create("Keyboard Lock", &keyboard_lock_icon, NULL, NULL, NULL, NULL);
+    //struct menu_item *input_log = menu_item_create("Input Logging", &keyboard_logging_icon, NULL, NULL, NULL, NULL);
 
-    menu_item_add_child(advanced_menu, kb_lock);
-    menu_item_add_child(advanced_menu, input_log);
+    //menu_item_add_child(advanced_menu, kb_lock);
+    //menu_item_add_child(advanced_menu, input_log);
 
     ESP_LOGI(TAG, "Menu tree structure setup complete");
 }
