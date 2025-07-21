@@ -494,7 +494,7 @@ static void menu_setup_tree(void)
 
     // Create LED submenu items
     struct menu_item *led_toggle = menu_item_create("Toggle LED", &switch_icon, keyboard_gui_prepare_led_toggle, keyboard_gui_post_led_toggle, NULL, keyboard_gui_led_toggle_action);
-    struct menu_item *led_pattern = menu_item_create("LED Pattern", &led_pattern_icon, NULL, NULL, NULL, NULL);
+    struct menu_item *led_pattern = menu_item_create("LED Pattern", &led_pattern_icon, keyboard_gui_prepare_led_pattern_settings, keyboard_gui_post_led_pattern_settings, keyboard_gui_led_pattern_settings_handle_input, keyboard_gui_led_pattern_settings_action);
 
     menu_item_add_child(led_menu, led_toggle);
     menu_item_add_child(led_menu, led_pattern);

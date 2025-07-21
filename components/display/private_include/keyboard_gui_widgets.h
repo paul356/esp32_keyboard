@@ -156,6 +156,40 @@ esp_err_t keyboard_gui_post_led_toggle(struct menu_item *self);
 esp_err_t keyboard_gui_led_toggle_action(void *user_ctx);
 
 /**
+ * @brief Prepare LED pattern settings GUI function for menu items
+ * Creates and shows LED pattern settings interface with pattern roller and parameter fields
+ * @param self Menu item that displays LED pattern settings
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_prepare_led_pattern_settings(struct menu_item *self);
+
+/**
+ * @brief Post LED pattern settings GUI function for menu items
+ * Cleanup function for LED pattern settings interface
+ * @param self Menu item that displays LED pattern settings
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_post_led_pattern_settings(struct menu_item *self);
+
+/**
+ * @brief Input handler for LED pattern settings menu item
+ * Handles navigation, text input and pattern selection for LED pattern settings
+ * @param user_ctx User context data for the input handler
+ * @param input_event Type of input event
+ * @param key_code Key code for the input
+ * @return bool true if input was handled, false otherwise
+ */
+bool keyboard_gui_led_pattern_settings_handle_input(void *user_ctx, input_event_e input_event, char key_code);
+
+/**
+ * @brief Action function for LED pattern settings menu item
+ * Applies the current LED pattern settings
+ * @param user_ctx User context data for the action function
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_led_pattern_settings_action(void *user_ctx);
+
+/**
  * @brief Prepare bt_pair_kb GUI function for menu items
  * Creates and shows Bluetooth pair keyboard interface with BLE name and icon
  * @param self Menu item that displays Bluetooth pair keyboard functionality

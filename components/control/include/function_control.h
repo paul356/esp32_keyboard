@@ -43,9 +43,9 @@ esp_err_t update_usb_state(bool enabled);
 bool is_usb_enabled(void);
 
 esp_err_t update_led_switch(bool flag);
-esp_err_t update_led_pattern(led_pattern_type_t pattern);
+esp_err_t update_led_pattern(led_pattern_type_e pattern);
 bool is_led_enabled(void);
-led_pattern_type_t get_led_pattern(void);
+led_pattern_type_e get_led_pattern(void);
 
 esp_err_t restore_saved_state(void);
 

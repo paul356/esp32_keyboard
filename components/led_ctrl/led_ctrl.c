@@ -23,6 +23,18 @@ typedef struct {
     bool pressed;  // True if key is pressed, false if released
 } led_ctrl_keystroke_t;
 
+/**
+ * Pattern configuration structure
+ */
+typedef struct {
+    led_pattern_type_e pattern;     // Pattern type
+    led_drv_color_t primary_color;  // Primary color for pattern
+    led_drv_color_t secondary_color; // Secondary color (for gradients, etc.)
+    uint8_t brightness;             // Overall brightness (0-255)
+    uint32_t param1;                // Pattern-specific parameter 1
+    uint32_t param2;                // Pattern-specific parameter 2
+} led_pattern_config_t;
+
 // Component state
 static bool s_initialized = false;
 
@@ -50,16 +62,16 @@ esp_err_t led_ctrl_init(void) {
         ESP_LOGW(TAG, "LED control already initialized");
         return ESP_OK;
     }
-    
+
     ESP_LOGI(TAG, "Initializing LED control component");
-    
+
     // Initialize LED driver first
     esp_err_t ret = led_drv_init();
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to initialize LED driver: %s", esp_err_to_name(ret));
         return ret;
     }
-    
+
     // Register event handler with drv_loop
     ret = drv_loop_register_handler(LED_CTRL_EVENTS, ESP_EVENT_ANY_ID,
                                    led_ctrl_event_handler, NULL);
@@ -67,22 +79,43 @@ esp_err_t led_ctrl_init(void) {
         ESP_LOGE(TAG, "Failed to register event handler: %s", esp_err_to_name(ret));
         return ret;
     }
-    
+
     // Initialize all LEDs to off
     led_drv_clear();
-    
+
     s_initialized = true;
     ESP_LOGI(TAG, "LED control component initialized successfully");
-    
+
     return ESP_OK;
 }
 
-esp_err_t led_ctrl_set_pattern(led_pattern_type_t pattern_type, uint32_t param1, uint32_t param2) {
+esp_err_t led_ctrl_set_pattern(led_pattern_type_e pattern_type, uint32_t param1, uint32_t param2) {
     if (!s_initialized) {
         return ESP_ERR_INVALID_STATE;
     }
 
     s_current_pattern.pattern = pattern_type;
+    s_current_pattern.param1 = param1;
+    s_current_pattern.param2 = param2;
+
+    ESP_LOGI(TAG, "LED pattern set to %d with param1=%lu, param2=%lu", pattern_type, param1, param2);
+    return ESP_OK;
+}
+
+esp_err_t led_ctrl_get_pattern(led_pattern_type_e *pattern_type, uint32_t *param1, uint32_t *param2) {
+    if (!s_initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (pattern_type == NULL || param1 == NULL || param2 == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Copy current pattern configuration to provided pointers
+    *pattern_type = s_current_pattern.pattern;
+    *param1 = s_current_pattern.param1;
+    *param2 = s_current_pattern.param2;
+
     return ESP_OK;
 }
 
@@ -101,16 +134,16 @@ esp_err_t led_ctrl_keystroke(uint8_t row, uint8_t col, bool pressed) {
         // If the current pattern is OFF, we can just ignore the keystroke
         return ESP_OK;
     }
-    
+
     ESP_LOGD(TAG, "Keystroke: pos=(%d,%d), pressed=%d", row, col, pressed);
-    
+
     // Fill event structure and post to drv_loop
     led_ctrl_keystroke_t keystroke = {
         .row = row,
         .col = col,
         .pressed = pressed,
     };
-    
+
     return drv_loop_post_event(LED_CTRL_EVENTS, LED_CTRL_EVENT_KEYSTROKE,
                               &keystroke, sizeof(keystroke), 0);
 }
@@ -148,7 +181,7 @@ static void handle_keystroke_event(uint8_t row, uint8_t col, bool pressed) {
         .arg = NULL,
         .name = "clear_leds_timer"
     };
-    
+
     esp_err_t timer_ret = esp_timer_create(&clear_timer_args, &clear_timer);
     if (timer_ret == ESP_OK) {
         esp_timer_start_once(clear_timer, s_current_pattern.param1 * 1000); // 5ms in microseconds
@@ -156,7 +189,7 @@ static void handle_keystroke_event(uint8_t row, uint8_t col, bool pressed) {
     } else {
         ESP_LOGE(TAG, "Failed to create clear LEDs timer: %s", esp_err_to_name(timer_ret));
     }*/
-    
+
     ESP_LOGI(TAG, "Keystroke count: %d", count);
 }
 
@@ -166,27 +199,27 @@ static void led_ctrl_event_handler(void *event_handler_arg, esp_event_base_t eve
     if (event_base != LED_CTRL_EVENTS) {
         return;
     }
-    
+
     switch (event_id) {
         case LED_CTRL_EVENT_KEYSTROKE: {
             if (event_data) {
                 led_ctrl_keystroke_t *keystroke = (led_ctrl_keystroke_t *)event_data;
-                ESP_LOGD(TAG, "Processing keystroke: pos=(%d,%d), pressed=%d", 
+                ESP_LOGD(TAG, "Processing keystroke: pos=(%d,%d), pressed=%d",
                         keystroke->row, keystroke->col, keystroke->pressed);
-                
+
                 // Handle keystroke-based patterns if needed
                 handle_keystroke_event(keystroke->row, keystroke->col, keystroke->pressed);
             }
             break;
         }
-        
+
         case LED_CTRL_EVENT_CLEAR_LEDS: {
             led_drv_clear();
             led_drv_update();
             ESP_LOGI(TAG, "Clearing all LEDs");
             break;
         }
-        
+
         default:
             ESP_LOGW(TAG, "Unknown event ID: %ld", event_id);
             break;

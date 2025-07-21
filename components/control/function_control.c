@@ -79,7 +79,7 @@ typedef struct _control_state_t {
     } usb;
     struct {
         bool enabled;
-        led_pattern_type_t pattern;
+        led_pattern_type_e pattern;
     } led;
 } control_state_t;
 
@@ -466,7 +466,7 @@ esp_err_t update_led_switch(bool flag)
     return update_persisted_config(LED);
 }
 
-esp_err_t update_led_pattern(led_pattern_type_t pattern)
+esp_err_t update_led_pattern(led_pattern_type_e pattern)
 {
     if (pattern < LED_PATTERN_OFF || pattern >= LED_PATTERN_MAX) {
         ESP_LOGE(TAG, "Invalid LED pattern: %d", pattern);
@@ -491,7 +491,7 @@ bool is_led_enabled(void)
     return function_state.led.enabled;
 }
 
-led_pattern_type_t get_led_pattern(void)
+led_pattern_type_e get_led_pattern(void)
 {
     return function_state.led.pattern;
 }
