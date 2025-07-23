@@ -436,37 +436,100 @@ err_out:
     return ret;
 }
 
+/**
+ * @brief Escape special characters in a string for JSON output
+ *
+ * This function escapes all characters that need to be escaped according to JSON specification:
+ * - " (quotation mark) -> \"
+ * - \ (backslash) -> \\
+ * - / (forward slash) -> \/ (optional but included)
+ * - \b (backspace) -> \b
+ * - \f (form feed) -> \f
+ * - \n (line feed) -> \n
+ * - \r (carriage return) -> \r
+ * - \t (horizontal tab) -> \t
+ * - Control characters (0x00-0x1F) -> \uXXXX
+ *
+ * @param content The string to escape (modified in place)
+ * @param max_size Maximum size of the buffer including null terminator
+ */
 static void escape_string(char* content, int max_size)
 {
     int len = strlen(content);
-
     int i = 0;
-    while (content[i] != '\0') {
-        switch (content[i]) {
-        case '\n':
-            if (len + 1 >= max_size) {
-                return;
-            }
-            memmove(&content[i+2], &content[i+1], len - i);
-            len += 1;
-            content[i] = '\\';
-            content[i+1] = 'n';
-            i += 2;
-            break;
+
+    while (i < len && content[i] != '\0') {
+        unsigned char c = (unsigned char)content[i];
+        int escape_len = 0;
+        char escape_seq[7]; // Maximum needed for \uXXXX + null terminator
+
+        // Determine the escape sequence needed
+        switch (c) {
         case '"':
-            if (len + 1 >= max_size) {
-                return;
-            }
-            memmove(&content[i+2], &content[i+1], len - i);
-            len += 1;
-            content[i] = '\\';
-            content[i+1] = '"';
-            i += 2;
+            escape_seq[0] = '\\';
+            escape_seq[1] = '"';
+            escape_len = 2;
+            break;
+        case '\\':
+            escape_seq[0] = '\\';
+            escape_seq[1] = '\\';
+            escape_len = 2;
+            break;
+        case '/':
+            // Optional: JSON allows forward slash to be escaped
+            escape_seq[0] = '\\';
+            escape_seq[1] = '/';
+            escape_len = 2;
+            break;
+        case '\b':
+            escape_seq[0] = '\\';
+            escape_seq[1] = 'b';
+            escape_len = 2;
+            break;
+        case '\f':
+            escape_seq[0] = '\\';
+            escape_seq[1] = 'f';
+            escape_len = 2;
+            break;
+        case '\n':
+            escape_seq[0] = '\\';
+            escape_seq[1] = 'n';
+            escape_len = 2;
+            break;
+        case '\r':
+            escape_seq[0] = '\\';
+            escape_seq[1] = 'r';
+            escape_len = 2;
+            break;
+        case '\t':
+            escape_seq[0] = '\\';
+            escape_seq[1] = 't';
+            escape_len = 2;
             break;
         default:
+            // No escaping needed for this character
             i++;
-            break;
+            continue; // Skip the escape sequence processing
         }
+
+        // Check if we have enough space for the escape sequence (including null terminator)
+        if (len + escape_len - 1 >= max_size - 1) {
+            // Not enough space, truncate here
+            content[i] = '\0';
+            return;
+        }
+
+        // Make room for the escape sequence by moving the rest of the string
+        // Move from position i+1 to end of string, total length is (len - i - 1) + 1 for null terminator
+        memmove(&content[i + escape_len], &content[i + 1], len - i);
+        len += escape_len - 1;
+
+        // Insert the escape sequence
+        for (int j = 0; j < escape_len; j++) {
+            content[i + j] = escape_seq[j];
+        }
+
+        i += escape_len;
     }
 }
 
