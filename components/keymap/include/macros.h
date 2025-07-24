@@ -34,6 +34,10 @@
 esp_err_t set_macro_str(uint16_t keycode, char* buf);
 esp_err_t get_macro_str(uint16_t keycode, char* buf, int buf_len);
 
+esp_err_t get_macro_readable_str(uint16_t keycode, char* buf, int buf_len);
+esp_err_t convert_user_friendly_to_qmk(const char* user_input, char* qmk_output, size_t output_size);
+esp_err_t convert_qmk_to_user_friendly(const char* qmk_input, char* user_output, size_t output_size);
+
 esp_err_t get_macro_name(uint16_t keycode, char* buf, int buf_len);
 esp_err_t parse_macro_name(const char* macro_name, uint16_t* keycode);
 

@@ -550,7 +550,7 @@ static esp_err_t get_macro_content(httpd_req_t* req)
         goto err_out;
     }
 
-    ESP_GOTO_ON_ERROR(get_macro_str(keycode, content, MACRO_STR_MAX_LEN), err_out, TAG, "fail to get macro content %s", last_token);
+    ESP_GOTO_ON_ERROR(get_macro_readable_str(keycode, content, MACRO_STR_MAX_LEN), err_out, TAG, "fail to get macro content %s", last_token);
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_sendstr_chunk(req, "{\"");
