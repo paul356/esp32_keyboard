@@ -58,4 +58,29 @@ esp_err_t generate_keycodes_json(append_str_fn_t append_str, void* target);
  */
 esp_err_t update_layout_from_json(const cJSON *json);
 
+/**
+ * @brief Generate JSON representation of all macros
+ *
+ * @param append_str Function pointer to append string to target
+ * @param target Opaque pointer passed to append_str function
+ * @return esp_err_t ESP_OK on success, error code on failure
+ */
+esp_err_t generate_macros_json(append_str_fn_t append_str, void* target);
+
+/**
+ * @brief Update multiple macros from a JSON object
+ *
+ * @param json The cJSON object containing macro updates
+ * @return esp_err_t ESP_OK on success, error code on failure
+ */
+esp_err_t update_macros_from_json(const cJSON* json);
+
+/**
+ * @brief Escape special characters in a string for JSON output
+ *
+ * @param str String to escape (modified in place)
+ * @param max_len Maximum length of the string buffer
+ */
+void escape_string_for_json(char* str, size_t max_len);
+
 #endif /* KEYMAP_JSON_H */

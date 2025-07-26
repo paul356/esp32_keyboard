@@ -25,6 +25,7 @@
 #include "layout_store.h"
 #include "macros.h"
 #include "keymap_json.h"
+#include <string.h>
 
 #define TAG "KEYMAP_JSON"
 #define KEYBOARD_NAME "ninjia-keyboard-v1"
@@ -449,4 +450,176 @@ cleanup:
     if (counts) free(counts);
 
     return ret;
+}
+
+/**
+ * @brief Escape special characters in a string for JSON output
+ *
+ * This function escapes quotes, backslashes, and newlines to make
+ * the string safe for JSON output.
+ */
+void escape_string_for_json(char* str, size_t max_len)
+{
+    if (!str || max_len == 0) return;
+
+    size_t len = strlen(str);
+    if (len == 0) return;
+
+    // Work backwards to avoid overwriting characters we haven't processed yet
+    for (int i = len - 1; i >= 0; i--) {
+        char ch = str[i];
+        size_t escape_len = 0;
+        const char* escape_seq = NULL;
+
+        switch (ch) {
+            case '"':
+                escape_seq = "\\\"";
+                escape_len = 2;
+                break;
+            case '\\':
+                escape_seq = "\\\\";
+                escape_len = 2;
+                break;
+            case '\n':
+                escape_seq = "\\n";
+                escape_len = 2;
+                break;
+            case '\r':
+                escape_seq = "\\r";
+                escape_len = 2;
+                break;
+            case '\t':
+                escape_seq = "\\t";
+                escape_len = 2;
+                break;
+            default:
+                continue; // No escaping needed
+        }
+
+        // Check if we have enough space for the escape sequence
+        if (len + escape_len - 1 >= max_len) {
+            ESP_LOGW(TAG, "String too long for escaping, truncating");
+            str[i] = '\0';
+            break;
+        }
+
+        // Shift the remaining string to make room for escape sequence
+        memmove(&str[i + escape_len], &str[i + 1], len - i);
+
+        // Insert the escape sequence
+        memcpy(&str[i], escape_seq, escape_len);
+
+        len += escape_len - 1;
+    }
+}
+
+/**
+ * @brief Generate JSON representation of all macros
+ */
+esp_err_t generate_macros_json(append_str_fn_t append_str, void* target)
+{
+    if (!append_str || !target) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Start JSON object
+    append_str(target, "{");
+
+    bool first = true;
+
+    // Iterate through all possible macro keycodes
+    for (int i = 0; i < MACRO_CODE_NUM; i++) {
+        uint16_t keycode = MACRO_CODE_MIN + i;
+
+        // Get macro name (e.g., "MACRO0", "MACRO1", etc.)
+        char macro_name[16];
+        esp_err_t ret = get_macro_name(keycode, macro_name, sizeof(macro_name));
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to get macro name for keycode %d", keycode);
+            continue;
+        }
+
+        // Get macro content
+        char* content = malloc(MACRO_STR_MAX_LEN);
+        if (!content) {
+            ESP_LOGE(TAG, "Failed to allocate memory for macro content");
+            return ESP_ERR_NO_MEM;
+        }
+
+        ret = get_macro_readable_str(keycode, content, MACRO_STR_MAX_LEN);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to get macro content for %s", macro_name);
+            free(content);
+            continue;
+        }
+
+        // Add comma separator for subsequent entries
+        if (!first) {
+            append_str(target, ",");
+        }
+        first = false;
+
+        // Add macro entry: "MACRO0": "macro_content"
+        append_str(target, "\"");
+        append_str(target, macro_name);
+        append_str(target, "\":\"");
+
+        if (strlen(content) > 0) {
+            escape_string_for_json(content, MACRO_STR_MAX_LEN);
+            append_str(target, content);
+        }
+
+        append_str(target, "\"");
+
+        free(content);
+    }
+
+    // End JSON object
+    append_str(target, "}");
+
+    return ESP_OK;
+}
+
+/**
+ * @brief Update multiple macros from a JSON object
+ */
+esp_err_t update_macros_from_json(const cJSON* json)
+{
+    if (!json) {
+        ESP_LOGE(TAG, "Invalid JSON object for macro update");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    bool success = true;
+
+    // Iterate through all items in the JSON object
+    cJSON* item = NULL;
+    cJSON_ArrayForEach(item, json) {
+        const char* macro_name = item->string;
+        if (!macro_name || !cJSON_IsString(item)) {
+            ESP_LOGW(TAG, "Skipping invalid macro item");
+            continue;
+        }
+
+        // Parse macro name to get keycode
+        uint16_t keycode;
+        esp_err_t ret = parse_macro_name(macro_name, &keycode);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to parse macro name: %s", macro_name);
+            success = false;
+            continue;
+        }
+
+        // Set macro content
+        ret = set_macro_str(keycode, item->valuestring);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to set macro %s content", macro_name);
+            success = false;
+            continue;
+        }
+
+        ESP_LOGI(TAG, "Updated macro %s successfully", macro_name);
+    }
+
+    return success ? ESP_OK : ESP_ERR_INVALID_STATE;
 }

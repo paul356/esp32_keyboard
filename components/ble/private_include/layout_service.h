@@ -53,6 +53,10 @@ extern "C" {
 #define KEYCODE_CHAR_UUID        0xDEF3  // Keycode characteristic UUID
 #define KEYCODE_OFFSET_CHAR_UUID 0xDEF4  // Keycode offset characteristic UUID
 #define LAYOUT_UPDATE_CHAR_UUID  0xDFF1  // Layout update characteristic UUID (write-only)
+#define MACRO_ID_CHAR_UUID       0xE001  // Macro ID characteristic UUID (write-only)
+#define MACRO_CHAR_UUID          0xE002  // Macro characteristic UUID (read-only)
+#define MACRO_OFFSET_CHAR_UUID   0xE003  // Macro offset characteristic UUID (write-only)
+#define MACRO_UPDATE_CHAR_UUID   0xE004  // Macro update characteristic UUID (write-only)
 
 /**
  * @brief Initialize the layout service

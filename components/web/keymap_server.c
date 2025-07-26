@@ -436,146 +436,32 @@ err_out:
     return ret;
 }
 
-/**
- * @brief Escape special characters in a string for JSON output
- *
- * This function escapes all characters that need to be escaped according to JSON specification:
- * - " (quotation mark) -> \"
- * - \ (backslash) -> \\
- * - / (forward slash) -> \/ (optional but included)
- * - \b (backspace) -> \b
- * - \f (form feed) -> \f
- * - \n (line feed) -> \n
- * - \r (carriage return) -> \r
- * - \t (horizontal tab) -> \t
- * - Control characters (0x00-0x1F) -> \uXXXX
- *
- * @param content The string to escape (modified in place)
- * @param max_size Maximum size of the buffer including null terminator
- */
-static void escape_string(char* content, int max_size)
+static void append_to_httpd_response(void* target, const char* str)
 {
-    int len = strlen(content);
-    int i = 0;
-
-    while (i < len && content[i] != '\0') {
-        unsigned char c = (unsigned char)content[i];
-        int escape_len = 0;
-        char escape_seq[7]; // Maximum needed for \uXXXX + null terminator
-
-        // Determine the escape sequence needed
-        switch (c) {
-        case '"':
-            escape_seq[0] = '\\';
-            escape_seq[1] = '"';
-            escape_len = 2;
-            break;
-        case '\\':
-            escape_seq[0] = '\\';
-            escape_seq[1] = '\\';
-            escape_len = 2;
-            break;
-        case '/':
-            // Optional: JSON allows forward slash to be escaped
-            escape_seq[0] = '\\';
-            escape_seq[1] = '/';
-            escape_len = 2;
-            break;
-        case '\b':
-            escape_seq[0] = '\\';
-            escape_seq[1] = 'b';
-            escape_len = 2;
-            break;
-        case '\f':
-            escape_seq[0] = '\\';
-            escape_seq[1] = 'f';
-            escape_len = 2;
-            break;
-        case '\n':
-            escape_seq[0] = '\\';
-            escape_seq[1] = 'n';
-            escape_len = 2;
-            break;
-        case '\r':
-            escape_seq[0] = '\\';
-            escape_seq[1] = 'r';
-            escape_len = 2;
-            break;
-        case '\t':
-            escape_seq[0] = '\\';
-            escape_seq[1] = 't';
-            escape_len = 2;
-            break;
-        default:
-            // No escaping needed for this character
-            i++;
-            continue; // Skip the escape sequence processing
-        }
-
-        // Check if we have enough space for the escape sequence (including null terminator)
-        if (len + escape_len - 1 >= max_size - 1) {
-            // Not enough space, truncate here
-            content[i] = '\0';
-            return;
-        }
-
-        // Make room for the escape sequence by moving the rest of the string
-        // Move from position i+1 to end of string, total length is (len - i - 1) + 1 for null terminator
-        memmove(&content[i + escape_len], &content[i + 1], len - i);
-        len += escape_len - 1;
-
-        // Insert the escape sequence
-        for (int j = 0; j < escape_len; j++) {
-            content[i + j] = escape_seq[j];
-        }
-
-        i += escape_len;
-    }
+    httpd_req_t* req = (httpd_req_t*)target;
+    httpd_resp_sendstr_chunk(req, str);
 }
 
-static esp_err_t get_macro_content(httpd_req_t* req)
+static esp_err_t get_macros_content(httpd_req_t* req)
 {
-    const char* prefix = "/api/macro/";
-    const char* last_token = &req->uri[strlen(prefix)];
-    char* content = NULL;
-    esp_err_t ret;
+    httpd_resp_set_type(req, "application/json");
 
-    uint16_t keycode;
-    ESP_GOTO_ON_ERROR(parse_macro_name(last_token, &keycode), err_out, TAG, "error macro name %s", last_token);
-
-    content = malloc(MACRO_STR_MAX_LEN);
-    if (!content) {
-        ret = ESP_ERR_NO_MEM;
-        ESP_LOGE(TAG, "not enough memory to process request %s", req->uri);
+    esp_err_t ret = generate_macros_json(append_to_httpd_response, req);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to generate macros JSON");
         goto err_out;
     }
 
-    ESP_GOTO_ON_ERROR(get_macro_readable_str(keycode, content, MACRO_STR_MAX_LEN), err_out, TAG, "fail to get macro content %s", last_token);
-
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_sendstr_chunk(req, "{\"");
-    httpd_resp_sendstr_chunk(req, last_token);
-    httpd_resp_sendstr_chunk(req, "\" : \"");
-    if (strlen(content) > 0) {
-        escape_string(content, MACRO_STR_MAX_LEN);
-        httpd_resp_sendstr_chunk(req, content);
-    }
-    httpd_resp_sendstr_chunk(req, "\"}");
-
-    free(content);
     httpd_resp_sendstr_chunk(req, NULL);
     return ESP_OK;
 
 err_out:
-    if (content) free(content);
     httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Oops. Something is wrong.");
     return ret;
 }
 
 static esp_err_t set_macro_content(httpd_req_t* req)
 {
-    const char* prefix = "/api/macro/";
-    const char* last_token = &req->uri[strlen(prefix)];
     esp_err_t ret;
 
     cJSON* root = NULL;
@@ -585,16 +471,12 @@ static esp_err_t set_macro_content(httpd_req_t* req)
         return ret;
     }
 
-    uint16_t keycode;
-    ESP_GOTO_ON_ERROR(parse_macro_name(last_token, &keycode), err_out, TAG, "error macro name %s", last_token);
-
-    cJSON* contentItem = cJSON_GetObjectItem(root, last_token);
-    if (!contentItem) {
-        ESP_LOGE(TAG, "There is no field %s in the input", last_token);
+    // Use the new utility function to update macros
+    ret = update_macros_from_json(root);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to update macro from JSON");
         goto err_out;
     }
-
-    ESP_GOTO_ON_ERROR(set_macro_str(keycode, contentItem->valuestring), err_out, TAG, "fail to set macro %s string", last_token);
 
     cJSON_Delete(root);
     httpd_resp_sendstr_chunk(req, NULL);
@@ -620,7 +502,7 @@ static struct {
     {"/api/device-status",     HTTP_GET,      get_device_status,      NULL},
     {"/upload/bin_file",       HTTP_POST,     upload_bin_file,        NULL},
     {"/api/switches/*",        HTTP_PUT,      modify_functions,       NULL},
-    {"/api/macro/*",           HTTP_GET,      get_macro_content,      NULL},
+    {"/api/macros",            HTTP_GET,      get_macros_content,     NULL},
     {"/api/macro/*",           HTTP_PUT,      set_macro_content,      NULL},
     {"/*",                     HTTP_GET,      serve_static_files,     NULL}
 };

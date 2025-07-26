@@ -533,11 +533,36 @@ function _render_layouts()
 
 function _render_macros()
 {
-    let render_macro = function(macro_name) {
+    // First, get all macros from the new endpoint
+    let xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        if (xhttp.readyState == 4) {
+            if (xhttp.status == 200) {
+                let all_macros = JSON.parse(xhttp.responseText);
+                // Clear existing macros
+                let macros_div = document.getElementById("macros");
+                macros_div.innerHTML = "";
+
+                // Render each macro
+                Object.keys(all_macros).forEach(macro_name => {
+                    macros_div.append(render_macro(macro_name, all_macros[macro_name]));
+                });
+            } else {
+                _handle_server_error(xhttp);
+            }
+        }
+    }
+    xhttp.open("GET", "/api/macros", true);
+    xhttp.send();
+
+    let render_macro = function(macro_name, initial_content) {
         let macro_div = _create_div(null, {"class" : "macro_div"});
         let label   = _create_element("label", macro_name+":", {"class" : "macro_label"});
         let content = _create_element("textarea", null, {"class" : "macro_content"});
         let btn = _create_element("button", "Update " + macro_name, {"class" : "macro_button"});
+
+        // Set initial content
+        content.value = initial_content || "";
 
         macro_div.append(label);
         macro_div.append(content);
@@ -564,27 +589,8 @@ function _render_macros()
             xhttp.send(data);
         });
 
-        let request_path = "/api/macro/" + macro_name;
-        let xhttp = new XMLHttpRequest();
-        xhttp.onreadystatechange = function() {
-            if (xhttp.readyState == 4) {
-                if (xhttp.status == 200) {
-                    let ret_json = JSON.parse(xhttp.responseText);
-                    content.value = ret_json[macro_name];
-                } else {
-                    content.value = "fail to get this macro";
-                }
-            }
-        }
-
-        xhttp.open("GET", request_path, true);
-        xhttp.send();
-
         return macro_div;
     }
-
-    let macros_div = document.getElementById("macros");
-    macro_names.forEach(macro_name => macros_div.append(render_macro(macro_name)));
 }
 
 function render_layouts_and_macros()
@@ -605,7 +611,7 @@ function update_keymap()
         selected_key[1].replaceWith(selected_key[0]);
         selected_key = null;
     }
-    
+
     // Create changes object for the new API format
     let changes = {};
     let hasChanges = false;

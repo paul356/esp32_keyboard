@@ -93,14 +93,20 @@
 ```
 * Output: none
 
-7. 获取Macro字符串
+7. 获取所有Macro字符串
 * Method: GET
-* URI: /api/macro/macro-name
+* URI: /api/macros
 * Input: none
 * Output:
+```json
 {
-    "macro-name" : "macro-content"
+    "MACRO0" : "macro-content-0",
+    "MACRO1" : "macro-content-1",
+    "MACRO2" : "macro-content-2",
+    ...
+    "MACRO31" : "macro-content-31"
 }
+```
 
 8. 设置Macro字符串
 * Method: PUT
