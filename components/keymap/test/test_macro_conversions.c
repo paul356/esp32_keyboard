@@ -78,12 +78,12 @@ TEST_CASE("test_convert_user_friendly_to_qmk_special_keys", "keymap") {
     // Test escaped backslash
     result = convert_user_friendly_to_qmk("\\\\", output, sizeof(output));
     TEST_ASSERT_EQUAL(ESP_OK, result);
-    TEST_ASSERT_EQUAL_STRING("\\", output);
+    TEST_ASSERT_EQUAL_STRING("\\\\", output);
 
     // Test escaped parenthesis
     result = convert_user_friendly_to_qmk("\\)", output, sizeof(output));
     TEST_ASSERT_EQUAL(ESP_OK, result);
-    TEST_ASSERT_EQUAL_STRING(")", output);
+    TEST_ASSERT_EQUAL_STRING("\\)", output);
 }
 
 // Test modifier key conversions
@@ -235,7 +235,7 @@ TEST_CASE("test_convert_qmk_to_user_friendly_special_keys", "keymap") {
     // Test backslash
     result = convert_qmk_to_user_friendly("\\", output, sizeof(output));
     TEST_ASSERT_EQUAL(ESP_OK, result);
-    TEST_ASSERT_EQUAL_STRING("\\\\", output);
+    TEST_ASSERT_EQUAL_STRING("\\", output);
 }
 
 // Test QMK to user-friendly modifiers
@@ -335,7 +335,7 @@ TEST_CASE("test_buffer_size_edge_cases", "keymap") {
     TEST_ASSERT_EQUAL(ESP_ERR_NO_MEM, result);
 
     // Test QMK conversion that expands beyond buffer
-    result = convert_user_friendly_to_qmk("\\b", output, 4); // SS_TAP(X_BSPACE) is longer than 4 chars
+    result = convert_user_friendly_to_qmk("\\b", output, 3); // SS_TAP(X_BSPACE) is 4 chars including '\0'
     TEST_ASSERT_EQUAL(ESP_ERR_NO_MEM, result);
 }
 
@@ -352,4 +352,21 @@ TEST_CASE("test_convert_qmk_to_user_friendly_errors", "keymap") {
     // Test buffer too small for user-friendly output
     result = convert_qmk_to_user_friendly(SS_DOWN(X_LSFT) "test" SS_UP(X_LSFT), output, 5);
     TEST_ASSERT_EQUAL(ESP_ERR_NO_MEM, result);
+
+    // Test buffer too small for user-friendly output
+    result = convert_qmk_to_user_friendly("test", output, 4);
+    TEST_ASSERT_EQUAL(ESP_ERR_NO_MEM, result);
+}
+
+TEST_CASE("test_invalid_input_characters", "keymap") {
+    char output[TEST_BUFFER_SIZE];
+    esp_err_t result;
+
+    result = convert_user_friendly_to_qmk("test\x7f\x01\x1f" "end", output, sizeof(output));
+    TEST_ASSERT_EQUAL(ESP_OK, result);
+    TEST_ASSERT_EQUAL_STRING("test...end", output);
+
+    result = convert_user_friendly_to_qmk("\\lshift(\x7f\x01\x1ftest)", output, sizeof(output));
+    TEST_ASSERT_EQUAL(ESP_OK, result);
+    TEST_ASSERT_EQUAL_STRING(SS_DOWN(X_LSFT) "...test" SS_UP(X_LSFT), output);
 }

@@ -43,7 +43,6 @@ typedef struct {
 static const expression_mapping_t special_key_mappings[] = {
     {"\\d", SS_TAP(X_DELETE)},
     {"\\b", SS_TAP(X_BSPACE)},
-    {"\\\\", "\\"},
     {"\\)", ")"},
     {"\\e", SS_TAP(X_ESCAPE)},
     {NULL, NULL}
@@ -73,6 +72,12 @@ static const expression_mapping_t modifier_up_mappings[] = {
     {NULL, NULL}
 };
 
+// Helper to check if a character is printable ASCII
+static inline bool is_printable_ascii(char c) {
+    // space to tilde based on table at https://www.ascii-code.com/
+    return (c >= 32 && c <= 126);
+}
+
 // Convert user-friendly expressions to QMK compatible representations
 esp_err_t convert_user_friendly_to_qmk(const char* user_input, char* qmk_output, size_t output_size)
 {
@@ -97,6 +102,10 @@ esp_err_t convert_user_friendly_to_qmk(const char* user_input, char* qmk_output,
             for (int i = 0; special_key_mappings[i].user_expr != NULL; i++) {
                 size_t expr_len = strlen(special_key_mappings[i].user_expr);
                 if (strncmp(&user_input[input_pos], special_key_mappings[i].user_expr, expr_len) == 0) {
+                    // Don't convert "\\)" outside of any modifier
+                    if (user_input[input_pos + 1] == ')' && stack_top == -1) {
+                        break;
+                    }
                     size_t qmk_len = strlen(special_key_mappings[i].qmk_expr);
                     if (output_pos + qmk_len < output_size) {
                         memcpy(&qmk_output[output_pos], special_key_mappings[i].qmk_expr, qmk_len);
@@ -168,8 +177,20 @@ esp_err_t convert_user_friendly_to_qmk(const char* user_input, char* qmk_output,
             if (output_pos + 1 >= output_size) {
                 return ESP_ERR_NO_MEM;
             }
-            qmk_output[output_pos++] = user_input[input_pos++];
+            // Range check for printable ASCII
+            if (!is_printable_ascii(user_input[input_pos])) {
+                ESP_LOGE(TAG, "Non-printable ASCII character at position %zu: 0x%02X", input_pos, (unsigned char)user_input[input_pos]);
+                input_pos++;
+                qmk_output[output_pos++] = '.';
+            } else {
+                qmk_output[output_pos++] = user_input[input_pos++];
+            }
         }
+    }
+
+    if (input_pos < input_len && output_pos >= output_size - 1) {
+        // No space for output
+        return ESP_ERR_NO_MEM;
     }
 
     // Check for unmatched opening parentheses
@@ -229,18 +250,6 @@ esp_err_t convert_qmk_to_user_friendly(const char* qmk_input, char* user_output,
 
     while (input_pos < input_len && output_pos < output_size - 1) {
         char current_char = qmk_input[input_pos];
-
-        // Fast path: Direct character optimizations
-        if (current_char == '\\') {
-            // Output "\\\\" directly for backslash
-            if (output_pos + 2 >= output_size) {
-                return ESP_ERR_NO_MEM;
-            }
-            user_output[output_pos++] = '\\';
-            user_output[output_pos++] = '\\';
-            input_pos++;
-            continue;
-        }
 
         if (current_char == ')') {
             if (modifier_depth > 0) {
@@ -313,6 +322,11 @@ esp_err_t convert_qmk_to_user_friendly(const char* qmk_input, char* user_output,
             return ESP_ERR_NO_MEM;
         }
         user_output[output_pos++] = qmk_input[input_pos++];
+    }
+
+    if (input_pos < input_len && output_pos >= output_size - 1) {
+        // No space for output
+        return ESP_ERR_NO_MEM;
     }
 
     // Check for unmatched modifiers
