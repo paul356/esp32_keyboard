@@ -456,7 +456,7 @@ static void menu_setup_tree(void)
     struct menu_item *bluetooth_menu = menu_item_create("Bluetooth", &bluetooth_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
     struct menu_item *wifi_menu = menu_item_create("WiFi", &wifi_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
     struct menu_item *led_menu = menu_item_create("LED", &led_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
-    struct menu_item *advanced_menu = menu_item_create("Advanced", &advanced_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
+    //struct menu_item *advanced_menu = menu_item_create("Advanced", &advanced_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
 
     // Create About menu item (to be added to main menu)
     struct menu_item *about = menu_item_create("About", &info_icon, keyboard_gui_prepare_about, keyboard_gui_post_about, NULL, NULL);
