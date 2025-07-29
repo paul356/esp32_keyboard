@@ -23,6 +23,7 @@
 #include "key_definitions.h"
 #include "function_key.h"
 #include "layout_store.h"
+#include "keycode.h"
 #include "macros.h"
 #include "keymap_json.h"
 #include <string.h>
@@ -84,7 +85,8 @@ esp_err_t generate_layouts_json(append_str_fn_t append_str, void* target)
 
                 if (err != ESP_OK) {
                     // Send default code
-                    append_str(target, "____");
+                    get_full_key_name(KC_TRNS, scratch_buf, sizeof(scratch_buf));
+                    append_str(target, scratch_buf);
                 }
 
                 if (k != cols - 1) {
