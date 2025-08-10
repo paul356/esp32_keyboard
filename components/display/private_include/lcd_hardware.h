@@ -23,7 +23,7 @@
 #include <stdbool.h>
 #include "esp_err.h"
 
-#define TEST_HARDWARE
+//#define TEST_HARDWARE
 #ifdef TEST_HARDWARE
 #define LCD_WIDTH           280
 #define LCD_HEIGHT          240

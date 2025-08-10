@@ -45,7 +45,8 @@
 #define LCD_SPI_HOST        SPI2_HOST
 #define LCD_PIXEL_CLOCK_HZ  (20 * 1000 * 1000)  // 20MHz
 #define DRAW_BUFFER_SIZE    (LCD_WIDTH * LCD_HEIGHT * sizeof(lv_color16_t) / 10)
-#define SCREEN_OFFSET_X     20  // Offset for X coordinate, adjust as needed
+#define SCREEN_OFFSET_X     18  // Offset for X coordinate, adjust as needed
+#define SCREEN_OFFSET_Y     82
 
 /**
  * @brief LCD hardware interface structure
@@ -79,18 +80,20 @@ static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, unsigned ch
     // Implement the flush callback to send the buffer to the display
     esp_lcd_panel_handle_t panel_handle = lv_display_get_user_data(disp);
     esp_lcd_panel_swap_xy(panel_handle, true);
-    esp_lcd_panel_mirror(panel_handle, true, false);
+    esp_lcd_panel_mirror(panel_handle, false, true);
 
     int offsetx1 = area->x1;
     int offsetx2 = area->x2;
     int offsety1 = area->y1;
     int offsety2 = area->y2;
 
-    esp_lcd_panel_invert_color(panel_handle, true);
+    esp_lcd_panel_invert_color(panel_handle, false);
     lv_draw_sw_rgb565_swap(px_map, (offsetx2 + 1 - offsetx1) * (offsety2 + 1 - offsety1));
     // copy a buffer's content to a specific area of the display
     offsetx1 += SCREEN_OFFSET_X;
     offsetx2 += SCREEN_OFFSET_X;
+    offsety1 += SCREEN_OFFSET_Y;
+    offsety2 += SCREEN_OFFSET_Y;
     esp_lcd_panel_draw_bitmap(panel_handle, offsetx1, offsety1, offsetx2 + 1, offsety2 + 1, px_map);
 }
 
