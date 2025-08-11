@@ -115,16 +115,29 @@ static void deep_sleep(void *pvParameters) {
 }
 #endif
 
+static int32_t encoder_last_pos;
 //How to handle key reports
 static void keyboard_timer_func(void *pvParameters)
 {
     keyboard_task();
+    int32_t curr_pos = miscs_encoder_get_position();
+    if (curr_pos != encoder_last_pos) {
+        encoder_last_pos = curr_pos;
+        miscs_encoder_direction_t encoder_direct = miscs_encoder_get_direction();
+        if (encoder_direct == MISCS_ENCODER_CW) {
+            keyboard_gui_post_input_event_isr(INPUT_EVENT_ENCODER_CW, 0);
+        } else if (encoder_direct == MISCS_ENCODER_CCW) {
+            keyboard_gui_post_input_event_isr(INPUT_EVENT_ENCODER_CCW, 0);
+        }
+    }
 }
 
 void start_keyboard_timer()
 {
     esp_timer_create_args_t timer_args = {&keyboard_timer_func, NULL, ESP_TIMER_TASK, "kb_task", true};
     esp_timer_handle_t timer_handle = NULL;
+
+    encoder_last_pos = miscs_encoder_get_position();
 
     esp_err_t ret = esp_timer_create(&timer_args, &timer_handle);
     if (ret != ESP_OK) {
