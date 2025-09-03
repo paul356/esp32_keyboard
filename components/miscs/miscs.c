@@ -14,6 +14,7 @@
 #define MISCS_BATTERY_ADC_GPIO  GPIO_NUM_5   // Battery voltage ADC
 #define MISCS_ENCODER_A_GPIO    GPIO_NUM_21  // Rotary encoder A
 #define MISCS_ENCODER_B_GPIO    GPIO_NUM_47  // Rotary encoder B
+#define MISCS_ENCODER_BTN_GPIO  GPIO_NUM_45  // Rotary encoder button
 
 /**
  * ADC Configuration
@@ -63,7 +64,8 @@ static void IRAM_ATTR encoder_isr_handler(void* arg)
         int32_t new_position = encoder_raw_position / ENCODER_DAMPEN_RATIO;
         if (new_position != encoder_position) {
             encoder_position = new_position;
-            encoder_direction = (direction > 0) ? MISCS_ENCODER_CW : MISCS_ENCODER_CCW;
+            // It seems direct < 0 is clock wise.
+            encoder_direction = (direction < 0) ? MISCS_ENCODER_CW : MISCS_ENCODER_CCW;
         }
     }
 
@@ -262,6 +264,13 @@ static esp_err_t miscs_encoder_init(void)
         return ret;
     }
 
+    // Configure encoder button GPIO as input with pull-up (button connects to GND)
+    ret = miscs_gpio_config(MISCS_ENCODER_BTN_GPIO, GPIO_MODE_INPUT, GPIO_PULLUP_ONLY);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure encoder button GPIO");
+        return ret;
+    }
+
     // Install GPIO ISR service
     ret = gpio_install_isr_service(0);
     if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
@@ -321,4 +330,9 @@ void miscs_encoder_reset_position(void)
 miscs_encoder_direction_t miscs_encoder_get_direction(void)
 {
     return encoder_direction;
+}
+
+bool miscs_encoder_button_pressed(void)
+{
+    return gpio_get_level(MISCS_ENCODER_BTN_GPIO) == 0; // Button is pressed when GPIO is low (connected to GND)
 }

@@ -13,3 +13,6 @@ target_add_binary_data(esp32_keyboard.elf "resources/style.css" binary)
 
 idf_build_set_property(COMPILE_OPTIONS -D__ESP32S3__ APPEND)
 #idf_build_set_property(COMPILE_OPTIONS -DDEBUG_ACTION APPEND)
+
+# Disable TinyUSB automatic Neopixel LED strip to free up RMT channels for our LED driver
+idf_build_set_property(COMPILE_DEFINITIONS NEOPIXEL_PIN= APPEND)

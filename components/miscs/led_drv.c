@@ -14,9 +14,23 @@
 
 static const char *TAG = "LED_DRV";
 
-// Static variables
-static rmt_channel_handle_t led_chan = NULL;
-static rmt_encoder_handle_t led_encoder = NULL;
+// GPIO pins for each LED strip
+static const uint8_t strip_gpio_pins[LED_DRV_NUM_STRIPS] = {
+    LED_DRV_STRIP1_GPIO,
+    LED_DRV_STRIP2_GPIO,
+    LED_DRV_STRIP3_GPIO
+};
+
+// LED count for each strip
+static const uint8_t strip_led_counts[LED_DRV_NUM_STRIPS] = {
+    LED_DRV_STRIP1_END - LED_DRV_STRIP1_START + 1,  // 20 LEDs
+    LED_DRV_STRIP2_END - LED_DRV_STRIP2_START + 1,  // 21 LEDs
+    LED_DRV_STRIP3_END - LED_DRV_STRIP3_START + 1   // 20 LEDs
+};
+
+// Static variables - now arrays for multiple strips
+static rmt_channel_handle_t led_channels[LED_DRV_NUM_STRIPS] = {NULL};
+static rmt_encoder_handle_t led_encoders[LED_DRV_NUM_STRIPS] = {NULL};
 static rmt_transmit_config_t tx_config = {
     .loop_count = 0, // no transfer loop
 };
@@ -154,124 +168,153 @@ err:
 
 esp_err_t led_drv_init(void)
 {
-    ESP_LOGI(TAG, "Initializing LED strip driver (GPIO%d, %d LEDs)", LED_DRV_GPIO_PIN, LED_DRV_NUM_LEDS);
+    ESP_LOGI(TAG, "Initializing LED strip driver (%d strips, %d total LEDs)", LED_DRV_NUM_STRIPS, LED_DRV_NUM_LEDS);
 
     esp_err_t ret = ESP_OK;
 
-    // Create RMT TX channel
-    rmt_tx_channel_config_t tx_chan_config = {
-        .clk_src = RMT_CLK_SRC_DEFAULT,
-        .gpio_num = LED_DRV_GPIO_PIN,
-        .mem_block_symbols = 128, // increase from default 64 to 128 for better signal stability
-        .resolution_hz = LED_DRV_RMT_RESOLUTION_HZ,
-        .trans_queue_depth = 4, // set the number of transactions that can be pending in the background
-    };
-    ret = rmt_new_tx_channel(&tx_chan_config, &led_chan);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to create RMT TX channel: %s", esp_err_to_name(ret));
-        return ret;
-    }
+    // Initialize each LED strip
+    for (int strip = 0; strip < LED_DRV_NUM_STRIPS; strip++) {
+        ESP_LOGI(TAG, "Initializing strip %d on GPIO%d with %d LEDs",
+                 strip, strip_gpio_pins[strip], strip_led_counts[strip]);
 
-    // Create LED strip encoder
-    led_strip_encoder_config_t encoder_config = {
-        .resolution = LED_DRV_RMT_RESOLUTION_HZ,
-    };
-    ret = rmt_new_led_strip_encoder(&encoder_config, &led_encoder);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to create LED strip encoder: %s", esp_err_to_name(ret));
-        rmt_del_channel(led_chan);
-        led_chan = NULL;
-        return ret;
-    }
+        // Create RMT TX channel for this strip
+        rmt_tx_channel_config_t tx_chan_config = {
+            .clk_src = RMT_CLK_SRC_DEFAULT,
+            .gpio_num = strip_gpio_pins[strip],
+            .mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL,
+            .resolution_hz = LED_DRV_RMT_RESOLUTION_HZ,
+            .trans_queue_depth = 4,
+        };
+        ret = rmt_new_tx_channel(&tx_chan_config, &led_channels[strip]);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to create RMT TX channel for strip %d: %s", strip, esp_err_to_name(ret));
+            goto cleanup;
+        }
 
-    // Enable RMT TX channel
-    ret = rmt_enable(led_chan);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to enable RMT channel: %s", esp_err_to_name(ret));
-        rmt_del_encoder(led_encoder);
-        rmt_del_channel(led_chan);
-        led_chan = NULL;
-        led_encoder = NULL;
-        return ret;
+        // Create LED strip encoder for this strip
+        led_strip_encoder_config_t encoder_config = {
+            .resolution = LED_DRV_RMT_RESOLUTION_HZ,
+        };
+        ret = rmt_new_led_strip_encoder(&encoder_config, &led_encoders[strip]);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to create LED strip encoder for strip %d: %s", strip, esp_err_to_name(ret));
+            goto cleanup;
+        }
+
+        // Enable RMT TX channel
+        ret = rmt_enable(led_channels[strip]);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to enable RMT channel for strip %d: %s", strip, esp_err_to_name(ret));
+            goto cleanup;
+        }
     }
 
     // Initialize LED buffer to all black (off)
     memset(led_buffer, 0, sizeof(led_buffer));
 
-    // Clear the strip initially
+    // Clear all strips initially
     led_drv_clear();
 
     ESP_LOGI(TAG, "LED strip driver initialized successfully");
     return ESP_OK;
+
+cleanup:
+    // Clean up any initialized strips on error
+    for (int i = 0; i < LED_DRV_NUM_STRIPS; i++) {
+        if (led_channels[i]) {
+            rmt_disable(led_channels[i]);
+            rmt_del_channel(led_channels[i]);
+            led_channels[i] = NULL;
+        }
+        if (led_encoders[i]) {
+            rmt_del_encoder(led_encoders[i]);
+            led_encoders[i] = NULL;
+        }
+    }
+    return ret;
 }
 
 esp_err_t led_drv_deinit(void)
 {
     ESP_LOGI(TAG, "Deinitializing LED strip driver");
 
-    // Clear the strip before deinitializing
-    if (led_chan && led_encoder) {
-        led_drv_clear();
-        vTaskDelay(pdMS_TO_TICKS(50)); // Give time for the clear operation to complete
+    // Clear all strips before deinitializing
+    for (int strip = 0; strip < LED_DRV_NUM_STRIPS; strip++) {
+        if (led_channels[strip] && led_encoders[strip]) {
+            // Clear this strip
+            led_drv_color_t black = {0, 0, 0}; // GRB format: all zeros
+            for (int i = 0; i < strip_led_counts[strip]; i++) {
+                led_buffer[strip * strip_led_counts[0] + i] = black; // Simplified indexing
+            }
+        }
     }
 
-    // Disable and delete RMT channel
-    if (led_chan) {
-        rmt_disable(led_chan);
-        rmt_del_channel(led_chan);
-        led_chan = NULL;
-    }
+    // Send clear command to all strips
+    led_drv_update();
+    vTaskDelay(pdMS_TO_TICKS(50)); // Give time for the clear operation to complete
 
-    // Delete encoder
-    if (led_encoder) {
-        rmt_del_encoder(led_encoder);
-        led_encoder = NULL;
+    // Disable and delete all RMT channels and encoders
+    for (int strip = 0; strip < LED_DRV_NUM_STRIPS; strip++) {
+        if (led_channels[strip]) {
+            rmt_disable(led_channels[strip]);
+            rmt_del_channel(led_channels[strip]);
+            led_channels[strip] = NULL;
+        }
+
+        if (led_encoders[strip]) {
+            rmt_del_encoder(led_encoders[strip]);
+            led_encoders[strip] = NULL;
+        }
     }
 
     ESP_LOGI(TAG, "LED strip driver deinitialized successfully");
     return ESP_OK;
 }
 
-static esp_err_t led_drv_write(const led_drv_color_t *led_data, uint32_t num_leds)
+static esp_err_t led_drv_write(void)
 {
-    if (led_data == NULL || num_leds == 0) {
-        ESP_LOGE(TAG, "LED data pointer is NULL");
-        return ESP_ERR_INVALID_ARG;
-    }
+    esp_err_t ret = ESP_OK;
 
-    if (led_chan == NULL || led_encoder == NULL) {
-        ESP_LOGE(TAG, "LED driver not initialized");
-        return ESP_ERR_INVALID_STATE;
-    }
+    // Define strip start indices for direct buffer access
+    // Since LED indices are contiguous for each strip, we can use
+    // direct slices of led_buffer without allocation or copying
+    const uint16_t strip_starts[LED_DRV_NUM_STRIPS] = {
+        LED_DRV_STRIP1_START,
+        LED_DRV_STRIP2_START,
+        LED_DRV_STRIP3_START
+    };
 
-    // Convert RGB to GRB format (WS2812 expects GRB)
-    uint8_t *led_strip_pixels = (uint8_t *)malloc(num_leds * 3);
-    for (int i = 0; i < num_leds; i++) {
-        led_strip_pixels[i * 3 + 0] = led_data[i].green;  // G
-        led_strip_pixels[i * 3 + 1] = led_data[i].red;    // R
-        led_strip_pixels[i * 3 + 2] = led_data[i].blue;   // B
-    }
+    // Process each strip separately
+    for (int strip = 0; strip < LED_DRV_NUM_STRIPS; strip++) {
+        if (led_channels[strip] == NULL || led_encoders[strip] == NULL) {
+            ESP_LOGE(TAG, "LED strip %d not initialized", strip);
+            return ESP_ERR_INVALID_STATE;
+        }
 
-    // Transmit the data
-    esp_err_t ret = rmt_transmit(led_chan, led_encoder, led_strip_pixels, num_leds * 3, &tx_config);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to transmit LED data: %s", esp_err_to_name(ret));
-        goto cleanup;
-    }
+        // Use direct slice of led_buffer (already in GRB format)
+        uint8_t *strip_data = (uint8_t *)&led_buffer[strip_starts[strip]];
+        size_t strip_data_size = strip_led_counts[strip] * 3; // 3 bytes per LED (GRB)
 
-    // Wait for transmission to complete
-    ret = rmt_tx_wait_all_done(led_chan, portMAX_DELAY);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to wait for transmission completion: %s", esp_err_to_name(ret));
-        goto cleanup;
+        // Transmit data to this strip (no allocation or copying needed)
+        ret = rmt_transmit(led_channels[strip], led_encoders[strip],
+                         strip_data, strip_data_size, &tx_config);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to transmit data to strip %d: %s", strip, esp_err_to_name(ret));
+            return ret;
+        }
+
+        // Wait for transmission to complete
+        ret = rmt_tx_wait_all_done(led_channels[strip], portMAX_DELAY);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to wait for transmission completion on strip %d: %s",
+                     strip, esp_err_to_name(ret));
+            return ret;
+        }
     }
 
     // Add small delay for signal stability
     vTaskDelay(pdMS_TO_TICKS(1));
-
-cleanup:
-    free(led_strip_pixels);
-    return ret;
+    return ESP_OK;
 }
 
 void led_drv_clear(void)
@@ -292,5 +335,5 @@ esp_err_t led_drv_set_led(uint16_t index, led_drv_color_t color)
 
 esp_err_t led_drv_update(void)
 {
-    return led_drv_write(led_buffer, LED_DRV_NUM_LEDS);
+    return led_drv_write();
 }

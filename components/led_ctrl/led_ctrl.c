@@ -46,8 +46,8 @@ ESP_EVENT_DEFINE_BASE(LED_CTRL_EVENTS);
 // Current pattern configuration
 static led_pattern_config_t s_current_pattern = {
     .pattern = LED_PATTERN_OFF,
-    .primary_color = {0, 0, 0},
-    .secondary_color = {0, 0, 0},
+    .primary_color = LED_COLOR_BLACK,
+    .secondary_color = LED_COLOR_BLACK,
     .brightness = 128,
     .param1 = 5,
     .param2 = 0
@@ -85,6 +85,8 @@ esp_err_t led_ctrl_init(void) {
 
     s_initialized = true;
     ESP_LOGI(TAG, "LED control component initialized successfully");
+
+    drv_loop_post_event(LED_CTRL_EVENTS, LED_CTRL_EVENT_CLEAR_LEDS, NULL, 0, 0);
 
     return ESP_OK;
 }
@@ -169,8 +171,8 @@ static void handle_keystroke_event(uint8_t row, uint8_t col, bool pressed) {
         led_drv_clear(); // Clear all LEDs
     }
 
-    led_drv_color_t white = { 255, 255, 255 };
-    led_drv_set_led(count, white); // Set the LED at index 'count' to red
+    led_drv_color_t white = LED_COLOR_WHITE; // Using helper macro for white color
+    led_drv_set_led(count, white); // Set the LED at index 'count' to white
 
     led_drv_update(); // Update the LED strip with the new colors
 

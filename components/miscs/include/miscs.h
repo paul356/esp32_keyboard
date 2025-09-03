@@ -20,35 +20,35 @@ typedef enum {
 
 /**
  * @brief Initialize miscellaneous peripheral hardware
- * 
+ *
  * @return esp_err_t ESP_OK on success, error code otherwise
  */
 esp_err_t miscs_init(void);
 
 /**
  * @brief Deinitialize miscellaneous peripheral hardware
- * 
+ *
  * @return esp_err_t ESP_OK on success, error code otherwise
  */
 esp_err_t miscs_deinit(void);
 
 /**
  * @brief Check if device is powered by USB
- * 
+ *
  * @return true if USB power is detected (GPIO6 high), false if battery powered
  */
 bool miscs_is_usb_powered(void);
 
 /**
  * @brief Check if battery is charging
- * 
+ *
  * @return true if battery is charging (GPIO7 low), false if not charging
  */
 bool miscs_is_battery_charging(void);
 
 /**
  * @brief Read battery voltage via ADC
- * 
+ *
  * @param voltage_mv Pointer to store voltage reading in millivolts
  * @return esp_err_t ESP_OK on success, error code otherwise
  */
@@ -56,7 +56,7 @@ esp_err_t miscs_read_battery_voltage(uint32_t *voltage_mv);
 
 /**
  * @brief Get current encoder position
- * 
+ *
  * @return int32_t Current encoder position (increments/decrements based on rotation)
  */
 int32_t miscs_encoder_get_position(void);
@@ -68,10 +68,17 @@ void miscs_encoder_reset_position(void);
 
 /**
  * @brief Get encoder direction from last movement
- * 
+ *
  * @return miscs_encoder_direction_t Direction of last encoder movement
  */
 miscs_encoder_direction_t miscs_encoder_get_direction(void);
+
+/**
+ * @brief Check if encoder button is pressed
+ *
+ * @return true if button is pressed (GPIO45 low), false if not pressed
+ */
+bool miscs_encoder_button_pressed(void);
 
 #ifdef __cplusplus
 }
