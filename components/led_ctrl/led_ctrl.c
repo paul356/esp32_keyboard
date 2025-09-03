@@ -6,8 +6,6 @@
 #include <string.h>
 #include <math.h>
 
-#define MAX_LEDS 70
-
 /**
  * LED control event IDs
  */
@@ -165,7 +163,7 @@ static void handle_keystroke_event(uint8_t row, uint8_t col, bool pressed) {
 
     count ++;
     // Example: Increment a counter for demonstration purposes
-    if (count >= MAX_LEDS) {
+    if (count >= LED_DRV_NUM_LEDS) {
         ESP_LOGI(TAG, "Maximum keystroke count reached, resetting to 0");
         count = 0; // Reset count if it exceeds MAX_LEDS
         led_drv_clear(); // Clear all LEDs

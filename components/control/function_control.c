@@ -300,6 +300,16 @@ esp_err_t restore_saved_state(void)
     }
 
     log_memory_usage("After halBLEInit");
+
+    if (function_state.led.enabled) {
+        ret = led_ctrl_set_pattern(function_state.led.pattern, 0, 0);
+    } else {
+        ret = led_ctrl_set_pattern(LED_PATTERN_OFF, 0, 0);
+    }
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Fail to set led ctrl pattern, enabled=%d, pattern=%d, ret=%d", function_state.led.enabled, function_state.led.pattern, ret);
+    }
+
     return ESP_OK;
 }
 

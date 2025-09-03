@@ -203,7 +203,7 @@ bool keyboard_gui_handle_key_input(uint8_t mods, uint8_t *scan_code, int code_le
             }
 
             input_event_e input_event = scancode_to_input_event(scan_code[i]);
-            if (input_event != INPUT_EVENT_KEYCODE) {
+            if (input_event == INPUT_EVENT_KEYCODE) {
                 count++;
             }
         }
