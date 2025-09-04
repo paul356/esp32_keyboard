@@ -161,16 +161,15 @@ static void handle_keystroke_event(uint8_t row, uint8_t col, bool pressed) {
     // For now, we just log the event
     ESP_LOGI(TAG, "Keystroke event: row=%d, col=%d, pressed=%d", row, col, pressed);
 
-    count ++;
+    int prev = count++;
     // Example: Increment a counter for demonstration purposes
     if (count >= LED_DRV_NUM_LEDS) {
-        ESP_LOGI(TAG, "Maximum keystroke count reached, resetting to 0");
         count = 0; // Reset count if it exceeds MAX_LEDS
-        led_drv_clear(); // Clear all LEDs
+        prev = LED_DRV_NUM_LEDS - 1;
     }
 
-    led_drv_color_t white = LED_COLOR_WHITE; // Using helper macro for white color
-    led_drv_set_led(count, white); // Set the LED at index 'count' to white
+    led_drv_set_led(prev, LED_COLOR_BLACK);
+    led_drv_set_led(count, LED_COLOR_BLUE); // Set the LED at index 'count' to white
 
     led_drv_update(); // Update the LED strip with the new colors
 
