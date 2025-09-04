@@ -29,7 +29,7 @@
 #include <string.h>
 
 #define TAG "KEYMAP_JSON"
-#define KEYBOARD_NAME "ninjia-keyboard-v1.4"
+#define KEYBOARD_NAME "ninja-keyboard-v1.4"
 
 esp_err_t generate_layouts_json(append_str_fn_t append_str, void* target)
 {
