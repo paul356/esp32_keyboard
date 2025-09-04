@@ -18,50 +18,53 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <string.h>
-#include <stdlib.h>
 #include "esp_err.h"
-#include "esp_log.h"
 #include "esp_gap_ble_api.h"
-#include "lvgl.h"
-#include "lcd_hardware.h"
-#include "menu_state_machine.h"
-#include "keyboard_gui_widgets.h"
-#include "menu_icons.h"
-#include "hal_ble.h"
+#include "esp_log.h"
 #include "function_control.h"
+#include "hal_ble.h"
+#include "keyboard_gui_widgets.h"
+#include "lcd_hardware.h"
+#include "lvgl.h"
+#include "menu_icons.h"
+#include "menu_state_machine.h"
+#include <stdlib.h>
+#include <string.h>
 
 #define TAG "gui_bluetooth"
 
 // GUI context structures for Bluetooth functionality
-typedef struct {
+typedef struct
+{
     lv_obj_t *container;
-    lv_obj_t *bluetooth_icon;       // Bluetooth icon
-    lv_obj_t *status_label;         // Label showing "Open" or "Close"
+    lv_obj_t *bluetooth_icon; // Bluetooth icon
+    lv_obj_t *status_label;   // Label showing "Open" or "Close"
 } bt_toggle_gui_t;
 
-typedef struct {
+typedef struct
+{
     lv_obj_t *container;
-    lv_obj_t *bluetooth_pair_icon;   // Bluetooth pair icon
-    lv_obj_t *status_label;          // Label showing "Connect <ble_name> on"
-    lv_obj_t *passkey_label;         // Label showing "Type passkey now: <passkey>"
+    lv_obj_t *bluetooth_pair_icon; // Bluetooth pair icon
+    lv_obj_t *status_label;        // Label showing "Connect <ble_name> on"
+    lv_obj_t *passkey_label;       // Label showing "Type passkey now: <passkey>"
     uint32_t last_timeout_ms;
     bool prompt_for_passkey;
-    char input_buffer[16];           // Buffer to collect numeric input for PIN entry
-    int input_length;                // Current length of input in buffer
+    char input_buffer[16]; // Buffer to collect numeric input for PIN entry
+    int input_length;      // Current length of input in buffer
     esp_bd_addr_t pair_bda;
 } bt_pair_kb_gui_t;
 
-typedef struct {
+typedef struct
+{
     lv_obj_t *container;
-    lv_obj_t *bluetooth_pair_icon;   // Bluetooth phone pair icon
-    lv_obj_t *status_label;          // Label showing "Connect <ble_name> on"
+    lv_obj_t *bluetooth_pair_icon; // Bluetooth phone pair icon
+    lv_obj_t *status_label;        // Label showing "Connect <ble_name> on"
     uint32_t last_timeout_ms;
 } bt_pair_admin_gui_t;
 
 // Static function declarations
-static bt_toggle_gui_t* create_bt_toggle_gui(void);
-static bt_pair_kb_gui_t* create_bt_pair_kb_gui(void);
+static bt_toggle_gui_t *create_bt_toggle_gui(void);
+static bt_pair_kb_gui_t *create_bt_pair_kb_gui(void);
 static esp_err_t prepare_bt_toggle_gui(struct menu_item *self);
 static esp_err_t post_bt_toggle_gui(struct menu_item *self);
 static esp_err_t prepare_bt_pair_kb_gui(struct menu_item *self);
@@ -69,10 +72,11 @@ static esp_err_t post_bt_pair_kb_gui(struct menu_item *self);
 static void update_passkey_display(bt_pair_kb_gui_t *gui);
 static bool bt_pair_kb_handle_input_key(void *user_ctx, input_event_e input_event, char key_code);
 
-static bt_toggle_gui_t* create_bt_toggle_gui(void)
+static bt_toggle_gui_t *create_bt_toggle_gui(void)
 {
     bt_toggle_gui_t *gui = malloc(sizeof(bt_toggle_gui_t));
-    if (!gui) {
+    if (!gui)
+    {
         ESP_LOGE(TAG, "Failed to allocate bt_toggle GUI");
         return NULL;
     }
@@ -100,18 +104,21 @@ static bt_toggle_gui_t* create_bt_toggle_gui(void)
     lv_obj_set_style_text_color(gui->status_label, lv_color_white(), 0);
     lv_obj_set_style_text_font(gui->status_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_align(gui->status_label, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_style_margin_right(gui->status_label, 20, 0);  // Gap between label and icon
+    lv_obj_set_style_margin_right(gui->status_label, 20, 0); // Gap between label and icon
 
     // Bluetooth icon
     gui->bluetooth_icon = lv_image_create(gui->container);
     lv_image_set_src(gui->bluetooth_icon, &bluetooth_icon);
 
     // Set initial label text and icon appearance based on current Bluetooth state
-    if (is_ble_enabled()) {
+    if (is_ble_enabled())
+    {
         lv_label_set_text(gui->status_label, "Close");
         // Icon is colored normally when BT is enabled
         lv_obj_set_style_image_recolor_opa(gui->bluetooth_icon, LV_OPA_TRANSP, 0);
-    } else {
+    }
+    else
+    {
         lv_label_set_text(gui->status_label, "Open");
         // Grey out the icon when BT is disabled
         lv_obj_set_style_image_recolor_opa(gui->bluetooth_icon, LV_OPA_50, 0);
@@ -121,10 +128,11 @@ static bt_toggle_gui_t* create_bt_toggle_gui(void)
     return gui;
 }
 
-static bt_pair_kb_gui_t* create_bt_pair_kb_gui(void)
+static bt_pair_kb_gui_t *create_bt_pair_kb_gui(void)
 {
     bt_pair_kb_gui_t *gui = malloc(sizeof(bt_pair_kb_gui_t));
-    if (!gui) {
+    if (!gui)
+    {
         ESP_LOGE(TAG, "Failed to allocate memory for bt_pair_kb GUI");
         return NULL;
     }
@@ -152,12 +160,12 @@ static bt_pair_kb_gui_t* create_bt_pair_kb_gui(void)
     lv_obj_set_style_text_color(gui->status_label, lv_color_white(), 0);
     lv_obj_set_style_text_font(gui->status_label, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_align(gui->status_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_margin_bottom(gui->status_label, 15, 0);  // Gap below status label
+    lv_obj_set_style_margin_bottom(gui->status_label, 15, 0); // Gap below status label
 
     // Bluetooth pair icon in the middle
     gui->bluetooth_pair_icon = lv_image_create(gui->container);
     lv_image_set_src(gui->bluetooth_pair_icon, &bluetooth_pc_pair);
-    lv_obj_set_style_margin_bottom(gui->bluetooth_pair_icon, 15, 0);  // Gap below icon
+    lv_obj_set_style_margin_bottom(gui->bluetooth_pair_icon, 15, 0); // Gap below icon
 
     // Passkey label at the bottom
     gui->passkey_label = lv_label_create(gui->container);
@@ -184,14 +192,17 @@ static esp_err_t prepare_bt_toggle_gui(struct menu_item *self)
 {
     ESP_LOGI(TAG, "Preparing Bluetooth toggle GUI");
 
-    if (!self) {
+    if (!self)
+    {
         return ESP_ERR_INVALID_ARG;
     }
 
     // Create Bluetooth toggle GUI if not already created
-    if (!self->user_ctx) {
+    if (!self->user_ctx)
+    {
         self->user_ctx = create_bt_toggle_gui();
-        if (!self->user_ctx) {
+        if (!self->user_ctx)
+        {
             ESP_LOGE(TAG, "Failed to create Bluetooth toggle GUI");
             return ESP_ERR_NO_MEM;
         }
@@ -201,11 +212,14 @@ static esp_err_t prepare_bt_toggle_gui(struct menu_item *self)
     bt_toggle_gui_t *gui = (bt_toggle_gui_t *)self->user_ctx;
 
     // Update label text and icon appearance based on current Bluetooth state
-    if (is_ble_enabled()) {
+    if (is_ble_enabled())
+    {
         lv_label_set_text(gui->status_label, "Close");
         // Icon is colored normally when BT is enabled
         lv_obj_set_style_image_recolor_opa(gui->bluetooth_icon, LV_OPA_TRANSP, 0);
-    } else {
+    }
+    else
+    {
         lv_label_set_text(gui->status_label, "Open");
         // Grey out the icon when BT is disabled
         lv_obj_set_style_image_recolor_opa(gui->bluetooth_icon, LV_OPA_50, 0);
@@ -223,7 +237,8 @@ static esp_err_t post_bt_toggle_gui(struct menu_item *self)
 {
     ESP_LOGD(TAG, "Post Bluetooth toggle GUI cleanup");
 
-    if (!self || !self->user_ctx) {
+    if (!self || !self->user_ctx)
+    {
         return ESP_OK;
     }
 
@@ -238,7 +253,8 @@ static esp_err_t post_bt_toggle_gui(struct menu_item *self)
 
 static esp_err_t prepare_bt_pair_kb_gui(struct menu_item *self)
 {
-    if (!self) {
+    if (!self)
+    {
         ESP_LOGE(TAG, "Cannot prepare BT pair keyboard GUI: menu item is NULL");
         return ESP_ERR_INVALID_ARG;
     }
@@ -246,9 +262,11 @@ static esp_err_t prepare_bt_pair_kb_gui(struct menu_item *self)
     ESP_LOGI(TAG, "Preparing BT pair keyboard GUI");
 
     // Create GUI if it doesn't exist
-    if (!self->user_ctx) {
+    if (!self->user_ctx)
+    {
         self->user_ctx = create_bt_pair_kb_gui();
-        if (!self->user_ctx) {
+        if (!self->user_ctx)
+        {
             ESP_LOGE(TAG, "Failed to create BT pair keyboard GUI");
             return ESP_ERR_NO_MEM;
         }
@@ -279,7 +297,8 @@ static esp_err_t prepare_bt_pair_kb_gui(struct menu_item *self)
 
 static esp_err_t post_bt_pair_kb_gui(struct menu_item *self)
 {
-    if (!self || !self->user_ctx) {
+    if (!self || !self->user_ctx)
+    {
         ESP_LOGE(TAG, "Cannot cleanup BT pair keyboard GUI: invalid context");
         return ESP_ERR_INVALID_ARG;
     }
@@ -299,11 +318,14 @@ static esp_err_t post_bt_pair_kb_gui(struct menu_item *self)
 // Helper function to update the passkey display
 static void update_passkey_display(bt_pair_kb_gui_t *gui)
 {
-    if (gui->prompt_for_passkey) {
+    if (gui->prompt_for_passkey)
+    {
         char passkey_text[64];
         snprintf(passkey_text, sizeof(passkey_text), "Type passkey now: %s", gui->input_buffer);
         lv_label_set_text(gui->passkey_label, passkey_text);
-    } else {
+    }
+    else
+    {
         lv_label_set_text(gui->passkey_label, "");
     }
 }
@@ -311,7 +333,8 @@ static void update_passkey_display(bt_pair_kb_gui_t *gui)
 // Function to handle input for BT pair keyboard menu
 static bool bt_pair_kb_handle_input_key(void *user_ctx, input_event_e input_event, char key_code)
 {
-    if (!user_ctx) {
+    if (!user_ctx)
+    {
         ESP_LOGE(TAG, "Invalid user context in bt_pair_kb_handle_input_key");
         return false;
     }
@@ -319,15 +342,19 @@ static bool bt_pair_kb_handle_input_key(void *user_ctx, input_event_e input_even
     bt_pair_kb_gui_t *gui = (bt_pair_kb_gui_t *)user_ctx;
 
     // Handle numeric keycode input for PIN entry
-    if (input_event == INPUT_EVENT_KEYCODE) {
+    if (input_event == INPUT_EVENT_KEYCODE)
+    {
         // Only process input if we're prompting for passkey
-        if (!gui->prompt_for_passkey) {
+        if (!gui->prompt_for_passkey)
+        {
             return false; // Let other handlers process the input
         }
 
         // Check if it's a numeric key (KC_1 through KC_0)
-        if (key_code >= '0' && key_code <= '9') {
-            if (gui->input_length < sizeof(gui->input_buffer) - 1) {
+        if (key_code >= '0' && key_code <= '9')
+        {
+            if (gui->input_length < sizeof(gui->input_buffer) - 1)
+            {
                 gui->input_buffer[gui->input_length++] = key_code;
                 gui->input_buffer[gui->input_length] = '\0';
 
@@ -342,13 +369,16 @@ static bool bt_pair_kb_handle_input_key(void *user_ctx, input_event_e input_even
     }
 
     // Handle backspace to delete last digit
-    if (input_event == INPUT_EVENT_BACKSPACE) {
+    if (input_event == INPUT_EVENT_BACKSPACE)
+    {
         // Only process backspace if we're prompting for passkey
-        if (!gui->prompt_for_passkey) {
+        if (!gui->prompt_for_passkey)
+        {
             return false; // Let other handlers process the input
         }
 
-        if (gui->input_length > 0) {
+        if (gui->input_length > 0)
+        {
             gui->input_buffer[--gui->input_length] = '\0';
         }
 
@@ -392,44 +422,61 @@ bool keyboard_gui_bt_pair_kb_handle_input(void *user_ctx, input_event_e input_ev
     return bt_pair_kb_handle_input_key(user_ctx, input_event, key_code);
 }
 
-void keyboard_gui_bt_pair_kb_prompt_for_passkey(struct menu_item *self, enum passkey_event_e event, esp_bd_addr_t bd_addr)
+void keyboard_gui_bt_pair_kb_prompt_for_passkey(struct menu_item *self, enum passkey_event_e event,
+                                                esp_bd_addr_t bd_addr)
 {
-    if (self == menu_state_get_current_menu() && self->user_ctx != NULL) {
-        bt_pair_kb_gui_t *gui = (bt_pair_kb_gui_t *)self->user_ctx;
+    bt_pair_kb_gui_t *gui = (bt_pair_kb_gui_t *)(self->user_ctx);
 
-        switch (event)
+    switch (event)
+    {
+    case PASSKEY_CHALLENGE:
+        if (self != menu_state_get_current_menu())
         {
-        case PASSKEY_CHALLENGE:
-            // Reset input buffer
-            memset(gui->input_buffer, 0, sizeof(gui->input_buffer));
-            gui->input_length = 0;
-            // Enable passkey prompting
-            gui->prompt_for_passkey = true;
+            menu_navigate_to(self);
+        }
 
-            memcpy(gui->pair_bda, bd_addr, sizeof(esp_bd_addr_t));
-            // Update passkey display to show initial prompt state
-            update_passkey_display(gui);
-            break;
-        case PASSKEY_FAILURE:
-            // Reset input buffer and disable passkey prompting
-            memset(gui->input_buffer, 0, sizeof(gui->input_buffer));
-            gui->input_length = 0;
-            gui->prompt_for_passkey = false;
+        // user_ctx may be lazy allocated, so we need to get it again
+        gui = (bt_pair_kb_gui_t *)(self->user_ctx);
 
-            // Clear passkey display
-            lv_label_set_text(gui->passkey_label, "passkey failed or cancelled");
-            ESP_LOGI(TAG, "Passkey failed or cancelled");
-            break;
-        case PASSKEY_SUCCESS:
-            // Reset input buffer and disable passkey prompting
-            memset(gui->input_buffer, 0, sizeof(gui->input_buffer));
-            gui->input_length = 0;
-            gui->prompt_for_passkey = false;
-            // Clear passkey display
-            lv_label_set_text(gui->passkey_label, "passkey matched");
-            ESP_LOGI(TAG, "Passkey challenge succeeded");
+        // Reset input buffer
+        memset(gui->input_buffer, 0, sizeof(gui->input_buffer));
+        gui->input_length = 0;
+        // Enable passkey prompting
+        gui->prompt_for_passkey = true;
+
+        memcpy(gui->pair_bda, bd_addr, sizeof(esp_bd_addr_t));
+        // Update passkey display to show initial prompt state
+        update_passkey_display(gui);
+        break;
+    case PASSKEY_FAILURE:
+        // if gui is null, just break
+        if (!gui) {
             break;
         }
+        // Reset input buffer and disable passkey prompting
+        memset(gui->input_buffer, 0, sizeof(gui->input_buffer));
+        gui->input_length = 0;
+        gui->prompt_for_passkey = false;
+
+        // Clear passkey display
+        lv_label_set_text(gui->passkey_label, "passkey failed or cancelled");
+        ESP_LOGI(TAG, "Passkey failed or cancelled");
+        menu_state_set_timeout_ms(gui->last_timeout_ms);
+        break;
+    case PASSKEY_SUCCESS:
+        // if gui is null, just break
+        if (!gui) {
+            break;
+        }
+        // Reset input buffer and disable passkey prompting
+        memset(gui->input_buffer, 0, sizeof(gui->input_buffer));
+        gui->input_length = 0;
+        gui->prompt_for_passkey = false;
+        // Clear passkey display
+        lv_label_set_text(gui->passkey_label, "passkey matched");
+        ESP_LOGI(TAG, "Passkey challenge succeeded");
+        menu_state_set_timeout_ms(gui->last_timeout_ms);
+        break;
     }
 }
 
@@ -437,7 +484,8 @@ esp_err_t keyboard_gui_bt_pair_kb_action(void *user_ctx)
 {
     ESP_LOGI(TAG, "BT pair keyboard action triggered");
 
-    if (!user_ctx) {
+    if (!user_ctx)
+    {
         ESP_LOGE(TAG, "Invalid BT pair keyboard user context");
         return ESP_ERR_INVALID_ARG;
     }
@@ -445,10 +493,12 @@ esp_err_t keyboard_gui_bt_pair_kb_action(void *user_ctx)
     bt_pair_kb_gui_t *gui = (bt_pair_kb_gui_t *)user_ctx;
 
     // If we're prompting for passkey and have input, submit it
-    if (gui->prompt_for_passkey && gui->input_length > 0) {
+    if (gui->prompt_for_passkey && gui->input_length > 0)
+    {
         // Convert input buffer to uint32_t
         uint32_t passkey = 0;
-        for (int i = 0; i < gui->input_length; i++) {
+        for (int i = 0; i < gui->input_length; i++)
+        {
             passkey = passkey * 10 + (gui->input_buffer[i] - '0');
         }
 
@@ -460,10 +510,13 @@ esp_err_t keyboard_gui_bt_pair_kb_action(void *user_ctx)
         gui->input_length = 0;
         gui->prompt_for_passkey = false;
 
-        if (ret == ESP_OK) {
+        if (ret == ESP_OK)
+        {
             // Update display
             lv_label_set_text(gui->passkey_label, "Passkey confirmed");
-        } else {
+        }
+        else
+        {
             lv_label_set_text(gui->passkey_label, "Passkey error");
         }
 

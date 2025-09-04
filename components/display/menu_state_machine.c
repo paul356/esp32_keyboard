@@ -53,7 +53,6 @@ static struct menu_item* menu_get_first_child(struct menu_item *parent);
 static struct menu_item* menu_get_last_child(struct menu_item *parent);
 static struct menu_item* menu_get_next_sibling(struct menu_item *item);
 static struct menu_item* menu_get_prev_sibling(struct menu_item *item);
-static void menu_navigate_to(struct menu_item *target);
 
 bool menu_state_init(void)
 {
@@ -378,7 +377,7 @@ bool menu_item_add_child(struct menu_item *parent, struct menu_item *child)
     return true;
 }
 
-static void menu_navigate_to(struct menu_item *target)
+void menu_navigate_to(struct menu_item *target)
 {
     if (!target) {
         ESP_LOGE(TAG, "Cannot navigate to NULL menu item");

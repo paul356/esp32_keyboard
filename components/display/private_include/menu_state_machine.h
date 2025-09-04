@@ -55,6 +55,11 @@ struct menu_item {
 bool menu_state_init(void);
 
 /**
+ * @brief Change menu state machine to a specific menu
+ */
+void menu_navigate_to(struct menu_item *target);
+
+/**
  * @brief Process input event
  * @param event Input event to process
  * @return true if event was consumed, false otherwise
