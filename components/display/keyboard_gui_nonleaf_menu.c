@@ -29,21 +29,18 @@
 #include "menu_icons.h"
 
 // Horizontal menu layout constants
-#define MENU_ICON_WIDTH         76      // Width of each menu icon
-#define MENU_ICON_HEIGHT        76      // Height of each menu icon
+#define MENU_ICON_WIDTH         72      // Width of each menu icon (reasonable size)
+#define MENU_ICON_HEIGHT        72      // Height of each menu icon (reasonable size)
 #define MENU_ICON_SPACING       8       // Spacing between icons
-#define MENU_TEXT_HEIGHT        12      // Height for text below icons
-#define MENU_CONTAINER_PADDING  4       // Padding around menu container
+#define MENU_CONTAINER_PADDING  0       // No padding to maximize space
 #define MAX_VISIBLE_ITEMS       ((LCD_WIDTH - 2 * MENU_CONTAINER_PADDING) / (MENU_ICON_WIDTH + MENU_ICON_SPACING))
 
 #define TAG "gui_nonleaf_menu"
 
 typedef struct {
     lv_obj_t *container;
-    lv_obj_t *menu_title_label;
     lv_obj_t *menu_items_container;
     lv_obj_t **menu_icons;          // Array of icon containers
-    lv_obj_t **menu_labels;         // Array of text labels
     int visible_items_count;        // Number of currently visible items
     int first_visible_index;        // Index of first visible item
     int total_items_count;          // Total number of menu items
@@ -70,7 +67,7 @@ static lv_obj_t* create_menu_icon(lv_obj_t *parent, struct menu_item *menu_item,
     // Create icon container
     lv_obj_t *icon_container = lv_obj_create(parent);
     lv_obj_set_size(icon_container, MENU_ICON_WIDTH, MENU_ICON_HEIGHT);
-    lv_obj_set_style_radius(icon_container, 8, 0);
+    lv_obj_set_style_radius(icon_container, 4, 0);  // Reduced radius to save space
 
     // Disable scrollbars on icon container
     lv_obj_clear_flag(icon_container, LV_OBJ_FLAG_SCROLLABLE);
@@ -212,7 +209,7 @@ static void update_horizontal_menu_display(nonleaf_item_gui_t *gui, struct menu_
     // Calculate total width needed for visible icons
     int total_icons_width = gui->visible_items_count * MENU_ICON_WIDTH +
                            (gui->visible_items_count - 1) * MENU_ICON_SPACING;
-    int container_width_pixels = LCD_WIDTH - 2 * MENU_CONTAINER_PADDING;
+    int container_width_pixels = LCD_WIDTH;  // Use full width since no padding
     int icons_start_x = (container_width_pixels - total_icons_width) / 2;
 
     // Create horizontal menu items using circular indexing
@@ -231,31 +228,13 @@ static void update_horizontal_menu_display(nonleaf_item_gui_t *gui, struct menu_
         }
         lv_obj_t *icon = create_menu_icon(gui->menu_items_container, child, is_focused);
 
-        // Position icon horizontally - centered within container
+        // Position icon horizontally and center vertically
         int x_pos = icons_start_x + visible_item_index * (MENU_ICON_WIDTH + MENU_ICON_SPACING);
-        lv_obj_set_pos(icon, x_pos, 0);
+        int y_pos = (LCD_HEIGHT - MENU_ICON_HEIGHT) / 2;  // Center vertically in the display
+        lv_obj_set_pos(icon, x_pos, y_pos);
 
-        // Create text label below icon
-        lv_obj_t *text_label = lv_label_create(gui->menu_items_container);
-        lv_obj_set_style_text_color(text_label, is_focused ? lv_color_white() : lv_color_hex(0x808080), 0);
-        lv_obj_set_style_text_font(text_label, &lv_font_montserrat_8, 0);
-        lv_obj_set_pos(text_label, x_pos, MENU_ICON_HEIGHT + 2);
-        lv_obj_set_width(text_label, MENU_ICON_WIDTH);
-        lv_obj_set_style_text_align(text_label, LV_TEXT_ALIGN_CENTER, 0);
-
-        // Truncate long text
-        char truncated_text[9] = {0};
-        if (strlen(child->text) > 8) {
-            strncpy(truncated_text, child->text, 7);
-            strcat(truncated_text, ".");
-        } else {
-            strcpy(truncated_text, child->text);
-        }
-        lv_label_set_text(text_label, truncated_text);
-
-        // Store references
+        // Store icon reference
         gui->menu_icons[visible_item_index] = icon;
-        gui->menu_labels[visible_item_index] = text_label;
     }
 }
 
@@ -276,7 +255,7 @@ static nonleaf_item_gui_t* create_nonleaf_item_gui(void)
     lv_obj_set_pos(gui->container, 0, 0);
     lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
     lv_obj_set_style_border_width(gui->container, 0, 0);
-    lv_obj_set_style_pad_all(gui->container, MENU_CONTAINER_PADDING, 0);
+    lv_obj_set_style_pad_all(gui->container, MENU_CONTAINER_PADDING, 0);  // No padding to maximize space
 
     // Disable scrollbars for root container
     lv_obj_clear_flag(gui->container, LV_OBJ_FLAG_SCROLLABLE);
@@ -284,23 +263,14 @@ static nonleaf_item_gui_t* create_nonleaf_item_gui(void)
     // Hide container initially - will be shown when prepare_gui_func is called
     lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
 
-    // Menu title
-    gui->menu_title_label = lv_label_create(gui->container);
-    lv_obj_set_style_text_color(gui->menu_title_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->menu_title_label, &lv_font_montserrat_12, 0);
-    lv_obj_align(gui->menu_title_label, LV_ALIGN_CENTER, 0, -40);  // Position above centered container
-    lv_label_set_text(gui->menu_title_label, "Menu");
-
     // Horizontal menu items container
     gui->menu_items_container = lv_obj_create(gui->container);
-    lv_coord_t container_width = LCD_WIDTH - 2 * MENU_CONTAINER_PADDING;
-    lv_coord_t container_height = MENU_ICON_HEIGHT + MENU_TEXT_HEIGHT + 16;  // Increased padding for larger icons
+    lv_coord_t container_width = LCD_WIDTH;  // Use full width since no padding
+    lv_coord_t container_height = LCD_HEIGHT;  // Use full height to allow vertical centering
     lv_obj_set_size(gui->menu_items_container, container_width, container_height);
 
-    // Center the container both horizontally and vertically
-    lv_coord_t x_pos = (LCD_WIDTH - container_width) / 2;
-    lv_coord_t y_pos = (LCD_HEIGHT - container_height) / 2;
-    lv_obj_set_pos(gui->menu_items_container, x_pos, y_pos);
+    // Position container to fill the entire screen
+    lv_obj_set_pos(gui->menu_items_container, 0, 0);
     lv_obj_set_style_bg_color(gui->menu_items_container, lv_color_black(), 0);
     lv_obj_set_style_border_width(gui->menu_items_container, 0, 0);
     lv_obj_set_style_pad_all(gui->menu_items_container, 0, 0);
@@ -310,12 +280,9 @@ static nonleaf_item_gui_t* create_nonleaf_item_gui(void)
 
     // Allocate arrays for maximum possible visible items
     gui->menu_icons = malloc(MAX_VISIBLE_ITEMS * sizeof(lv_obj_t*));
-    gui->menu_labels = malloc(MAX_VISIBLE_ITEMS * sizeof(lv_obj_t*));
 
-    if (!gui->menu_icons || !gui->menu_labels) {
+    if (!gui->menu_icons) {
         ESP_LOGE(TAG, "Failed to allocate memory for menu arrays");
-        if (gui->menu_icons) free(gui->menu_icons);
-        if (gui->menu_labels) free(gui->menu_labels);
         free(gui);
         return NULL;
     }
@@ -323,15 +290,7 @@ static nonleaf_item_gui_t* create_nonleaf_item_gui(void)
     // Initialize arrays
     for (int i = 0; i < MAX_VISIBLE_ITEMS; i++) {
         gui->menu_icons[i] = NULL;
-        gui->menu_labels[i] = NULL;
     }
-
-    // Instructions
-    lv_obj_t *instruction_label = lv_label_create(gui->container);
-    lv_obj_set_style_text_color(instruction_label, lv_color_hex(0x808080), 0);
-    lv_obj_set_style_text_font(instruction_label, &lv_font_montserrat_8, 0);
-    lv_obj_align(instruction_label, LV_ALIGN_BOTTOM_MID, 0, 50);  // Position below centered container
-    lv_label_set_text(instruction_label, "Rotate=Navigate Enter=Select ESC=Back");
 
     return gui;
 }
@@ -379,7 +338,7 @@ static esp_err_t post_nonleaf_item_gui(struct menu_item *self)
     // Hide the nonleaf item container
     lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
 
-    // Clean up horizontal menu icon and label arrays
+    // Clean up horizontal menu icon arrays
     if (gui->menu_icons) {
         for (int i = 0; i < MAX_VISIBLE_ITEMS; i++) {
             if (gui->menu_icons[i]) {
@@ -389,17 +348,6 @@ static esp_err_t post_nonleaf_item_gui(struct menu_item *self)
         }
         free(gui->menu_icons);
         gui->menu_icons = NULL;
-    }
-
-    if (gui->menu_labels) {
-        for (int i = 0; i < MAX_VISIBLE_ITEMS; i++) {
-            if (gui->menu_labels[i]) {
-                lv_obj_delete(gui->menu_labels[i]);
-                gui->menu_labels[i] = NULL;
-            }
-        }
-        free(gui->menu_labels);
-        gui->menu_labels = NULL;
     }
 
     // Clean up the main container and GUI structure
@@ -422,9 +370,6 @@ static void update_nonleaf_item_display(nonleaf_item_gui_t *gui, struct menu_ite
     if (!gui || !menu_item) {
         return;
     }
-
-    // Update menu title
-    lv_label_set_text(gui->menu_title_label, menu_item->text);
 
     // Update horizontal menu display
     update_horizontal_menu_display(gui, menu_item);
