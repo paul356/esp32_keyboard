@@ -234,29 +234,30 @@ static wifi_settings_gui_t* create_wifi_settings_gui(void)
     lv_obj_set_pos(gui->container, 0, 0);
     lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
     lv_obj_set_style_border_width(gui->container, 0, 0);
-    lv_obj_set_style_pad_all(gui->container, 10, 0);
+    lv_obj_set_style_pad_all(gui->container, 5, 0);
     lv_obj_clear_flag(gui->container, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
 
-    // Set vertical layout for better fit on small screens
-    lv_obj_set_flex_flow(gui->container, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(gui->container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // Set horizontal layout - mode selector on left, text fields on right
+    lv_obj_set_flex_flow(gui->container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(gui->container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    // Mode section - horizontal label + selector
-    lv_obj_t *mode_section = lv_obj_create(gui->container);
-    lv_obj_set_size(mode_section, LCD_WIDTH - 20, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_opa(mode_section, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(mode_section, 0, 0);
-    lv_obj_set_style_pad_all(mode_section, 5, 0);
-    lv_obj_set_flex_flow(mode_section, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(mode_section, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // Left section - Mode selector (vertical layout)
+    lv_obj_t *left_section = lv_obj_create(gui->container);
+    lv_obj_set_size(left_section, 130, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(left_section, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(left_section, 0, 0);
+    lv_obj_set_style_pad_all(left_section, 3, 0);
+    lv_obj_set_flex_flow(left_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(left_section, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    gui->mode_label = lv_label_create(mode_section);
+    gui->mode_label = lv_label_create(left_section);
     lv_label_set_text(gui->mode_label, "Mode:");
     lv_obj_set_style_text_color(gui->mode_label, lv_color_white(), 0);
     lv_obj_set_style_text_font(gui->mode_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_margin_bottom(gui->mode_label, 3, 0);
 
-    gui->mode_selector = lv_buttonmatrix_create(mode_section);
+    gui->mode_selector = lv_buttonmatrix_create(left_section);
     // Use wifi_mode_to_str to get string representation for the two modes
     static const char * mode_map[] = {NULL, NULL, ""};
     mode_map[0] = wifi_mode_to_str(WIFI_MODE_STA);
@@ -266,13 +267,13 @@ static wifi_settings_gui_t* create_wifi_settings_gui(void)
     lv_buttonmatrix_set_one_checked(gui->mode_selector, true);
     // Set the initial checked button to mode 0 (STA)
     lv_buttonmatrix_set_button_ctrl(gui->mode_selector, 0, LV_BUTTONMATRIX_CTRL_CHECKED);
-    lv_obj_set_size(gui->mode_selector, 140, 30);
+    lv_obj_set_size(gui->mode_selector, 120, 26);
 
     // Style the button matrix background
     lv_obj_set_style_bg_color(gui->mode_selector, lv_color_hex(0x333333), 0);
     lv_obj_set_style_text_color(gui->mode_selector, lv_color_white(), 0);
-    lv_obj_set_style_pad_all(gui->mode_selector, 2, 0);
-    lv_obj_set_style_pad_gap(gui->mode_selector, 4, 0);
+    lv_obj_set_style_pad_all(gui->mode_selector, 1, 0);
+    lv_obj_set_style_pad_gap(gui->mode_selector, 2, 0);
 
     // Style unselected buttons (default state)
     lv_obj_set_style_bg_color(gui->mode_selector, lv_color_hex(0x555555), LV_PART_ITEMS);
@@ -286,48 +287,68 @@ static wifi_settings_gui_t* create_wifi_settings_gui(void)
     lv_obj_set_style_border_width(gui->mode_selector, 2, LV_PART_ITEMS | LV_STATE_CHECKED);
     lv_obj_set_style_border_color(gui->mode_selector, lv_color_hex(0x00AAFF), LV_PART_ITEMS | LV_STATE_CHECKED);
 
-    // SSID section - horizontal label + field
-    lv_obj_t *ssid_section = lv_obj_create(gui->container);
-    lv_obj_set_size(ssid_section, LCD_WIDTH - 20, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_opa(ssid_section, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(ssid_section, 0, 0);
-    lv_obj_set_style_pad_all(ssid_section, 5, 0);
-    lv_obj_set_flex_flow(ssid_section, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(ssid_section, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // Right section - Text fields (vertical layout)
+    lv_obj_t *right_section = lv_obj_create(gui->container);
+    lv_obj_set_size(right_section, LCD_WIDTH - 150, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(right_section, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(right_section, 0, 0);
+    lv_obj_set_style_pad_all(right_section, 3, 0);
+    lv_obj_set_flex_flow(right_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(right_section, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_START);
 
-    gui->ssid_label = lv_label_create(ssid_section);
+    // SSID field
+    lv_obj_t *ssid_row = lv_obj_create(right_section);
+    lv_obj_set_size(ssid_row, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(ssid_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ssid_row, 0, 0);
+    lv_obj_set_style_pad_all(ssid_row, 1, 0);
+    lv_obj_set_style_margin_bottom(ssid_row, 2, 0);
+    lv_obj_set_flex_flow(ssid_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(ssid_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(ssid_row, LV_OBJ_FLAG_SCROLLABLE);
+
+    gui->ssid_label = lv_label_create(ssid_row);
     lv_label_set_text(gui->ssid_label, "SSID:");
     lv_obj_set_style_text_color(gui->ssid_label, lv_color_white(), 0);
     lv_obj_set_style_text_font(gui->ssid_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_width(gui->ssid_label, 35);
 
-    gui->ssid_textfield = lv_textarea_create(ssid_section);
+    gui->ssid_textfield = lv_textarea_create(ssid_row);
     lv_textarea_set_one_line(gui->ssid_textfield, true);
     lv_textarea_set_placeholder_text(gui->ssid_textfield, "WiFi SSID");
-    lv_obj_set_width(gui->ssid_textfield, 120);
+    lv_obj_set_width(gui->ssid_textfield, 90);
+    lv_obj_set_height(gui->ssid_textfield, 26);
     lv_obj_set_style_text_color(gui->ssid_textfield, lv_color_white(), 0);
     lv_obj_set_style_bg_color(gui->ssid_textfield, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_text_font(gui->ssid_textfield, &lv_font_montserrat_10, 0);
+    lv_obj_clear_flag(gui->ssid_textfield, LV_OBJ_FLAG_SCROLLABLE);
 
-    // Password section - horizontal label + field
-    lv_obj_t *password_section = lv_obj_create(gui->container);
-    lv_obj_set_size(password_section, LCD_WIDTH - 20, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_opa(password_section, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(password_section, 0, 0);
-    lv_obj_set_style_pad_all(password_section, 5, 0);
-    lv_obj_set_flex_flow(password_section, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(password_section, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // Password field
+    lv_obj_t *password_row = lv_obj_create(right_section);
+    lv_obj_set_size(password_row, LV_PCT(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(password_row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(password_row, 0, 0);
+    lv_obj_set_style_pad_all(password_row, 1, 0);
+    lv_obj_set_flex_flow(password_row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(password_row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_clear_flag(password_row, LV_OBJ_FLAG_SCROLLABLE);
 
-    gui->password_label = lv_label_create(password_section);
-    lv_label_set_text(gui->password_label, "Password:");
+    gui->password_label = lv_label_create(password_row);
+    lv_label_set_text(gui->password_label, "Pass:");
     lv_obj_set_style_text_color(gui->password_label, lv_color_white(), 0);
     lv_obj_set_style_text_font(gui->password_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_width(gui->password_label, 35);
 
-    gui->password_textfield = lv_textarea_create(password_section);
+    gui->password_textfield = lv_textarea_create(password_row);
     lv_textarea_set_one_line(gui->password_textfield, true);
     lv_textarea_set_placeholder_text(gui->password_textfield, "Password");
-    lv_textarea_set_password_mode(gui->password_textfield, true);
-    lv_obj_set_width(gui->password_textfield, 120);
+    // lv_textarea_set_password_mode(gui->password_textfield, true); // Disabled: using custom display
+    lv_obj_set_width(gui->password_textfield, 90);
+    lv_obj_set_height(gui->password_textfield, 26);
     lv_obj_set_style_text_color(gui->password_textfield, lv_color_white(), 0);
     lv_obj_set_style_bg_color(gui->password_textfield, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_text_font(gui->password_textfield, &lv_font_montserrat_10, 0);
+    lv_obj_clear_flag(gui->password_textfield, LV_OBJ_FLAG_SCROLLABLE);
 
     // Set initial focus styling
     update_focus_style(gui);
