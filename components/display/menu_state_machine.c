@@ -59,7 +59,7 @@ bool menu_state_init(void)
     ESP_LOGI(TAG, "Initializing menu state machine with tree structure");
 
     memset(&s_menu_context, 0, sizeof(s_menu_context));
-    s_menu_context.timeout_ms = 10000; // 10 seconds
+    s_menu_context.timeout_ms = 5000; // 5 seconds
 
     // Setup the menu tree
     menu_setup_tree();

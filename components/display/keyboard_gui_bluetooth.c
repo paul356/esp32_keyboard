@@ -143,7 +143,7 @@ static bt_pair_kb_gui_t *create_bt_pair_kb_gui(void)
     lv_obj_set_pos(gui->container, 0, 0);
     lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
     lv_obj_set_style_border_width(gui->container, 0, 0);
-    lv_obj_set_style_pad_all(gui->container, 20, 0);
+    lv_obj_set_style_pad_all(gui->container, 8, 0);
 
     // Disable scrollbars for bt_pair_kb container
     lv_obj_clear_flag(gui->container, LV_OBJ_FLAG_SCROLLABLE);
@@ -151,34 +151,37 @@ static bt_pair_kb_gui_t *create_bt_pair_kb_gui(void)
     // Hide container initially - will be shown when prepare_gui_func is called
     lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
 
-    // Set vertical flex layout for the container - status label, icon, and passkey label in a column
-    lv_obj_set_flex_flow(gui->container, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(gui->container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // Set horizontal flex layout for the container - icon on left, labels on right
+    lv_obj_set_flex_flow(gui->container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(gui->container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    // Status label at the top
-    gui->status_label = lv_label_create(gui->container);
-    lv_obj_set_style_text_color(gui->status_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->status_label, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_align(gui->status_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_style_margin_bottom(gui->status_label, 15, 0); // Gap below status label
-
-    // Bluetooth pair icon in the middle
+    // Bluetooth pair icon on the left
     gui->bluetooth_pair_icon = lv_image_create(gui->container);
     lv_image_set_src(gui->bluetooth_pair_icon, &bluetooth_pc_pair);
-    lv_obj_set_style_margin_bottom(gui->bluetooth_pair_icon, 15, 0); // Gap below icon
 
-    // Passkey label at the bottom
-    gui->passkey_label = lv_label_create(gui->container);
+    // Create a vertical container for the labels on the right side
+    lv_obj_t *labels_container = lv_obj_create(gui->container);
+    lv_obj_set_style_bg_opa(labels_container, LV_OPA_TRANSP, 0); // Transparent background
+    lv_obj_set_style_border_width(labels_container, 0, 0); // No border
+    lv_obj_set_style_pad_all(labels_container, 0, 0); // No padding
+    lv_obj_set_flex_flow(labels_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(labels_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_flex_grow(labels_container, 1); // Take remaining space
+
+    // Status label at the top of labels container
+    gui->status_label = lv_label_create(labels_container);
+    lv_obj_set_style_text_color(gui->status_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->status_label, &lv_font_montserrat_12, 0); // Reduced font size
+    lv_obj_set_style_text_align(gui->status_label, LV_TEXT_ALIGN_LEFT, 0);
+    lv_obj_set_style_margin_bottom(gui->status_label, 5, 0); // Increased gap for visibility
+    lv_label_set_text(gui->status_label, "");
+
+    // Passkey label below status label
+    gui->passkey_label = lv_label_create(labels_container);
     lv_obj_set_style_text_color(gui->passkey_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->passkey_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_style_text_align(gui->passkey_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_font(gui->passkey_label, &lv_font_montserrat_12, 0); // Increased font size to match status label
+    lv_obj_set_style_text_align(gui->passkey_label, LV_TEXT_ALIGN_LEFT, 0);
     lv_label_set_text(gui->passkey_label, ""); // Start empty, will be updated when prompting
-
-    // Set initial label text with BLE name
-    char label_text[64];
-    const char *ble_name = get_ble_name();
-    snprintf(label_text, sizeof(label_text), "Connect %s on", ble_name ? ble_name : "Device");
-    lv_label_set_text(gui->status_label, label_text);
 
     // Initialize input buffer and flag
     memset(gui->input_buffer, 0, sizeof(gui->input_buffer));
@@ -282,7 +285,7 @@ static esp_err_t prepare_bt_pair_kb_gui(struct menu_item *self)
     // Update the label text with current BLE name
     char label_text[64];
     const char *ble_name = get_ble_name();
-    snprintf(label_text, sizeof(label_text), "Connect %s on", ble_name ? ble_name : "Device");
+    snprintf(label_text, sizeof(label_text), "Keyboard Name: %s", ble_name ? ble_name : "Device");
     lv_label_set_text(gui->status_label, label_text);
 
     // Show the GUI
@@ -309,6 +312,14 @@ static esp_err_t post_bt_pair_kb_gui(struct menu_item *self)
 
     menu_state_set_timeout_ms(gui->last_timeout_ms); // Restore previous timeout
 
+    // Reset passkey label content
+    lv_label_set_text(gui->passkey_label, "");
+
+    // Reset input state
+    memset(gui->input_buffer, 0, sizeof(gui->input_buffer));
+    gui->input_length = 0;
+    gui->prompt_for_passkey = false;
+
     // Hide the GUI
     lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
 
@@ -321,7 +332,8 @@ static void update_passkey_display(bt_pair_kb_gui_t *gui)
     if (gui->prompt_for_passkey)
     {
         char passkey_text[64];
-        snprintf(passkey_text, sizeof(passkey_text), "Type passkey now: %s", gui->input_buffer);
+        // Show the passkey prompt with current input
+        snprintf(passkey_text, sizeof(passkey_text), "Passkey: %s", gui->input_buffer);
         lv_label_set_text(gui->passkey_label, passkey_text);
     }
     else

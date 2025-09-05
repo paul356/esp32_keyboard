@@ -58,6 +58,7 @@ static const char* led_pattern_names[] = {
 // LED pattern settings GUI context structure
 typedef struct {
     lv_obj_t *container;
+    lv_obj_t *pattern_section;      // Container for pattern roller and label
     lv_obj_t *pattern_roller;       // Roller for pattern selection
     lv_obj_t *param1_textfield;     // Text field for first parameter (speed/hue)
     lv_obj_t *param2_textfield;     // Text field for second parameter (saturation/brightness)
@@ -265,35 +266,52 @@ static led_pattern_settings_gui_t* create_led_pattern_settings_gui(void)
 
     // Create main container
     gui->container = lv_obj_create(lv_screen_active());
+    if (!gui->container) {
+        ESP_LOGE(TAG, "Failed to create main container");
+        free(gui);
+        return NULL;
+    }
     lv_obj_set_size(gui->container, LCD_WIDTH, LCD_HEIGHT);
     lv_obj_set_pos(gui->container, 0, 0);
     lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
     lv_obj_set_style_border_width(gui->container, 0, 0);
-    lv_obj_set_style_pad_all(gui->container, 10, 0);
+    lv_obj_set_style_pad_all(gui->container, 5, 0);
     lv_obj_clear_flag(gui->container, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
 
-    // Set vertical layout for better fit on small screens
-    lv_obj_set_flex_flow(gui->container, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_flex_align(gui->container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // Set horizontal layout to fit in 76px height
+    lv_obj_set_flex_flow(gui->container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(gui->container, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    // Pattern section - horizontal label + roller
-    lv_obj_t *pattern_section = lv_obj_create(gui->container);
-    lv_obj_set_size(pattern_section, LCD_WIDTH - 20, LV_SIZE_CONTENT);
-    lv_obj_set_style_bg_opa(pattern_section, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(pattern_section, 0, 0);
-    lv_obj_set_style_pad_all(pattern_section, 5, 0);
-    lv_obj_set_flex_flow(pattern_section, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(pattern_section, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // Pattern section - vertical label + roller for compact horizontal layout
+    gui->pattern_section = lv_obj_create(gui->container);
+    lv_obj_set_size(gui->pattern_section, 120, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(gui->pattern_section, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(gui->pattern_section, 0, 0);
+    lv_obj_set_style_pad_all(gui->pattern_section, 2, 0);
+    lv_obj_set_flex_flow(gui->pattern_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(gui->pattern_section, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
-    gui->pattern_label = lv_label_create(pattern_section);
+    gui->pattern_label = lv_label_create(gui->pattern_section);
     lv_label_set_text(gui->pattern_label, "Pattern:");
     lv_obj_set_style_text_color(gui->pattern_label, lv_color_white(), 0);
     lv_obj_set_style_text_font(gui->pattern_label, &lv_font_montserrat_12, 0);
 
-    gui->pattern_roller = lv_roller_create(pattern_section);
+    gui->pattern_roller = lv_roller_create(gui->pattern_section);
+    if (!gui->pattern_roller) {
+        ESP_LOGE(TAG, "Failed to create pattern roller");
+        lv_obj_del(gui->container);
+        free(gui);
+        return NULL;
+    }
     // Create options string from pattern names
     char *options = malloc(1024);
+    if (!options) {
+        ESP_LOGE(TAG, "Failed to allocate memory for pattern options");
+        lv_obj_del(gui->container);
+        free(gui);
+        return NULL;
+    }
     strcpy(options, led_pattern_names[0]);
     for (int i = 1; i < LED_PATTERN_COUNT; i++) {
         strcat(options, "\n");
@@ -301,17 +319,33 @@ static led_pattern_settings_gui_t* create_led_pattern_settings_gui(void)
     }
     lv_roller_set_options(gui->pattern_roller, options, LV_ROLLER_MODE_NORMAL);
     free(options);
-    lv_roller_set_visible_row_count(gui->pattern_roller, 3);
-    lv_obj_set_width(gui->pattern_roller, 140);
+    lv_roller_set_visible_row_count(gui->pattern_roller, 1);
+    lv_obj_set_size(gui->pattern_roller, 100, 25); // Set explicit height to make it compact
     lv_obj_set_style_bg_color(gui->pattern_roller, lv_color_hex(0x333333), 0);
     lv_obj_set_style_text_color(gui->pattern_roller, lv_color_white(), 0);
+    lv_obj_set_style_pad_all(gui->pattern_roller, 2, 0); // Reduce internal padding
+    lv_obj_set_style_text_font(gui->pattern_roller, &lv_font_montserrat_12, 0); // Use smaller font
 
-    // Parameter 1 section - horizontal label + field
-    lv_obj_t *param1_section = lv_obj_create(gui->container);
-    lv_obj_set_size(param1_section, LCD_WIDTH - 20, LV_SIZE_CONTENT);
+    // Remove the blue background and white border from selected item
+    lv_obj_set_style_bg_opa(gui->pattern_roller, LV_OPA_TRANSP, LV_PART_SELECTED);
+    lv_obj_set_style_border_width(gui->pattern_roller, 0, LV_PART_SELECTED);
+    lv_obj_set_style_outline_width(gui->pattern_roller, 0, LV_PART_SELECTED);
+
+    // Create container for parameters - stacked vertically
+    lv_obj_t *params_container = lv_obj_create(gui->container);
+    lv_obj_set_size(params_container, 160, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(params_container, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(params_container, 0, 0);
+    lv_obj_set_style_pad_all(params_container, 2, 0);
+    lv_obj_set_flex_flow(params_container, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(params_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    // Parameter 1 section - horizontal label + field within the vertical stack
+    lv_obj_t *param1_section = lv_obj_create(params_container);
+    lv_obj_set_size(param1_section, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(param1_section, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(param1_section, 0, 0);
-    lv_obj_set_style_pad_all(param1_section, 5, 0);
+    lv_obj_set_style_pad_all(param1_section, 1, 0);
     lv_obj_set_flex_flow(param1_section, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(param1_section, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
@@ -321,18 +355,26 @@ static led_pattern_settings_gui_t* create_led_pattern_settings_gui(void)
     lv_obj_set_style_text_font(gui->param1_label, &lv_font_montserrat_12, 0);
 
     gui->param1_textfield = lv_textarea_create(param1_section);
+    if (!gui->param1_textfield) {
+        ESP_LOGE(TAG, "Failed to create param1 textfield");
+        lv_obj_del(gui->container);
+        free(gui);
+        return NULL;
+    }
     lv_textarea_set_one_line(gui->param1_textfield, true);
     lv_textarea_set_placeholder_text(gui->param1_textfield, "0-255");
-    lv_obj_set_width(gui->param1_textfield, 80);
+    lv_obj_set_size(gui->param1_textfield, 80, 20); // Set explicit height for compactness
     lv_obj_set_style_text_color(gui->param1_textfield, lv_color_white(), 0);
     lv_obj_set_style_bg_color(gui->param1_textfield, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_pad_all(gui->param1_textfield, 2, 0); // Reduce padding
+    lv_obj_set_style_text_font(gui->param1_textfield, &lv_font_montserrat_12, 0); // Use smaller font
 
-    // Parameter 2 section - horizontal label + field
-    lv_obj_t *param2_section = lv_obj_create(gui->container);
-    lv_obj_set_size(param2_section, LCD_WIDTH - 20, LV_SIZE_CONTENT);
+    // Parameter 2 section - horizontal label + field within the vertical stack
+    lv_obj_t *param2_section = lv_obj_create(params_container);
+    lv_obj_set_size(param2_section, LV_PCT(100), LV_SIZE_CONTENT);
     lv_obj_set_style_bg_opa(param2_section, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(param2_section, 0, 0);
-    lv_obj_set_style_pad_all(param2_section, 5, 0);
+    lv_obj_set_style_pad_all(param2_section, 1, 0);
     lv_obj_set_flex_flow(param2_section, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(param2_section, LV_FLEX_ALIGN_SPACE_BETWEEN, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
 
@@ -342,18 +384,23 @@ static led_pattern_settings_gui_t* create_led_pattern_settings_gui(void)
     lv_obj_set_style_text_font(gui->param2_label, &lv_font_montserrat_12, 0);
 
     gui->param2_textfield = lv_textarea_create(param2_section);
+    if (!gui->param2_textfield) {
+        ESP_LOGE(TAG, "Failed to create param2 textfield");
+        lv_obj_del(gui->container);
+        free(gui);
+        return NULL;
+    }
     lv_textarea_set_one_line(gui->param2_textfield, true);
     lv_textarea_set_placeholder_text(gui->param2_textfield, "0-255");
-    lv_obj_set_width(gui->param2_textfield, 80);
+    lv_obj_set_size(gui->param2_textfield, 80, 20); // Set explicit height for compactness
     lv_obj_set_style_text_color(gui->param2_textfield, lv_color_white(), 0);
     lv_obj_set_style_bg_color(gui->param2_textfield, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_pad_all(gui->param2_textfield, 2, 0); // Reduce padding
+    lv_obj_set_style_text_font(gui->param2_textfield, &lv_font_montserrat_12, 0); // Use smaller font
 
     // Set initial values
     lv_textarea_set_text(gui->param1_textfield, gui->param1_buffer);
     lv_textarea_set_text(gui->param2_textfield, gui->param2_buffer);
-
-    // Set initial focus styling (will be called after function definitions)
-    // update_led_pattern_focus_style(gui); // Called via helper after all setup
 
     return gui;
 }
@@ -430,30 +477,38 @@ static void update_led_pattern_focus_style(led_pattern_settings_gui_t *gui)
 {
     if (!gui) return;
 
-    // Reset all borders
-    lv_obj_set_style_border_width(gui->pattern_roller, 0, 0);
+    // Reset all borders and styling
+    lv_obj_set_style_border_width(gui->pattern_section, 0, 0);
     lv_obj_set_style_border_width(gui->param1_textfield, 0, 0);
     lv_obj_set_style_border_width(gui->param2_textfield, 0, 0);
 
-    // Set focused widget border
-    lv_obj_t *focused_widget = NULL;
+    // Reset roller to default unfocused state
+    lv_obj_set_style_bg_color(gui->pattern_roller, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_text_color(gui->pattern_roller, lv_color_white(), 0);
+    lv_obj_set_style_bg_opa(gui->pattern_roller, LV_OPA_COVER, 0);
+
+    // Ensure selected part styling is always clean
+    lv_obj_set_style_bg_opa(gui->pattern_roller, LV_OPA_TRANSP, LV_PART_SELECTED);
+    lv_obj_set_style_border_width(gui->pattern_roller, 0, LV_PART_SELECTED);
+    lv_obj_set_style_outline_width(gui->pattern_roller, 0, LV_PART_SELECTED);
+
+    // Set focused widget styling
     switch (gui->current_focus) {
         case WIDGET_FOCUS_LED_PATTERN:
-            focused_widget = gui->pattern_roller;
+            // Apply the same focus style as textareas but to the pattern section container
+            lv_obj_set_style_border_width(gui->pattern_section, 2, 0);
+            lv_obj_set_style_border_color(gui->pattern_section, lv_color_hex(0x00AAFF), 0);
             break;
         case WIDGET_FOCUS_LED_PARAM1:
-            focused_widget = gui->param1_textfield;
+            lv_obj_set_style_border_width(gui->param1_textfield, 2, 0);
+            lv_obj_set_style_border_color(gui->param1_textfield, lv_color_hex(0x00AAFF), 0);
             break;
         case WIDGET_FOCUS_LED_PARAM2:
-            focused_widget = gui->param2_textfield;
+            lv_obj_set_style_border_width(gui->param2_textfield, 2, 0);
+            lv_obj_set_style_border_color(gui->param2_textfield, lv_color_hex(0x00AAFF), 0);
             break;
         default:
             break;
-    }
-
-    if (focused_widget) {
-        lv_obj_set_style_border_width(focused_widget, 2, 0);
-        lv_obj_set_style_border_color(focused_widget, lv_color_hex(0x00AAFF), 0);
     }
 
     // Update cursor display for text fields
@@ -514,15 +569,19 @@ static bool led_pattern_settings_handle_input_key(void *user_ctx, input_event_e 
         case INPUT_EVENT_TAB:
             // Navigate between widgets
             gui->current_focus = (led_pattern_widget_focus_e)((gui->current_focus + 1) % WIDGET_FOCUS_COUNT_PATTERN);
+
+            // Set cursor to end of text field when switching to it
+            if (gui->current_focus == WIDGET_FOCUS_LED_PARAM1) {
+                gui->cursor_pos_param1 = strlen(gui->param1_buffer);
+            } else if (gui->current_focus == WIDGET_FOCUS_LED_PARAM2) {
+                gui->cursor_pos_param2 = strlen(gui->param2_buffer);
+            }
+
             update_led_pattern_focus_style(gui);
             return true;
 
         case INPUT_EVENT_RIGHT_ARROW:
-            if (gui->current_focus == WIDGET_FOCUS_LED_PATTERN) {
-                // Navigate in pattern roller
-                gui->selected_pattern = (gui->selected_pattern + 1) % LED_PATTERN_COUNT;
-                lv_roller_set_selected(gui->pattern_roller, gui->selected_pattern, LV_ANIM_OFF);
-            } else if (gui->current_focus == WIDGET_FOCUS_LED_PARAM1) {
+            if (gui->current_focus == WIDGET_FOCUS_LED_PARAM1) {
                 // Move cursor right in param1 field
                 if (gui->cursor_pos_param1 < strlen(gui->param1_buffer)) {
                     gui->cursor_pos_param1++;
@@ -538,11 +597,7 @@ static bool led_pattern_settings_handle_input_key(void *user_ctx, input_event_e 
             return true;
 
         case INPUT_EVENT_LEFT_ARROW:
-            if (gui->current_focus == WIDGET_FOCUS_LED_PATTERN) {
-                // Navigate in pattern roller
-                gui->selected_pattern = (gui->selected_pattern + LED_PATTERN_COUNT - 1) % LED_PATTERN_COUNT;
-                lv_roller_set_selected(gui->pattern_roller, gui->selected_pattern, LV_ANIM_OFF);
-            } else if (gui->current_focus == WIDGET_FOCUS_LED_PARAM1) {
+            if (gui->current_focus == WIDGET_FOCUS_LED_PARAM1) {
                 // Move cursor left in param1 field
                 if (gui->cursor_pos_param1 > 0) {
                     gui->cursor_pos_param1--;
@@ -555,6 +610,24 @@ static bool led_pattern_settings_handle_input_key(void *user_ctx, input_event_e 
                     update_led_pattern_cursor_display(gui);
                 }
             }
+            return true;
+
+        case INPUT_EVENT_UP_ARROW:
+            if (gui->current_focus == WIDGET_FOCUS_LED_PATTERN) {
+                // Navigate up in pattern roller (same as left arrow)
+                gui->selected_pattern = (gui->selected_pattern + LED_PATTERN_COUNT - 1) % LED_PATTERN_COUNT;
+                lv_roller_set_selected(gui->pattern_roller, gui->selected_pattern, LV_ANIM_OFF);
+            }
+            // For text fields, up arrow doesn't do anything specific
+            return true;
+
+        case INPUT_EVENT_DOWN_ARROW:
+            if (gui->current_focus == WIDGET_FOCUS_LED_PATTERN) {
+                // Navigate down in pattern roller (same as right arrow)
+                gui->selected_pattern = (gui->selected_pattern + 1) % LED_PATTERN_COUNT;
+                lv_roller_set_selected(gui->pattern_roller, gui->selected_pattern, LV_ANIM_OFF);
+            }
+            // For text fields, down arrow doesn't do anything specific
             return true;
 
         case INPUT_EVENT_BACKSPACE:
@@ -660,14 +733,14 @@ esp_err_t keyboard_gui_led_pattern_settings_action(void *user_ctx)
 // Public interface function for LED pattern settings input handling
 bool keyboard_gui_led_pattern_settings_handle_input(void *user_ctx, input_event_e input_event, char key_code)
 {
-    // The user_ctx here is the menu_item, but we need the GUI context
-    // We need to get the GUI context from the menu item
-    struct menu_item *menu_item = (struct menu_item *)user_ctx;
-    if (!menu_item || !menu_item->user_ctx) {
+    // The user_ctx is actually the GUI context directly, not a menu_item
+    led_pattern_settings_gui_t *gui = (led_pattern_settings_gui_t *)user_ctx;
+
+    if (!gui) {
+        ESP_LOGE(TAG, "GUI context is NULL");
         return false;
     }
 
-    led_pattern_settings_gui_t *gui = (led_pattern_settings_gui_t *)menu_item->user_ctx;
     return led_pattern_settings_handle_input_key(gui, input_event, key_code);
 }
 
