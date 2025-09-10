@@ -7,6 +7,7 @@
 #include "hal_ble.h"
 #include "ble_events.h"  // Include BLE-specific events
 #include "keyboard_gui.h"
+#include "hid_desc.h"
 
 static void send_keyboard_to_queue(report_keyboard_t*);
 static uint8_t keyboard_leds_status(void);
@@ -20,7 +21,7 @@ int register_keyboard_reporter(void)
 
 static uint8_t keyboard_leds_status(void)
 {
-    return 0;
+    return is_caps_on() ? 0x2 : 0;
 }
 
 static void send_keyboard_to_queue(report_keyboard_t *report)

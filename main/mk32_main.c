@@ -159,12 +159,12 @@ void test_miscs(void)
     ESP_LOGI(TAG, "USB Powered: %s", usb_powered ? "Yes" : "No");
     bool charging = miscs_is_battery_charging();
     ESP_LOGI(TAG, "Battery Charging: %s", charging ? "Yes" : "No");
-    uint32_t voltage_mv = 0;
-    esp_err_t ret = miscs_read_battery_voltage(&voltage_mv);
+    uint8_t battery_percentage = 0;
+    esp_err_t ret = miscs_get_battery_percentage(&battery_percentage);
     if (ret == ESP_OK) {
-        ESP_LOGI(TAG, "Battery Voltage: %lu mV", voltage_mv);
+        ESP_LOGI(TAG, "Battery Percentage: %u%%", battery_percentage);
     } else {
-        ESP_LOGE(TAG, "Failed to read battery voltage: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to get battery percentage: %s", esp_err_to_name(ret));
     }
     uint32_t encoder_pos = miscs_encoder_get_position();
     ESP_LOGI(TAG, "Encoder Position: %ld", encoder_pos);

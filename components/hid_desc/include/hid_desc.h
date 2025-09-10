@@ -23,4 +23,6 @@
 
 void enable_usb_hid(void);
 
+bool is_caps_on(void);
+
 #endif

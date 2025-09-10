@@ -196,7 +196,7 @@ bool miscs_is_battery_charging(void)
 }
 
 // Battery Voltage ADC Functions
-esp_err_t miscs_read_battery_voltage(uint32_t *voltage_mv)
+static esp_err_t miscs_read_battery_voltage(uint32_t *voltage_mv)
 {
     if (voltage_mv == NULL) {
         return ESP_ERR_INVALID_ARG;
@@ -242,6 +242,40 @@ esp_err_t miscs_read_battery_voltage(uint32_t *voltage_mv)
 
     // Calculate average voltage
     *voltage_mv = voltage_sum / MISCS_ADC_READ_TIMES;
+
+    return ESP_OK;
+}
+
+esp_err_t miscs_get_battery_percentage(uint8_t *percentage)
+{
+    if (percentage == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    uint32_t voltage_mv = 0;
+    esp_err_t ret = miscs_read_battery_voltage(&voltage_mv);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+
+    // Typical Li-Ion battery voltage range:
+    // Full charge: ~4.2V (4200mV)
+    // Empty: ~3.0V (3000mV)
+    // These values may need adjustment based on your specific battery
+
+    const uint32_t BATTERY_MIN_VOLTAGE = 3000; // 3.0V
+    const uint32_t BATTERY_MAX_VOLTAGE = 4200; // 4.2V
+
+    if (voltage_mv >= BATTERY_MAX_VOLTAGE) {
+        *percentage = 100;
+    } else if (voltage_mv <= BATTERY_MIN_VOLTAGE) {
+        *percentage = 0;
+    } else {
+        // Linear interpolation between min and max voltage
+        uint32_t range = BATTERY_MAX_VOLTAGE - BATTERY_MIN_VOLTAGE;
+        uint32_t offset = voltage_mv - BATTERY_MIN_VOLTAGE;
+        *percentage = (uint8_t)((offset * 100) / range);
+    }
 
     return ESP_OK;
 }

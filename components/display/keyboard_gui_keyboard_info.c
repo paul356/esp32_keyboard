@@ -31,6 +31,9 @@
 #include "drv_loop.h"
 #include "nvs_io.h"
 #include "nvs.h"
+#include "function_control.h"
+#include "miscs.h"
+#include "host.h"
 
 #define TAG "gui_keyboard_info"
 
@@ -57,11 +60,18 @@ typedef struct {
 
 // GUI context structure for keyboard info
 typedef struct {
-    lv_obj_t *container;
-    lv_obj_t *total_count_icon;     // Icon for total char count
-    lv_obj_t *total_count_label;
-    lv_obj_t *session_count_icon;   // Icon for session char count
-    lv_obj_t *char_count_label;
+    // Combined main section containing all elements
+    lv_obj_t *main_container;
+    lv_obj_t *counter_container;      // Container for the three counter labels (leftmost)
+    lv_obj_t *session_counter_label;  // Session counter (top line)
+    lv_obj_t *divider_label;          // "/" divider (middle line)
+    lv_obj_t *total_counter_label;    // Total counter (bottom line)
+    lv_obj_t *caps_lock_img;          // Caps lock status (second position)
+    lv_obj_t *wifi_status_img;        // WiFi status (third position)
+    lv_obj_t *ble_status_img;         // BLE status (fourth position)
+    lv_obj_t *power_status_img;       // Power status (fifth position)
+    lv_obj_t *battery_percent_label;  // Battery percentage (follows power status)
+
     lv_timer_t *update_timer;  // Timer for periodic updates
 } keyboard_info_gui_t;
 
@@ -143,48 +153,76 @@ static keyboard_info_gui_t* create_keyboard_info_gui(void)
         return NULL;
     }
 
-    // Create container for keyboard info
-    gui->container = lv_obj_create(lv_screen_active());
-    lv_obj_set_size(gui->container, LCD_WIDTH, LCD_HEIGHT);
-    lv_obj_set_pos(gui->container, 0, 0);
-    lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
-    lv_obj_set_style_border_width(gui->container, 0, 0);
-    lv_obj_set_style_pad_all(gui->container, 20, 0);
+    // Create combined main container (full screen)
+    gui->main_container = lv_obj_create(lv_screen_active());
+    lv_obj_set_size(gui->main_container, LCD_WIDTH, LCD_HEIGHT);  // Use full screen
+    lv_obj_set_pos(gui->main_container, 0, 0);  // Position at top
+    lv_obj_set_style_bg_color(gui->main_container, lv_color_black(), 0);
+    lv_obj_set_style_border_width(gui->main_container, 0, 0);
+    lv_obj_set_style_pad_all(gui->main_container, 5, 0);  // Small padding for spacing
 
-    // Disable scrollbars for keyboard info container
-    lv_obj_clear_flag(gui->container, LV_OBJ_FLAG_SCROLLABLE);
+    // Disable scrollbars completely
+    lv_obj_clear_flag(gui->main_container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_scroll_dir(gui->main_container, LV_DIR_NONE);
 
-    // Hide container initially - will be shown when prepare_gui_func is called
-    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+    // Hide container initially
+    lv_obj_add_flag(gui->main_container, LV_OBJ_FLAG_HIDDEN);
 
-    // Set horizontal flex layout for the container - all elements in a row
-    lv_obj_set_flex_flow(gui->container, LV_FLEX_FLOW_ROW);
-    lv_obj_set_flex_align(gui->container, LV_FLEX_ALIGN_SPACE_AROUND, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    // Set up the main container as a flex container for the content
+    lv_obj_set_flex_flow(gui->main_container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(gui->main_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(gui->main_container, 0, 0);  // Gap between items
 
-    // Total count icon - directly in main container
-    gui->total_count_icon = lv_image_create(gui->container);
-    lv_image_set_src(gui->total_count_icon, &keyboard_meter_A);
-    lv_obj_set_style_margin_right(gui->total_count_icon, 8, 0);  // Small gap to count label
+    // Counter container and labels (session/total) - leftmost item
+    gui->counter_container = lv_obj_create(gui->main_container);
+    lv_obj_set_size(gui->counter_container, 60, 60);  // Fixed size container
+    lv_obj_set_style_bg_opa(gui->counter_container, LV_OPA_TRANSP, 0);  // Transparent background
+    lv_obj_set_style_border_width(gui->counter_container, 0, 0);  // No border
+    lv_obj_set_style_pad_all(gui->counter_container, 0, 0);  // No padding
+    lv_obj_clear_flag(gui->counter_container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_flex_flow(gui->counter_container, LV_FLEX_FLOW_COLUMN);  // Changed to vertical layout
+    lv_obj_set_flex_align(gui->counter_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_row(gui->counter_container, 1, 0);  // 1 pixel gap between items vertically
 
-    // Total count label - directly in main container
-    gui->total_count_label = lv_label_create(gui->container);
-    lv_obj_set_style_text_color(gui->total_count_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->total_count_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_style_text_align(gui->total_count_label, LV_TEXT_ALIGN_LEFT, 0);
-    lv_obj_set_style_margin_right(gui->total_count_label, 30, 0);  // Gap between total and session
-    lv_label_set_text(gui->total_count_label, "0");
+    // Session counter label (top)
+    gui->session_counter_label = lv_label_create(gui->counter_container);
+    lv_obj_set_style_text_color(gui->session_counter_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->session_counter_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_align(gui->session_counter_label, LV_TEXT_ALIGN_CENTER, 0);  // Center align for vertical layout
+    lv_obj_set_width(gui->session_counter_label, 80);  // Full width of container
+    lv_label_set_text(gui->session_counter_label, "0");
 
-    // Session count icon - directly in main container
-    gui->session_count_icon = lv_image_create(gui->container);
-    lv_image_set_src(gui->session_count_icon, &keyboard_meter_B);
-    lv_obj_set_style_margin_right(gui->session_count_icon, 8, 0);  // Small gap to count label
+    // Total counter label (bottom)
+    gui->total_counter_label = lv_label_create(gui->counter_container);
+    lv_obj_set_style_text_color(gui->total_counter_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->total_counter_label, &lv_font_montserrat_12, 0);
+    lv_obj_set_style_text_align(gui->total_counter_label, LV_TEXT_ALIGN_CENTER, 0);  // Center align for vertical layout
+    lv_obj_set_width(gui->total_counter_label, 80);  // Full width of container
+    lv_label_set_text(gui->total_counter_label, "0");
 
-    // Session count label - directly in main container
-    gui->char_count_label = lv_label_create(gui->container);
-    lv_obj_set_style_text_color(gui->char_count_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(gui->char_count_label, &lv_font_montserrat_12, 0);
-    lv_obj_set_style_text_align(gui->char_count_label, LV_TEXT_ALIGN_LEFT, 0);
-    lv_label_set_text(gui->char_count_label, "0");
+    // Caps lock status icon - second item
+    gui->caps_lock_img = lv_image_create(gui->main_container);
+    lv_image_set_src(gui->caps_lock_img, &lower_case_letter);
+
+    // WiFi status icon - third item
+    gui->wifi_status_img = lv_image_create(gui->main_container);
+    lv_image_set_src(gui->wifi_status_img, &wifi_off);
+
+    // BLE status icon - fourth item
+    gui->ble_status_img = lv_image_create(gui->main_container);
+    lv_image_set_src(gui->ble_status_img, &bluetooth_off);
+
+    // Power status icon - fifth item
+    gui->power_status_img = lv_image_create(gui->main_container);
+    lv_image_set_src(gui->power_status_img, &battery_normal);
+
+    // Battery percentage label - follows power status
+    gui->battery_percent_label = lv_label_create(gui->main_container);
+    lv_obj_set_style_text_color(gui->battery_percent_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->battery_percent_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_width(gui->battery_percent_label, 28);  // Width for percentage text
+    lv_obj_set_style_text_align(gui->battery_percent_label, LV_TEXT_ALIGN_CENTER, 0);  // Center align text
+    lv_label_set_text(gui->battery_percent_label, "100%");
 
     // Create timer for periodic updates (100ms interval)
     gui->update_timer = lv_timer_create(keyboard_info_timer_cb, 100, gui);
@@ -209,13 +247,62 @@ static void update_keyboard_info_display(keyboard_info_gui_t *gui)
 
     char buffer[32];
 
-    // Update total count - just show the number without "Total:" prefix
-    snprintf(buffer, sizeof(buffer), "%lu", s_keyboard_stats.total_char_count);
-    lv_label_set_text(gui->total_count_label, buffer);
+    // Update WiFi status
+    if (is_wifi_enabled()) {
+        lv_image_set_src(gui->wifi_status_img, &wifi_on);
+    } else {
+        lv_image_set_src(gui->wifi_status_img, &wifi_off);
+    }
 
-    // Update session character count - just show the number without "Chars:" prefix
-    snprintf(buffer, sizeof(buffer), "%lu", s_keyboard_stats.session_char_count);
-    lv_label_set_text(gui->char_count_label, buffer);
+    // Update BLE status
+    if (is_ble_enabled()) {
+        lv_image_set_src(gui->ble_status_img, &bluetooth_on);
+    } else {
+        lv_image_set_src(gui->ble_status_img, &bluetooth_off);
+    }
+
+    // Update power status and battery percentage
+    bool is_usb_powered = miscs_is_usb_powered();
+    bool is_charging = miscs_is_battery_charging();
+    uint8_t battery_percent = 0;
+
+    // Get battery percentage
+    miscs_get_battery_percentage(&battery_percent);
+
+    if (is_usb_powered && !is_charging) {
+        // USB powered, not charging
+        lv_image_set_src(gui->power_status_img, &plug_on);
+        // Show USB indicator instead of hiding battery percentage
+        lv_obj_remove_flag(gui->battery_percent_label, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(gui->battery_percent_label, "");
+    } else if (is_charging) {
+        // Charging
+        lv_image_set_src(gui->power_status_img, &battery_charge);
+        lv_obj_remove_flag(gui->battery_percent_label, LV_OBJ_FLAG_HIDDEN);
+        snprintf(buffer, sizeof(buffer), "%u%%", battery_percent);
+        lv_label_set_text(gui->battery_percent_label, buffer);
+    } else {
+        // Battery powered
+        lv_image_set_src(gui->power_status_img, &battery_normal);
+        lv_obj_remove_flag(gui->battery_percent_label, LV_OBJ_FLAG_HIDDEN);
+        snprintf(buffer, sizeof(buffer), "%u%%", battery_percent);
+        lv_label_set_text(gui->battery_percent_label, buffer);
+    }
+
+    // Update caps lock status
+    led_t host_leds = host_keyboard_led_state();
+    if (host_leds.caps_lock) { // USB_LED_CAPS_LOCK is bit 1
+        lv_image_set_src(gui->caps_lock_img, &upper_case_letter);
+    } else {
+        lv_image_set_src(gui->caps_lock_img, &lower_case_letter);
+    }
+
+    // Update counter display using three separate labels
+    snprintf(buffer, sizeof(buffer), "S: %lu", s_keyboard_stats.session_char_count);
+    lv_label_set_text(gui->session_counter_label, buffer);
+
+    snprintf(buffer, sizeof(buffer), "T: %lu", s_keyboard_stats.total_char_count);
+    lv_label_set_text(gui->total_counter_label, buffer);
 }
 
 static esp_err_t prepare_keyboard_info_gui(struct menu_item *self)
@@ -238,8 +325,8 @@ static esp_err_t prepare_keyboard_info_gui(struct menu_item *self)
 
     keyboard_info_gui_t *gui = (keyboard_info_gui_t *)self->user_ctx;
 
-    // Show the keyboard info container
-    lv_obj_remove_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+    // Show the combined main container
+    lv_obj_remove_flag(gui->main_container, LV_OBJ_FLAG_HIDDEN);
     ESP_LOGI(TAG, "Showed keyboard info container");
 
     // Start periodic updates
@@ -265,8 +352,8 @@ static esp_err_t post_keyboard_info_gui(struct menu_item *self)
         lv_timer_pause(gui->update_timer);
     }
 
-    // Hide the keyboard info container
-    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+    // Hide the combined main container
+    lv_obj_add_flag(gui->main_container, LV_OBJ_FLAG_HIDDEN);
     ESP_LOGI(TAG, "Hidden keyboard info container");
 
     return ESP_OK;
@@ -346,8 +433,9 @@ esp_err_t keyboard_gui_prepare_reset_meter(struct menu_item *self)
         lv_obj_set_style_border_width(container, 0, 0);
         lv_obj_set_style_pad_all(container, 0, 0);
 
-        // Disable scrollbars for container
+        // Disable scrollbars completely for container
         lv_obj_clear_flag(container, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_set_scroll_dir(container, LV_DIR_NONE);
 
         // Create banner image
         lv_obj_t *banner_img = lv_image_create(container);

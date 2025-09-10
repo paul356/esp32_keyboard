@@ -25,9 +25,18 @@ extern const lv_image_dsc_t led_pattern_icon;
 extern const lv_image_dsc_t wifi_setting_icon;
 extern const lv_image_dsc_t keyboard_meter_icon;
 extern const lv_image_dsc_t keyboard_meter_reset_icon;
-extern const lv_image_dsc_t keyboard_meter_A;
-extern const lv_image_dsc_t keyboard_meter_B;
 extern const lv_image_dsc_t keyboard_reset_meter_banner;
+
+// Status icons for keyboard info GUI
+extern const lv_image_dsc_t wifi_on;
+extern const lv_image_dsc_t wifi_off;
+extern const lv_image_dsc_t bluetooth_on;
+extern const lv_image_dsc_t bluetooth_off;
+extern const lv_image_dsc_t plug_on;
+extern const lv_image_dsc_t battery_charge;
+extern const lv_image_dsc_t battery_normal;
+extern const lv_image_dsc_t upper_case_letter;
+extern const lv_image_dsc_t lower_case_letter;
 
 #ifdef __cplusplus
 }

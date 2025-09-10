@@ -47,12 +47,15 @@ bool miscs_is_usb_powered(void);
 bool miscs_is_battery_charging(void);
 
 /**
- * @brief Read battery voltage via ADC
+ * @brief Get battery charge percentage
  *
- * @param voltage_mv Pointer to store voltage reading in millivolts
+ * This function reads the battery voltage and calculates the charge percentage
+ * based on typical Li-Ion battery voltage range (3.0V - 4.2V).
+ *
+ * @param percentage Pointer to store battery percentage (0-100)
  * @return esp_err_t ESP_OK on success, error code otherwise
  */
-esp_err_t miscs_read_battery_voltage(uint32_t *voltage_mv);
+esp_err_t miscs_get_battery_percentage(uint8_t *percentage);
 
 /**
  * @brief Get current encoder position
