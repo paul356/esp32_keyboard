@@ -72,6 +72,11 @@ bool is_caps_on(void)
     return caps_on;
 }
 
+void set_caps_state(bool state)
+{
+    caps_on = state;
+}
+
 void enable_usb_hid(void)
 {
     tinyusb_config_t tusb_cfg = {

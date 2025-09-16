@@ -33,10 +33,13 @@
 #include "nvs_io.h"  // For NVS operations
 #include "nvs.h"
 #include "function_control.h"
+#include "hid_desc.h"
 
 #define TAG "hal_ble"
 
 #define NVS_NAMESPACE "ble_device"
+
+#define REPORT_ID_KEYBOARD 0x1
 
 uint8_t battery_report[1] = { 0 };
 uint8_t key_report[REPORT_LEN] = { 0 };
@@ -53,7 +56,7 @@ const unsigned char hidapiReportMap[] = { //8 bytes input, 8 bytes feature
     0x05, 0x01,  // Usage Pg (Generic Desktop)
     0x09, 0x06,  // Usage (Keyboard)
     0xA1, 0x01,  // Collection: (Application)
-    0x85, 0x01,  // Report Id (1)
+    0x85, REPORT_ID_KEYBOARD,  // Report Id (1)
     //
     0x05, 0x07,  //   Usage Pg (Key Codes)
     0x19, 0xE0,  //   Usage Min (224)
@@ -226,8 +229,20 @@ static void ble_hidd_event_callback(void *handler_args, esp_event_base_t base, i
         break;
     }
     case ESP_HIDD_OUTPUT_EVENT: {
-        ESP_LOGI(TAG, "OUTPUT[%u]: %8s ID: %2u, Len: %d, Data:", param->output.map_index, esp_hid_usage_str(param->output.usage), param->output.report_id, param->output.length);
+        ESP_LOGI(TAG, "OUTPUT[%u]: %8s ID: %2u, Len: %d, Data:", param->output.map_index,
+                 esp_hid_usage_str(param->output.usage), param->output.report_id, param->output.length);
         ESP_LOG_BUFFER_HEX(TAG, param->output.data, param->output.length);
+
+        // Set keyboard LED e.g Capslock, Numlock etc...
+        if (param->output.report_id == REPORT_ID_KEYBOARD)
+        {
+            // bufsize should be (at least) 1
+            if (param->output.length < 1)
+                return;
+
+            uint8_t const kbd_leds = param->output.data[0];
+            set_caps_state((kbd_leds & 0x2) != 0);
+        }
         break;
     }
     case ESP_HIDD_FEATURE_EVENT: {
