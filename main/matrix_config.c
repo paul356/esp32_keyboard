@@ -21,7 +21,7 @@
 #include "esp_system.h"
 #include "driver/gpio.h"
 #include "driver/rtc_io.h"
-#include "keyboard_config.h"
+#include "keyboard_const.h"
 #include "esp_sleep.h"
 #include "esp_rom_gpio.h"
 #include "esp_log.h"
@@ -29,6 +29,9 @@
 #include "matrix_config.h"
 
 #define GPIO_TAG "gpio"
+
+#define CHECK_BIT(var,pos) ((var) & (1<<(pos)))
+#define SET_BIT(var,pos) ((var) |= 1LLU << (pos))
 
 const gpio_num_t rows[MATRIX_ROWS] = MATRIX_ROW_PINS;
 const gpio_num_t cols[MATRIX_COLS] = MATRIX_COL_PINS;

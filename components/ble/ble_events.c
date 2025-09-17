@@ -23,6 +23,7 @@
 #include "esp_event.h"
 #include "ble_device.h"
 #include "ble_events_prv.h"
+#include "hid_desc.h"
 
 static const char* TAG = "ble_events";
 
@@ -32,8 +33,9 @@ typedef struct {
 } ble_battery_event_t;
 
 typedef struct {
-    uint8_t report_data[8];  // Standard HID keyboard report size
+    uint8_t report_data[MAX_REPORT_LEN];  // Standard HID keyboard report size
     size_t report_len;
+    bool nkro;
 } ble_keyboard_event_t;
 
 // BLE Event IDs
@@ -61,7 +63,7 @@ esp_err_t ble_post_battery_event(uint8_t battery_level)
                               portMAX_DELAY);
 }
 
-esp_err_t ble_post_keyboard_event(const uint8_t* report_data, size_t report_len)
+esp_err_t ble_post_keyboard_event(const uint8_t* report_data, size_t report_len, bool nkro_bits)
 {
     if (!report_data || report_len == 0 || report_len > sizeof(((ble_keyboard_event_t*)0)->report_data)) {
         ESP_LOGE(TAG, "Invalid report data parameters");
@@ -69,7 +71,8 @@ esp_err_t ble_post_keyboard_event(const uint8_t* report_data, size_t report_len)
     }
 
     ble_keyboard_event_t event_data = {
-        .report_len = report_len
+        .report_len = report_len,
+        .nkro = nkro_bits
     };
     memcpy(event_data.report_data, report_data, report_len);
 
@@ -113,6 +116,9 @@ static void keyboard_event_handler(void* handler_args, esp_event_base_t base, in
     if (!hid_dev || !esp_hidd_dev_connected(hid_dev))
         return;
 
-    esp_hidd_dev_input_set(hid_dev, 0, 1, kbd_data->report_data, kbd_data->report_len);
-    ESP_LOGI(TAG, "Keyboard report sent");
+    if (kbd_data->nkro) {
+        esp_hidd_dev_input_set(hid_dev, HID_REPORT_ID_NKRO_KEYBOARD - 1, HID_REPORT_ID_NKRO_KEYBOARD, kbd_data->report_data, kbd_data->report_len);
+    } else {
+        esp_hidd_dev_input_set(hid_dev, HID_REPORT_ID_BOOT_KEYBOARD - 1, HID_REPORT_ID_BOOT_KEYBOARD, kbd_data->report_data, kbd_data->report_len);
+    }
 }

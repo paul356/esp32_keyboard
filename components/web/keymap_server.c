@@ -23,7 +23,6 @@
 #include "esp_ota_ops.h"
 #include "esp_random.h"
 #include "esp_check.h"
-#include "keyboard_config.h"
 #include "key_definitions.h"
 #include "layout_store.h"
 #include "cJSON.h"

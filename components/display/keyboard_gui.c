@@ -163,55 +163,79 @@ void keyboard_gui_update(void)
     lv_timer_handler();
 }
 
-bool keyboard_gui_handle_key_input(uint8_t mods, uint8_t *scan_code, int code_len)
+// Utility: handle a single keycode for GUI input
+static void keyboard_gui_handle_single_keycode(uint8_t mods, uint8_t keycode) {
+    input_event_e input_event = scancode_to_input_event(keycode);
+    if (input_event != INPUT_EVENT_KEYCODE) {
+        keyboard_gui_post_input_event_isr(input_event, 0);
+    } else {
+        char printable = scancode_to_printable_char(mods & MOD_LSFT, keycode);
+        if (printable != '\0') {
+            keyboard_gui_post_input_event_isr(INPUT_EVENT_KEYCODE, printable);
+        }
+    }
+}
+
+bool keyboard_gui_handle_key_input(uint8_t mods, uint8_t *scan_code, int code_len, bool nkro_bits)
 {
     if (!s_gui_initialized) {
         ESP_LOGW(TAG, "Keyboard GUI not initialized");
         return false;
     }
 
-    if (menu_state_accept_keys())
-    {
-        for (int i = 0; i < code_len; i++)
-        {
-            if (scan_code[i] == 0)
-            {
-                continue; // Skip null codes
-            }
+    bool accept_keys = menu_state_accept_keys();
+    uint32_t keycode_count = 0;
 
-            input_event_e input_event = scancode_to_input_event(scan_code[i]);
-            if (input_event != INPUT_EVENT_KEYCODE)
-            {
-                keyboard_gui_post_input_event_isr(input_event, 0);
+    if (!nkro_bits) {
+        // Standard array of scan codes
+        for (int i = 0; i < code_len; i++) {
+            if (scan_code[i] == 0) continue;
+
+            if (accept_keys) {
+                keyboard_gui_handle_single_keycode(mods, scan_code[i]);
             } else {
-                char keycode = scancode_to_printable_char(mods & MOD_LSFT, scan_code[i]);
-                if (keycode != '\0') {
-                    keyboard_gui_post_input_event_isr(INPUT_EVENT_KEYCODE, keycode);
+                input_event_e input_event = scancode_to_input_event(scan_code[i]);
+                if (input_event == INPUT_EVENT_KEYCODE) {
+                    keycode_count++;
                 }
             }
         }
-        return true;
-    }
-    else
-    {
-        uint32_t count = 0;
-        for (int i = 0; i < code_len; i++)
-        {
-            if (scan_code[i] == 0)
-            {
-                continue; // Skip null codes
+    } else {
+        // NKRO bit array: each bit is a keycode (0x00-0x7F)
+        for (int byte_idx = 0; byte_idx < code_len; byte_idx++) {
+            uint8_t byte = scan_code[byte_idx];
+            if (byte == 0) {
+                continue;
             }
 
-            input_event_e input_event = scancode_to_input_event(scan_code[i]);
-            if (input_event == INPUT_EVENT_KEYCODE) {
-                count++;
+            for (int bit_idx = 0; bit_idx < 8; bit_idx++) {
+                if ((byte & (1 << bit_idx)) == 0) {
+                    continue;
+                }
+                uint8_t keycode = (byte_idx << 3) + bit_idx;
+
+                if (accept_keys)
+                {
+                    keyboard_gui_handle_single_keycode(mods, keycode);
+                }
+                else
+                {
+                    input_event_e input_event = scancode_to_input_event(keycode);
+                    if (input_event == INPUT_EVENT_KEYCODE)
+                    {
+                        keycode_count++;
+                    }
+                }
             }
         }
-
-        keyboard_gui_update_stats(count);
     }
 
-    return false;
+    if (accept_keys) {
+        return true;
+    } else {
+        keyboard_gui_update_stats(keycode_count);
+        return false;
+    }
 }
 
 esp_err_t keyboard_gui_post_input_event_isr(input_event_e event, char keycode)

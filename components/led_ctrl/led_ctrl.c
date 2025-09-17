@@ -159,7 +159,7 @@ static int count = 0;
 static void handle_keystroke_event(uint8_t row, uint8_t col, bool pressed) {
     // This function can be used to handle keystroke events
     // For now, we just log the event
-    ESP_LOGI(TAG, "Keystroke event: row=%d, col=%d, pressed=%d", row, col, pressed);
+    ESP_LOGD(TAG, "Keystroke event: row=%d, col=%d, pressed=%d", row, col, pressed);
 
     int prev = count++;
     // Example: Increment a counter for demonstration purposes
@@ -189,7 +189,7 @@ static void handle_keystroke_event(uint8_t row, uint8_t col, bool pressed) {
         ESP_LOGE(TAG, "Failed to create clear LEDs timer: %s", esp_err_to_name(timer_ret));
     }*/
 
-    ESP_LOGI(TAG, "Keystroke count: %d", count);
+    ESP_LOGD(TAG, "Keystroke count: %d", count);
 }
 
 // Main event handler

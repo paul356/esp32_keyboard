@@ -27,9 +27,10 @@ esp_err_t ble_post_battery_event(uint8_t battery_level);
  *
  * @param report_data Pointer to keyboard report data
  * @param report_len Length of the report data
+ * @param nkro_bits Data format is a bitmap of key range 0x0 - 0x7f
  * @return ESP_OK on success, error code otherwise
  */
-esp_err_t ble_post_keyboard_event(const uint8_t* report_data, size_t report_len);
+esp_err_t ble_post_keyboard_event(const uint8_t* report_data, size_t report_len, bool nkro_bits);
 
 #ifdef __cplusplus
 }

@@ -11,7 +11,6 @@
 #include "esp_err.h"
 #include "nvs.h"
 #include "config.h"
-#include "keyboard_config.h"
 
 #ifndef NVS_FUNCS_H_
 #define NVS_FUNCS_H_

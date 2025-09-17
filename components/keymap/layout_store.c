@@ -31,6 +31,7 @@
 #include "nvs_io.h"
 #include "layout_store.h"
 #include "keymap.h"
+#include "keymap_const.h"
 #include <arr_conv.h>
 
 #define NVS_TAG "NVS Storage"
@@ -272,8 +273,8 @@ esp_err_t nvs_get_keymap_info(uint8_t *layers, uint32_t *rows, uint32_t *cols) {
 	}
 
 	*layers = layers_num; // Number of layers
-	*rows = MATRIX_ROWS;  // From keyboard_config.h
-	*cols = MATRIX_COLS;  // From keyboard_config.h
+	*rows = MATRIX_ROWS;
+	*cols = MATRIX_COLS;
 
 	return ESP_OK;
 }

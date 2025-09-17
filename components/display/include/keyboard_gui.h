@@ -43,9 +43,10 @@ void keyboard_gui_update(void);
  * @param mods Modifier keys (e.g., Shift, Ctrl)
  * @param scan_code Pointer to array of scan codes
  * @param code_len Length of the scan code array
+ * @param nkro_bits When nkro is true, the scan_code array is a bitmap for keycode 0x00 to 0x7f
  * @return bool true if the input was handled, false otherwise
  */
-bool keyboard_gui_handle_key_input(uint8_t mods, uint8_t *scan_code, int code_len);
+bool keyboard_gui_handle_key_input(uint8_t mods, uint8_t *scan_code, int code_len, bool nkro_bits);
 
 /**
  * @brief Post input event from ISR

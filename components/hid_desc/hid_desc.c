@@ -19,7 +19,12 @@
  */
 
 #include "tinyusb.h"
+#include "hid_desc.h"
+#include "report.h"
+#include "esp_log.h"
+#include "keycode_config.h"
 
+#define TAG "HID_DESC"
 #define EPNUM_HID 0x4
 
 enum {
@@ -28,8 +33,7 @@ enum {
 };
 
 enum {
-    STRID_LANGID = 0,
-    STRID_MANUFACTURER,
+    STRID_MANUFACTURER = 0,
     STRID_PRODUCT,
     STRID_SERIAL,
     STRID_HID
@@ -39,21 +43,65 @@ enum {
     TUSB_DESC_TOTAL_LEN = TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN
 };
 
-enum
-{
-  REPORT_ID_KEYBOARD = 1,
-  REPORT_ID_MOUSE,
-};
+#ifdef NKRO_ENABLE
+#define TUD_HID_REPORT_DESC_NKRO_KEYBOARD(...) \
+  HID_USAGE_PAGE ( HID_USAGE_PAGE_DESKTOP     )                    ,\
+  HID_USAGE      ( HID_USAGE_DESKTOP_KEYBOARD )                    ,\
+  HID_COLLECTION ( HID_COLLECTION_APPLICATION )                    ,\
+    /* Report ID if any */\
+    __VA_ARGS__ \
+    /* 8 bits Modifier Keys (Shift, Control, Alt) */ \
+    HID_USAGE_PAGE ( HID_USAGE_PAGE_KEYBOARD )                     ,\
+      HID_USAGE_MIN    ( 224                                    )  ,\
+      HID_USAGE_MAX    ( 231                                    )  ,\
+      HID_LOGICAL_MIN  ( 0                                      )  ,\
+      HID_LOGICAL_MAX  ( 1                                      )  ,\
+      HID_REPORT_COUNT ( 8                                      )  ,\
+      HID_REPORT_SIZE  ( 1                                      )  ,\
+      HID_INPUT        ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE )  ,\
+    /* 6-byte Keycodes */ \
+    HID_USAGE_PAGE ( HID_USAGE_PAGE_KEYBOARD )                     ,\
+      HID_USAGE_MIN    ( 0                                   )     ,\
+      HID_USAGE_MAX    ( (KEYBOARD_REPORT_BITS * 8 - 1)      )     ,\
+      HID_LOGICAL_MIN  ( 0                                   )     ,\
+      HID_LOGICAL_MAX  ( 1                                   )     ,\
+      HID_REPORT_COUNT ( (KEYBOARD_REPORT_BITS * 8)          )     ,\
+      HID_REPORT_SIZE  ( 1                                   )     ,\
+      HID_INPUT        ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE )     ,\
+    /* Output 5-bit LED Indicator Kana | Compose | ScrollLock | CapsLock | NumLock */ \
+    HID_USAGE_PAGE  ( HID_USAGE_PAGE_LED                   )       ,\
+      HID_USAGE_MIN    ( 1                                       ) ,\
+      HID_USAGE_MAX    ( 5                                       ) ,\
+      HID_REPORT_COUNT ( 5                                       ) ,\
+      HID_REPORT_SIZE  ( 1                                       ) ,\
+      HID_OUTPUT       ( HID_DATA | HID_VARIABLE | HID_ABSOLUTE  ) ,\
+      /* led padding */ \
+      HID_REPORT_COUNT ( 1                                       ) ,\
+      HID_REPORT_SIZE  ( 3                                       ) ,\
+      HID_OUTPUT       ( HID_CONSTANT                            ) ,\
+  HID_COLLECTION_END \
+
+  #endif
+
+// Helper macros to calculate descriptor sizes
+#define BOOT_KEYBOARD_DESC_SIZE sizeof((uint8_t[]){TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(HID_REPORT_ID_BOOT_KEYBOARD))})
+#define MOUSE_DESC_SIZE sizeof((uint8_t[]){TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(HID_REPORT_ID_MOUSE))})
+#ifdef NKRO_ENABLE
+#define NKRO_KEYBOARD_DESC_SIZE sizeof((uint8_t[]){TUD_HID_REPORT_DESC_NKRO_KEYBOARD(HID_REPORT_ID(HID_REPORT_ID_NKRO_KEYBOARD))})
+#endif
 
 uint8_t const desc_hid_report[] = {
-    TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(REPORT_ID_KEYBOARD) ),
-    TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(REPORT_ID_MOUSE) )
+    TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(HID_REPORT_ID_BOOT_KEYBOARD) ),
+    TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(HID_REPORT_ID_MOUSE) ),
+#ifdef NKRO_ENABLE
+    TUD_HID_REPORT_DESC_NKRO_KEYBOARD(HID_REPORT_ID(HID_REPORT_ID_NKRO_KEYBOARD) )
+#endif
 };
 
 static uint8_t const descriptor_hid_default[] = {
     TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, TUSB_DESC_TOTAL_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
 
-    TUD_HID_DESCRIPTOR(ITF_NUM_HID, STRID_HID, 0, sizeof(desc_hid_report), 0x80 | EPNUM_HID, 16, 10)
+    TUD_HID_DESCRIPTOR(ITF_NUM_HID, STRID_HID, 1, sizeof(desc_hid_report), 0x80 | EPNUM_HID, ESP32S3_EPSIZE, 10)
 };
 
 static const char * descriptor_str_default[] = {
@@ -62,10 +110,13 @@ static const char * descriptor_str_default[] = {
     CONFIG_TINYUSB_DESC_MANUFACTURER_STRING, // 1: Manufacturer
     CONFIG_TINYUSB_DESC_PRODUCT_STRING,      // 2: Product
     CONFIG_TINYUSB_DESC_SERIAL_STRING,       // 3: Serials, should use chip ID
-    "esp32 keyboard"
+    "esp32 keyboard",
+    NULL
 };
 
 static bool caps_on;
+// define var keyboard_protocol for tmk_core
+uint8_t keyboard_protocol = 1;
 
 bool is_caps_on(void)
 {
@@ -77,14 +128,66 @@ void set_caps_state(bool state)
     caps_on = state;
 }
 
+bool is_boot_protocol(void)
+{
+    return keyboard_protocol == 0;
+}
+
+void set_boot_protocol(bool boot)
+{
+    keyboard_protocol = boot ? 0 : 1;
+}
+
+int get_hid_report_desc(const uint8_t** report_start, size_t* report_len, int arr_len)
+{
+    if (!report_start || !report_len || arr_len < 1) {
+        return 0;
+    }
+
+    int report_count = 0;
+    size_t offset = 0;
+
+    // Boot Keyboard Report Descriptor
+    if (report_count < arr_len) {
+        report_start[report_count] = &desc_hid_report[offset];
+        report_len[report_count] = BOOT_KEYBOARD_DESC_SIZE;
+        offset += BOOT_KEYBOARD_DESC_SIZE;
+        report_count++;
+    }
+
+    // Mouse Report Descriptor
+    if (report_count < arr_len) {
+        report_start[report_count] = &desc_hid_report[offset];
+        report_len[report_count] = MOUSE_DESC_SIZE;
+        offset += MOUSE_DESC_SIZE;
+        report_count++;
+    }
+
+#ifdef NKRO_ENABLE
+    // NKRO Keyboard Report Descriptor
+    if (report_count < arr_len) {
+        report_start[report_count] = &desc_hid_report[offset];
+        report_len[report_count] = NKRO_KEYBOARD_DESC_SIZE;
+        offset += NKRO_KEYBOARD_DESC_SIZE;
+        report_count++;
+    }
+#endif
+
+    return report_count;
+}
+
 void enable_usb_hid(void)
 {
     tinyusb_config_t tusb_cfg = {
         .device_descriptor = NULL,
         .configuration_descriptor = descriptor_hid_default,
         .string_descriptor = descriptor_str_default,
+        .string_descriptor_count = 4,
         .external_phy = false
     };
+#ifdef NKRO_ENABLE
+    keymap_config.nkro = 1;
+#endif
 
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
 }
@@ -115,7 +218,7 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
     if (report_type == HID_REPORT_TYPE_OUTPUT)
     {
         // Set keyboard LED e.g Capslock, Numlock etc...
-        if (report_id == REPORT_ID_KEYBOARD)
+        if (report_id == HID_REPORT_ID_BOOT_KEYBOARD || report_id == HID_REPORT_ID_NKRO_KEYBOARD)
         {
             // bufsize should be (at least) 1
             if (bufsize < 1)
@@ -135,4 +238,10 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
             }
         }
     }
+}
+
+void tud_hid_set_protocol_cb(uint8_t instance, uint8_t protocol)
+{
+    ESP_LOGI(TAG, "Set keyboard protocol from %d to %d", keyboard_protocol, protocol);
+    keyboard_protocol = protocol;
 }

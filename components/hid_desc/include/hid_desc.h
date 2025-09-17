@@ -21,10 +21,37 @@
 #ifndef __HID_H__
 #define __HID_H__
 
+#include "report.h"
+
+#define ESP32S3_EPSIZE 16 // MAX interrupt packet size for esp32s3
+#define BOOT_REPORT_LEN 8
+#define BOOT_REPORT_OFFSET 2
+
+#ifdef NKRO_ENABLE
+#define MAX_REPORT_LEN (KEYBOARD_REPORT_BITS + 1)
+#else
+#define MAX_REPORT_LEN BOOT_REPORT_LEN
+#endif
+
+enum
+{
+  HID_REPORT_ID_BOOT_KEYBOARD = 1,
+  HID_REPORT_ID_MOUSE,
+  HID_REPORT_ID_NKRO_KEYBOARD,
+};
+
+#define HID_REPORT_DESC_NUM 3
+
 void enable_usb_hid(void);
+
+int get_hid_report_desc(const uint8_t** report_start, size_t* report_len, int arr_len);
 
 bool is_caps_on(void);
 
 void set_caps_state(bool state);
+
+bool is_boot_protocol(void);
+
+void set_boot_protocol(bool boot);
 
 #endif

@@ -12,4 +12,5 @@ target_add_binary_data(esp32_keyboard.elf "resources/index.html" binary)
 target_add_binary_data(esp32_keyboard.elf "resources/style.css" binary)
 
 idf_build_set_property(COMPILE_OPTIONS -D__ESP32S3__ APPEND)
+idf_build_set_property(COMPILE_OPTIONS -DNKRO_ENABLE APPEND)
 #idf_build_set_property(COMPILE_OPTIONS -DDEBUG_ACTION APPEND)

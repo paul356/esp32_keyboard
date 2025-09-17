@@ -22,7 +22,7 @@
 #define KEYMAP_C
 
 #include "key_definitions.h"
-#include "keyboard_config.h"
+#include "keymap_const.h"
 #include "keymap.h"
 #include "macros.h"
 #include "function_key.h"

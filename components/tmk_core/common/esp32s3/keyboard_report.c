@@ -1,6 +1,5 @@
 #include "host.h"
 #include "keyboard_report.h"
-#include "keyboard_config.h"
 #include "wait.h"
 #include "tinyusb.h"
 #include "esp_log.h"
@@ -8,6 +7,8 @@
 #include "ble_events.h"  // Include BLE-specific events
 #include "keyboard_gui.h"
 #include "hid_desc.h"
+#include "keycode_config.h"
+#include "report.h"
 
 static void send_keyboard_to_queue(report_keyboard_t*);
 static uint8_t keyboard_leds_status(void);
@@ -26,36 +27,54 @@ static uint8_t keyboard_leds_status(void)
 
 static void send_keyboard_to_queue(report_keyboard_t *report)
 {
-    uint8_t report_state[REPORT_LEN] = {0};
+    uint8_t report_state[MAX_REPORT_LEN] = {0};
+    uint8_t report_len = 0;
+    uint8_t report_data_offset = 0;
+
+    int report_id;
 
 #ifdef NKRO_ENABLE
-    //Check if the report was modified, if so send it
-    report_state[0] = report->nkro.mods;
-    report_state[1] = 0;
+    if (is_boot_protocol() == false && keymap_config.nkro)
+    {
+        // Check if the report was modified, if so send it
+        report_state[0] = report->nkro.mods;
 
-    int index = 0;
-    for (uint16_t i = 0; i < REPORT_COUNT_BYTES && index < KEYBOARD_REPORT_BITS; i++) {
-        if (report->nkro.bits[i]) {
-            for (uint16_t j = 0; j < 8 && ((1 << j) & report->nkro.bits[i]); j++) {
-                report_state[index + MOD_LED_BYTES] = (i << 3) + j;
+        for (uint16_t i = 0; i < KEYBOARD_REPORT_BITS; i++)
+        {
+            if (report->nkro.bits[i])
+            {
+                report_state[i + 1] = report->nkro.bits[i];
+            }
+        }
+
+        report_len = KEYBOARD_REPORT_BITS + 1;
+        report_data_offset = 1;
+        report_id = HID_REPORT_ID_NKRO_KEYBOARD;
+    }
+    else
+#endif
+    {
+        report_state[0] = report->mods;
+        report_state[1] = report->reserved;
+
+        int index = 0;
+        for (uint16_t i = 0; i < KEYBOARD_REPORT_KEYS; i++)
+        {
+            if (report->keys[i])
+            {
+                report_state[index + BOOT_REPORT_OFFSET] = report->keys[i];
                 index++;
             }
         }
-    }
-#else
-    report_state[0] = report->mods;
-    report_state[1] = report->reserved;
 
-    int index = 0;
-    for (uint16_t i = 0; i < REPORT_COUNT_BYTES && index < KEYBOARD_REPORT_KEYS; i++) {
-        if (report->keys[i]) {
-            report_state[index + MOD_LED_BYTES] = report->keys[i];
-            index++;
-        }
+        report_len = BOOT_REPORT_LEN;
+        report_data_offset = BOOT_REPORT_OFFSET;
+        report_id = HID_REPORT_ID_BOOT_KEYBOARD;
     }
-#endif
 
-    if (keyboard_gui_handle_key_input(report_state[0], &report_state[MOD_LED_BYTES], REPORT_COUNT_BYTES)) {
+    ESP_LOGI("REPORT", "Report length:%d, report_id:%d", report_len, report_id);
+
+    if (keyboard_gui_handle_key_input(report_state[0], &report_state[report_data_offset], report_len - report_data_offset, report_id == HID_REPORT_ID_NKRO_KEYBOARD)) {
         // If the GUI handled the key input, we don't need to send it further
         return;
     }
@@ -66,10 +85,10 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
         while (!tud_hid_n_ready(0)) {
             wait_ms(1);
         }
-        tud_hid_n_keyboard_report(0, 1, report_state[0], &report_state[2]);
+        tud_hid_n_report(0, report_id, report_state, report_len);
     }
 
     if (is_ble_ready()) {
-        ble_post_keyboard_event(report_state, REPORT_LEN);
+        ble_post_keyboard_event(report_state, report_len, report_id == HID_REPORT_ID_NKRO_KEYBOARD);
     }
 }
