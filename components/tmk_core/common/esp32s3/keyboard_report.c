@@ -72,7 +72,7 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
         report_id = HID_REPORT_ID_BOOT_KEYBOARD;
     }
 
-    ESP_LOGI("REPORT", "Report length:%d, report_id:%d", report_len, report_id);
+    ESP_LOGD("REPORT", "Report length:%d, report_id:%d", report_len, report_id);
 
     if (keyboard_gui_handle_key_input(report_state[0], &report_state[report_data_offset], report_len - report_data_offset, report_id == HID_REPORT_ID_NKRO_KEYBOARD)) {
         // If the GUI handled the key input, we don't need to send it further
