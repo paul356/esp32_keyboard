@@ -31,6 +31,7 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
     uint8_t report_len = 0;
     uint8_t report_data_offset = 0;
 
+    int intf_num;
     int report_id;
 
 #ifdef NKRO_ENABLE
@@ -49,7 +50,8 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
 
         report_len = KEYBOARD_REPORT_BITS + 1;
         report_data_offset = 1;
-        report_id = HID_REPORT_ID_NKRO_KEYBOARD;
+        intf_num = ITF_NUM_COMPOSITE;
+        report_id = REPORT_ID_NKRO;
     }
     else
 #endif
@@ -69,12 +71,11 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
 
         report_len = BOOT_REPORT_LEN;
         report_data_offset = BOOT_REPORT_OFFSET;
-        report_id = HID_REPORT_ID_BOOT_KEYBOARD;
+        intf_num = ITF_NUM_BOOT_KB;
+        report_id = 0; // must be set to 0 here
     }
 
-    ESP_LOGD("REPORT", "Report length:%d, report_id:%d", report_len, report_id);
-
-    if (keyboard_gui_handle_key_input(report_state[0], &report_state[report_data_offset], report_len - report_data_offset, report_id == HID_REPORT_ID_NKRO_KEYBOARD)) {
+    if (keyboard_gui_handle_key_input(report_state[0], &report_state[report_data_offset], report_len - report_data_offset, report_id == REPORT_ID_NKRO)) {
         // If the GUI handled the key input, we don't need to send it further
         return;
     }
@@ -85,10 +86,10 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
         while (!tud_hid_n_ready(0)) {
             wait_ms(1);
         }
-        tud_hid_n_report(0, report_id, report_state, report_len);
+        tud_hid_n_report(intf_num, report_id, report_state, report_len);
     }
 
     if (is_ble_ready()) {
-        ble_post_keyboard_event(report_state, report_len, report_id == HID_REPORT_ID_NKRO_KEYBOARD);
+        ble_post_keyboard_event(report_state, report_len, report_id == REPORT_ID_NKRO);
     }
 }

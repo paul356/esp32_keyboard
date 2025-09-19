@@ -27,7 +27,7 @@ esp_err_t drv_loop_init(void)
         .task_name = "drv_loop_task",
         .task_priority = 10,
         .task_stack_size = 8192,
-        .task_core_id = tskNO_AFFINITY
+        .task_core_id = 0
     };
 
     esp_err_t err = esp_event_loop_create(&loop_args, &s_event_loop);

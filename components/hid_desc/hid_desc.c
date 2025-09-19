@@ -25,22 +25,19 @@
 #include "keycode_config.h"
 
 #define TAG "HID_DESC"
-#define EPNUM_HID 0x4
+#define EPNUM_HID1 0x3
+#define EPNUM_HID2 0x4
 
 enum {
-    ITF_NUM_HID,
-    ITF_NUM_TOTAL
-};
-
-enum {
-    STRID_MANUFACTURER = 0,
+    STRID_LANGID = 0,
+    STRID_MANUFACTURER,
     STRID_PRODUCT,
     STRID_SERIAL,
     STRID_HID
 };
 
 enum {
-    TUSB_DESC_TOTAL_LEN = TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN
+    TUSB_DESC_TOTAL_LEN = TUD_CONFIG_DESC_LEN + TUD_HID_DESC_LEN * 2
 };
 
 #ifdef NKRO_ENABLE
@@ -84,24 +81,31 @@ enum {
   #endif
 
 // Helper macros to calculate descriptor sizes
-#define BOOT_KEYBOARD_DESC_SIZE sizeof((uint8_t[]){TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(HID_REPORT_ID_BOOT_KEYBOARD))})
-#define MOUSE_DESC_SIZE sizeof((uint8_t[]){TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(HID_REPORT_ID_MOUSE))})
+#define BOOT_KEYBOARD_DESC_SIZE sizeof((uint8_t[]){TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(REPORT_ID_KEYBOARD))})
+#define MOUSE_DESC_SIZE sizeof((uint8_t[]){TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(REPORT_ID_MOUSE))})
 #ifdef NKRO_ENABLE
-#define NKRO_KEYBOARD_DESC_SIZE sizeof((uint8_t[]){TUD_HID_REPORT_DESC_NKRO_KEYBOARD(HID_REPORT_ID(HID_REPORT_ID_NKRO_KEYBOARD))})
+#define NKRO_KEYBOARD_DESC_SIZE sizeof((uint8_t[]){TUD_HID_REPORT_DESC_NKRO_KEYBOARD(HID_REPORT_ID(REPORT_ID_NKRO))})
 #endif
 
 uint8_t const desc_hid_report[] = {
-    TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(HID_REPORT_ID_BOOT_KEYBOARD) ),
-    TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(HID_REPORT_ID_MOUSE) ),
+    TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(REPORT_ID_KEYBOARD)),
+    TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(REPORT_ID_MOUSE) ),
 #ifdef NKRO_ENABLE
-    TUD_HID_REPORT_DESC_NKRO_KEYBOARD(HID_REPORT_ID(HID_REPORT_ID_NKRO_KEYBOARD) )
+    TUD_HID_REPORT_DESC_NKRO_KEYBOARD(HID_REPORT_ID(REPORT_ID_NKRO) )
 #endif
+};
+
+// For boot protocol mode the report map should not contain report id.
+// Below we should use 0 zero for the report.
+uint8_t const desc_boot_report[] ={
+    TUD_HID_REPORT_DESC_KEYBOARD()
 };
 
 static uint8_t const descriptor_hid_default[] = {
     TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, TUSB_DESC_TOTAL_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 100),
 
-    TUD_HID_DESCRIPTOR(ITF_NUM_HID, STRID_HID, 1, sizeof(desc_hid_report), 0x80 | EPNUM_HID, ESP32S3_EPSIZE, 10)
+    TUD_HID_DESCRIPTOR(ITF_NUM_BOOT_KB, STRID_HID, HID_ITF_PROTOCOL_KEYBOARD, sizeof(desc_boot_report), 0x80 | EPNUM_HID1, ESP32S3_EPSIZE, 10),
+    TUD_HID_DESCRIPTOR(ITF_NUM_COMPOSITE, STRID_HID, HID_ITF_PROTOCOL_KEYBOARD, sizeof(desc_hid_report), 0x80 | EPNUM_HID2, ESP32S3_EPSIZE, 10)
 };
 
 static const char * descriptor_str_default[] = {
@@ -140,7 +144,7 @@ void set_boot_protocol(bool boot)
 
 int get_hid_report_desc(const uint8_t** report_start, size_t* report_len, int arr_len)
 {
-    if (!report_start || !report_len || arr_len < 1) {
+    if (!report_start || !report_len || arr_len < HID_REPORT_DESC_NUM) {
         return 0;
     }
 
@@ -182,11 +186,11 @@ void enable_usb_hid(void)
         .device_descriptor = NULL,
         .configuration_descriptor = descriptor_hid_default,
         .string_descriptor = descriptor_str_default,
-        .string_descriptor_count = 4,
+        .string_descriptor_count = 5,
         .external_phy = false
     };
 #ifdef NKRO_ENABLE
-    keymap_config.nkro = 1;
+    keymap_config.nkro = 0;
 #endif
 
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
@@ -194,19 +198,21 @@ void enable_usb_hid(void)
 
 uint8_t const *tud_hid_descriptor_report_cb(uint8_t itf)
 {
-    return desc_hid_report;
+    if (itf == ITF_NUM_BOOT_KB)
+        return desc_boot_report;
+    else
+        return desc_hid_report;
 }
 
 uint16_t tud_hid_get_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_t report_type, uint8_t* buffer, uint16_t reqlen)
 {
-  // TODO not Implemented
-  (void) instance;
-  (void) report_id;
-  (void) report_type;
-  (void) buffer;
-  (void) reqlen;
-
-  return 0;
+    // Not needed
+    (void)instance;
+    (void)report_id;
+    (void)report_type;
+    (void)buffer;
+    (void)reqlen;
+    return 0;
 }
 
 // Invoked when received SET_REPORT control request or
@@ -217,8 +223,8 @@ void tud_hid_set_report_cb(uint8_t instance, uint8_t report_id, hid_report_type_
 
     if (report_type == HID_REPORT_TYPE_OUTPUT)
     {
-        // Set keyboard LED e.g Capslock, Numlock etc...
-        if (report_id == HID_REPORT_ID_BOOT_KEYBOARD || report_id == HID_REPORT_ID_NKRO_KEYBOARD)
+        // report_id is 0, it means it is in boot protocol mode
+        if (report_id == 0 || report_id == REPORT_ID_KEYBOARD || report_id == REPORT_ID_NKRO)
         {
             // bufsize should be (at least) 1
             if (bufsize < 1)

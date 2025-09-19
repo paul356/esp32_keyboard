@@ -118,7 +118,6 @@ static int32_t encoder_last_pos;
 //How to handle key reports
 static void keyboard_timer_func(void *pvParameters)
 {
-    keyboard_task();
     int32_t curr_pos = miscs_encoder_get_position();
     if (curr_pos != encoder_last_pos) {
         encoder_last_pos = curr_pos;
@@ -254,4 +253,9 @@ void app_main()
     }
 
     log_memory_usage("Keyboard initialization complete");
+
+    while (1) {
+        keyboard_task();
+        vTaskDelay(1 / portTICK_PERIOD_MS);
+    }
 }

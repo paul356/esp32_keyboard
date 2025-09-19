@@ -117,8 +117,9 @@ static void keyboard_event_handler(void* handler_args, esp_event_base_t base, in
         return;
 
     if (kbd_data->nkro) {
-        esp_hidd_dev_input_set(hid_dev, HID_REPORT_ID_NKRO_KEYBOARD - 1, HID_REPORT_ID_NKRO_KEYBOARD, kbd_data->report_data, kbd_data->report_len);
+        esp_hidd_dev_input_set(hid_dev, REPORT_ID_NKRO - 1, REPORT_ID_NKRO, kbd_data->report_data, kbd_data->report_len);
     } else {
-        esp_hidd_dev_input_set(hid_dev, HID_REPORT_ID_BOOT_KEYBOARD - 1, HID_REPORT_ID_BOOT_KEYBOARD, kbd_data->report_data, kbd_data->report_len);
+        // If it is 6nkro, use the failback report id in the report maps
+        esp_hidd_dev_input_set(hid_dev, REPORT_ID_KEYBOARD - 1, REPORT_ID_KEYBOARD, kbd_data->report_data, kbd_data->report_len);
     }
 }
