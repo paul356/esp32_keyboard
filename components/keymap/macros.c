@@ -43,6 +43,7 @@ typedef struct {
 static const expression_mapping_t special_key_mappings[] = {
     {"\\d", SS_TAP(X_DELETE)},
     {"\\b", SS_TAP(X_BSPACE)},
+    {"\\t", SS_TAP(X_TAB)},
     {"\\)", ")"},
     {"\\e", SS_TAP(X_ESCAPE)},
     {NULL, NULL}

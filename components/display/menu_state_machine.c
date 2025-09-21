@@ -136,6 +136,8 @@ bool menu_state_process_event(input_event_e event, unsigned char ch)
         if (s_menu_context.current_menu->parent)
         {
             menu_navigate_to(s_menu_context.current_menu->parent);
+        } else {
+            menu_return_to_keyboard_mode();
         }
         event_consumed = true;
         break;
