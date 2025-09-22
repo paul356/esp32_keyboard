@@ -40,13 +40,7 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
         // Check if the report was modified, if so send it
         report_state[0] = report->nkro.mods;
 
-        for (uint16_t i = 0; i < KEYBOARD_REPORT_BITS; i++)
-        {
-            if (report->nkro.bits[i])
-            {
-                report_state[i + 1] = report->nkro.bits[i];
-            }
-        }
+        memcpy(&report_state[1], report->nkro.bits, KEYBOARD_REPORT_BITS);
 
         report_len = KEYBOARD_REPORT_BITS + 1;
         report_data_offset = 1;
@@ -86,7 +80,16 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
         while (!tud_hid_n_ready(0)) {
             wait_ms(1);
         }
-        tud_hid_n_report(intf_num, report_id, report_state, report_len);
+        bool result;
+        do {
+            // tud_hid_n_report may be busy sometimes. Need to retry transmit again.
+             result = tud_hid_n_report(intf_num, report_id, report_state, report_len);
+             if (result == false) {
+                wait_ms(1);
+             } else {
+                break;
+             }
+        } while (tud_hid_n_ready(0));
     }
 
     if (is_ble_ready()) {

@@ -190,7 +190,7 @@ void enable_usb_hid(void)
         .external_phy = false
     };
 #ifdef NKRO_ENABLE
-    keymap_config.nkro = 0;
+    keymap_config.nkro = 1;
 #endif
 
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
