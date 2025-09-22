@@ -185,19 +185,39 @@ bool keyboard_gui_handle_key_input(uint8_t mods, uint8_t *scan_code, int code_le
 
     bool accept_keys = menu_state_accept_keys();
     uint32_t keycode_count = 0;
+    static uint8_t scan_code_state[16];
 
     if (!nkro_bits) {
+        bool all_zero = true;
         // Standard array of scan codes
-        for (int i = 0; i < code_len; i++) {
-            if (scan_code[i] == 0) continue;
+        for (int i = 0; i < code_len; i++)
+        {
+            if (scan_code[i] == 0)
+                continue;
 
-            if (accept_keys) {
-                keyboard_gui_handle_single_keycode(mods, scan_code[i]);
-            } else {
-                input_event_e input_event = scancode_to_input_event(scan_code[i]);
-                if (input_event == INPUT_EVENT_KEYCODE) {
-                    keycode_count++;
+            all_zero = false;
+            if ((scan_code_state[scan_code[i] >> 3] & (1 << (scan_code[i] & 0x7))) == 0)
+            {
+                if (accept_keys)
+                {
+                    keyboard_gui_handle_single_keycode(mods, scan_code[i]);
                 }
+                else
+                {
+                    input_event_e input_event = scancode_to_input_event(scan_code[i]);
+                    if (input_event == INPUT_EVENT_KEYCODE)
+                    {
+                        keycode_count++;
+                    }
+                }
+            }
+        }
+
+        memset(scan_code_state, 0, sizeof(scan_code_state));
+        if (!all_zero) {
+            for (int i = 0; i < code_len; i++)
+            {
+                scan_code_state[scan_code[i] >> 3] |= (1 << (scan_code[i] & 0x7));
             }
         }
     } else {
@@ -205,26 +225,33 @@ bool keyboard_gui_handle_key_input(uint8_t mods, uint8_t *scan_code, int code_le
         for (int byte_idx = 0; byte_idx < code_len; byte_idx++) {
             uint8_t byte = scan_code[byte_idx];
             if (byte == 0) {
+                scan_code_state[byte_idx] = 0;
                 continue;
             }
 
             for (int bit_idx = 0; bit_idx < 8; bit_idx++) {
                 if ((byte & (1 << bit_idx)) == 0) {
+                    scan_code_state[byte_idx] &= ~(1 << bit_idx);
                     continue;
                 }
                 uint8_t keycode = (byte_idx << 3) + bit_idx;
 
-                if (accept_keys)
+                if ((scan_code_state[byte_idx] & (1 << bit_idx)) == 0)
                 {
-                    keyboard_gui_handle_single_keycode(mods, keycode);
-                }
-                else
-                {
-                    input_event_e input_event = scancode_to_input_event(keycode);
-                    if (input_event == INPUT_EVENT_KEYCODE)
+                    if (accept_keys)
                     {
-                        keycode_count++;
+                        keyboard_gui_handle_single_keycode(mods, keycode);
                     }
+                    else
+                    {
+                        input_event_e input_event = scancode_to_input_event(keycode);
+                        if (input_event == INPUT_EVENT_KEYCODE)
+                        {
+                            keycode_count++;
+                        }
+                    }
+
+                    scan_code_state[byte_idx] |= (1 << bit_idx);
                 }
             }
         }

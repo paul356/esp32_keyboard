@@ -177,9 +177,6 @@ esp_err_t led_drv_init(void)
         ESP_LOGI(TAG, "Initializing strip %d on GPIO%d with %d LEDs",
                  strip, strip_gpio_pins[strip], strip_led_counts[strip]);
 
-        if (strip == LED_DRV_NUM_STRIPS - 1)
-            break;
-
         // Create RMT TX channel for this strip
         rmt_tx_channel_config_t tx_chan_config = {
             .clk_src = RMT_CLK_SRC_DEFAULT,
@@ -289,8 +286,6 @@ static esp_err_t led_drv_write(void)
 
     // Process each strip separately
     for (int strip = 0; strip < LED_DRV_NUM_STRIPS; strip++) {
-        if (strip == LED_DRV_NUM_STRIPS - 1)
-            break;
         if (led_channels[strip] == NULL || led_encoders[strip] == NULL) {
             ESP_LOGE(TAG, "LED strip %d not initialized", strip);
             return ESP_ERR_INVALID_STATE;
