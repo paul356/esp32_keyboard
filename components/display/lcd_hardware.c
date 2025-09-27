@@ -80,7 +80,7 @@ static void lvgl_flush_cb(lv_display_t *disp, const lv_area_t *area, unsigned ch
     // Implement the flush callback to send the buffer to the display
     esp_lcd_panel_handle_t panel_handle = lv_display_get_user_data(disp);
     esp_lcd_panel_swap_xy(panel_handle, true);
-    esp_lcd_panel_mirror(panel_handle, false, true);
+    esp_lcd_panel_mirror(panel_handle, true, false);
 
     int offsetx1 = area->x1;
     int offsetx2 = area->x2;
