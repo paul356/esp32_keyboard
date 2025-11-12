@@ -20,9 +20,20 @@
  * ADC Configuration
  */
 #define MISCS_ADC_UNIT          ADC_UNIT_1
-#define MISCS_ADC_ATTEN         ADC_ATTEN_DB_12
+#define MISCS_ADC_ATTEN         ADC_ATTEN_DB_6
 #define MISCS_ADC_BITWIDTH      ADC_BITWIDTH_12
 #define MISCS_ADC_READ_TIMES    5 // Number of samples to read for battery voltage
+
+/**
+ * Battery Voltage Divider Configuration
+ * Hardware: R1=10kΩ (battery side), R2=11kΩ (ground side)
+ * Voltage at GPIO5 = Battery_Voltage × R2/(R1+R2) = Battery_Voltage × 11/21
+ * Battery_Voltage = GPIO5_Voltage × (R1+R2)/R2 = GPIO5_Voltage × 21/11
+ */
+#define VOLTAGE_DIVIDER_R1      10  // 10kΩ resistor on battery side
+#define VOLTAGE_DIVIDER_R2      11  // 11kΩ resistor on ground side
+#define VOLTAGE_DIVIDER_RATIO   ((VOLTAGE_DIVIDER_R1 + VOLTAGE_DIVIDER_R2) * 1000 / VOLTAGE_DIVIDER_R2) // 1909 (fixed point, divide by 1000)
+
 #define ENCODER_DAMPEN_RATIO 4
 
 static const char *TAG = "MISCS";
@@ -240,8 +251,12 @@ static esp_err_t miscs_read_battery_voltage(uint32_t *voltage_mv)
         }
     }
 
-    // Calculate average voltage
-    *voltage_mv = voltage_sum / MISCS_ADC_READ_TIMES;
+    // Calculate average voltage at GPIO5
+    uint32_t adc_voltage_mv = voltage_sum / MISCS_ADC_READ_TIMES;
+
+    // Scale up to actual battery voltage using voltage divider ratio
+    // Battery_Voltage = ADC_Voltage × (R1+R2)/R2 = ADC_Voltage × 21/11 ≈ ADC_Voltage × 1.909
+    *voltage_mv = (adc_voltage_mv * VOLTAGE_DIVIDER_RATIO) / 1000;
 
     return ESP_OK;
 }
@@ -258,13 +273,13 @@ esp_err_t miscs_get_battery_percentage(uint8_t *percentage)
         return ret;
     }
 
-    // Typical Li-Ion battery voltage range:
-    // Full charge: ~4.2V (4200mV)
-    // Empty: ~3.0V (3000mV)
-    // These values may need adjustment based on your specific battery
+    // Li-Ion battery voltage range (after voltage divider scaling):
+    // Full charge: 4.2V (4200mV)
+    // Safe minimum: 3.2V (3200mV) - discharging below 3.2V can damage the battery
+    // Note: These are actual battery voltages, not GPIO5 voltages
 
-    const uint32_t BATTERY_MIN_VOLTAGE = 3000; // 3.0V
-    const uint32_t BATTERY_MAX_VOLTAGE = 4200; // 4.2V
+    const uint32_t BATTERY_MIN_VOLTAGE = 3100; // 3.1V - safe discharge limit
+    const uint32_t BATTERY_MAX_VOLTAGE = 4110; // 4.11V - full charge
 
     if (voltage_mv >= BATTERY_MAX_VOLTAGE) {
         *percentage = 100;
@@ -276,6 +291,8 @@ esp_err_t miscs_get_battery_percentage(uint8_t *percentage)
         uint32_t offset = voltage_mv - BATTERY_MIN_VOLTAGE;
         *percentage = (uint8_t)((offset * 100) / range);
     }
+
+    ESP_LOGI(TAG, "Battery voltage is %lu, calculated percentag is %u", voltage_mv, *percentage);
 
     return ESP_OK;
 }
