@@ -104,8 +104,8 @@ uint8_t const desc_boot_report[] ={
 static uint8_t const descriptor_hid_default[] = {
     TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, TUSB_DESC_TOTAL_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 500),
 
-    TUD_HID_DESCRIPTOR(ITF_NUM_BOOT_KB, STRID_HID, HID_ITF_PROTOCOL_KEYBOARD, sizeof(desc_boot_report), 0x80 | EPNUM_HID1, ESP32S3_EPSIZE, 10),
-    TUD_HID_DESCRIPTOR(ITF_NUM_COMPOSITE, STRID_HID, HID_ITF_PROTOCOL_KEYBOARD, sizeof(desc_hid_report), 0x80 | EPNUM_HID2, ESP32S3_EPSIZE, 10)
+    TUD_HID_DESCRIPTOR(ITF_NUM_BOOT_KB, STRID_HID, 1, sizeof(desc_boot_report), 0x80 | EPNUM_HID1, ESP32S3_EPSIZE, 10),
+    TUD_HID_DESCRIPTOR(ITF_NUM_COMPOSITE, STRID_HID, 0, sizeof(desc_hid_report), 0x80 | EPNUM_HID2, ESP32S3_EPSIZE, 10)
 };
 
 static const char * descriptor_str_default[] = {
