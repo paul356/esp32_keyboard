@@ -187,11 +187,21 @@ void app_main()
     // Log initial memory state
     log_memory_usage("INITIAL STATE");
 
-    //Underclocking for better current draw (not really effective)
-    //    esp_pm_config_esp32_t pm_config;
-    //    pm_config.max_freq_mhz = 10;
-    //    pm_config.min_freq_mhz = 10;
-    //    esp_pm_configure(&pm_config);
+    // Configure Dynamic Frequency Scaling for power optimization
+    // This allows the CPU to scale between 40MHz (idle) and 160MHz (active)
+    // with automatic light sleep during idle periods
+    esp_pm_config_t pm_config = {
+        .max_freq_mhz = 160,  // Full speed when needed
+        .min_freq_mhz = 40,   // Scale down during idle (good balance for keyboard responsiveness)
+        .light_sleep_enable = true  // Enable automatic light sleep
+    };
+    ret = esp_pm_configure(&pm_config);
+    if (ret == ESP_OK) {
+        ESP_LOGI(TAG, "Dynamic Frequency Scaling enabled: 40-160 MHz with light sleep");
+    } else {
+        ESP_LOGW(TAG, "Failed to configure power management: %s", esp_err_to_name(ret));
+    }
+    log_memory_usage("After PM configuration");
 
     ESP_ERROR_CHECK(drv_loop_init());
 
