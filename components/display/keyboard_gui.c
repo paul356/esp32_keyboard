@@ -58,6 +58,8 @@ ESP_EVENT_DEFINE_BASE(KEYBOARD_GUI_EVENTS);
 
 // Global state for GUI
 static bool s_gui_initialized = false;
+static esp_timer_handle_t s_update_timer = NULL;
+static uint32_t s_current_update_period_ms = UPDATE_LVGL_PERIOD_MS;
 
 static void update_lvgl_timer_func(void *arg)
 {
@@ -108,9 +110,8 @@ static esp_err_t start_gui_routine_task(void)
         .name = "update_lvgl_timer"
     };
 
-    esp_timer_handle_t update_timer;
-    ESP_RETURN_ON_ERROR(esp_timer_create(&update_timer_args, &update_timer), TAG, "Failed to create LVGL update timer");
-    ESP_RETURN_ON_ERROR(esp_timer_start_periodic(update_timer, UPDATE_LVGL_PERIOD_MS * 1000), TAG, "Failed to start LVGL update timer");
+    ESP_RETURN_ON_ERROR(esp_timer_create(&update_timer_args, &s_update_timer), TAG, "Failed to create LVGL update timer");
+    ESP_RETURN_ON_ERROR(esp_timer_start_periodic(s_update_timer, UPDATE_LVGL_PERIOD_MS * 1000), TAG, "Failed to start LVGL update timer");
 
     return ESP_OK;
 }
@@ -297,5 +298,62 @@ esp_err_t keyboard_gui_set_brightness(uint8_t brightness)
 esp_err_t keyboard_gui_display_on_off(bool on)
 {
     return lcd_hardware_display_on_off(on);
+}
+
+esp_err_t keyboard_gui_set_update_rate(uint32_t period_ms)
+{
+    if (!s_gui_initialized) {
+        ESP_LOGE(TAG, "Keyboard GUI not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (s_update_timer == NULL) {
+        ESP_LOGE(TAG, "Update timer not initialized");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    // Stop the current timer
+    esp_err_t ret = esp_timer_stop(s_update_timer);
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+        ESP_LOGE(TAG, "Failed to stop update timer: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // If period is 0, keep timer stopped (suspend updates)
+    if (period_ms == 0) {
+        ESP_LOGI(TAG, "LVGL updates suspended");
+        s_current_update_period_ms = 0;
+        return ESP_OK;
+    }
+
+    // Start timer with new period
+    ret = esp_timer_start_periodic(s_update_timer, period_ms * 1000);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to start update timer: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    s_current_update_period_ms = period_ms;
+    ESP_LOGI(TAG, "LVGL update rate set to %lu ms (%lu Hz)",
+             (unsigned long)period_ms, (unsigned long)(1000 / period_ms));
+
+    return ESP_OK;
+}
+
+uint32_t keyboard_gui_get_update_rate(void)
+{
+    return s_current_update_period_ms;
+}
+
+esp_err_t keyboard_gui_suspend(void)
+{
+    ESP_LOGI(TAG, "Suspending keyboard GUI updates");
+    return keyboard_gui_set_update_rate(0);
+}
+
+esp_err_t keyboard_gui_resume(void)
+{
+    ESP_LOGI(TAG, "Resuming keyboard GUI updates");
+    return keyboard_gui_set_update_rate(UPDATE_LVGL_PERIOD_MS);
 }
 

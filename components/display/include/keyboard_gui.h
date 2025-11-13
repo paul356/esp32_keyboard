@@ -75,3 +75,45 @@ esp_err_t keyboard_gui_set_brightness(uint8_t brightness);
  * @return esp_err_t ESP_OK on success
  */
 esp_err_t keyboard_gui_display_on_off(bool on);
+
+/**
+ * @brief Set LVGL update period for power management
+ *
+ * Adjusts the display refresh rate to save power during idle periods.
+ * Lower refresh rates consume less CPU and SPI bus power.
+ *
+ * @param period_ms Update period in milliseconds (0 to suspend updates completely)
+ *                  Recommended values:
+ *                  - 250ms (4 FPS) - Active use, smooth updates
+ *                  - 500ms (2 FPS) - Light idle, responsive
+ *                  - 1000ms (1 FPS) - Idle, battery saver
+ *                  - 2000ms (0.5 FPS) - Deep idle, minimal updates
+ *                  - 0 - Suspend all updates (display off)
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_set_update_rate(uint32_t period_ms);
+
+/**
+ * @brief Get current LVGL update period
+ * @return Current update period in milliseconds (0 if suspended)
+ */
+uint32_t keyboard_gui_get_update_rate(void);
+
+/**
+ * @brief Suspend keyboard GUI updates completely
+ *
+ * Stops the LVGL update timer to save power when display is not needed.
+ * Call keyboard_gui_resume() to restart updates.
+ *
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_suspend(void);
+
+/**
+ * @brief Resume keyboard GUI updates
+ *
+ * Restarts LVGL updates at the default rate after suspension.
+ *
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_resume(void);

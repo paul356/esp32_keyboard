@@ -28,6 +28,7 @@
 #include "function_key.h"
 #include "quantum.h"
 #include "led_ctrl.h"
+#include "idle_detection.h"
 
 // A bit different from QMK, default returns you to the first layer, LOWER and raise increase/lower layer by order.
 #define DEFAULT 0x100
@@ -72,6 +73,11 @@ uint16_t _LAYERS[LAYERS][MATRIX_ROWS][MATRIX_COLS] = {
 };
 
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    // Reset idle timer on any key press
+    if (record->event.pressed) {
+        idle_detection_reset();
+    }
+
     if (keycode >= MACRO_CODE_MIN && keycode <= MACRO_CODE_MAX && record->event.pressed) {
         process_macro_code(keycode);
         return false; // Prevent further processing of this keycode

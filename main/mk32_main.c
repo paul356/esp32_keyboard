@@ -56,6 +56,7 @@
 #include "memory_debug.h"
 #include "drv_loop.h"
 #include "led_ctrl.h"
+#include "idle_detection.h"
 
 extern esp_err_t start_file_server();
 extern void wifi_init_softap(void);
@@ -116,8 +117,10 @@ static void deep_sleep(void *pvParameters) {
 
 static int32_t encoder_last_pos;
 //How to handle key reports
-static void keyboard_timer_func(void *pvParameters)
+static void detect_user_actions(void)
 {
+    keyboard_task();
+
     int32_t curr_pos = miscs_encoder_get_position();
     if (curr_pos != encoder_last_pos) {
         encoder_last_pos = curr_pos;
@@ -127,27 +130,12 @@ static void keyboard_timer_func(void *pvParameters)
         } else if (encoder_direct == MISCS_ENCODER_CCW) {
             keyboard_gui_post_input_event_isr(INPUT_EVENT_ENCODER_CCW, 0);
         }
-    }
-}
 
-void start_keyboard_timer()
-{
-    esp_timer_create_args_t timer_args = {&keyboard_timer_func, NULL, ESP_TIMER_TASK, "kb_task", true};
-    esp_timer_handle_t timer_handle = NULL;
-
-    encoder_last_pos = miscs_encoder_get_position();
-
-    esp_err_t ret = esp_timer_create(&timer_args, &timer_handle);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Create esp timer failed, ret=%d", ret);
-        return;
+        idle_detection_reset();
     }
 
-    ret = esp_timer_start_periodic(timer_handle, KEYBOARD_TASK_PERIOD);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Start peroidic timer failed, ret=%d", ret);
-        return;
-    }
+    // Process power management based on idle state
+    pwr_mgmt_process();
 }
 
 // for test only
@@ -250,9 +238,6 @@ void app_main()
     nvs_load_layouts();
     log_memory_usage("After nvs_load_layouts");
 
-    start_keyboard_timer();
-    log_memory_usage("After start_keyboard_timer");
-
     ESP_ERROR_CHECK(restore_saved_state());
     log_memory_usage("After restore_saved_state");
 
@@ -262,10 +247,14 @@ void app_main()
         log_memory_usage("After start_file_server");
     }
 
+    // Initialize idle detection system
+    idle_detection_init();
+
     log_memory_usage("Keyboard initialization complete");
 
+    encoder_last_pos = miscs_encoder_get_position();
     while (1) {
-        keyboard_task();
-        vTaskDelay(1 / portTICK_PERIOD_MS);
+        detect_user_actions();
+        vTaskDelay(5 / portTICK_PERIOD_MS);
     }
 }
