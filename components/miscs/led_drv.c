@@ -183,7 +183,7 @@ esp_err_t led_drv_init(void)
             .gpio_num = strip_gpio_pins[strip],
             .mem_block_symbols = SOC_RMT_MEM_WORDS_PER_CHANNEL,
             .resolution_hz = LED_DRV_RMT_RESOLUTION_HZ,
-            .trans_queue_depth = 4,
+            .trans_queue_depth = 4
         };
         ret = rmt_new_tx_channel(&tx_chan_config, &led_channels[strip]);
         if (ret != ESP_OK) {
@@ -336,4 +336,58 @@ esp_err_t led_drv_set_led(uint16_t index, led_drv_color_t color)
 esp_err_t led_drv_update(void)
 {
     return led_drv_write();
+}
+
+esp_err_t led_drv_enable(void)
+{
+    ESP_LOGI(TAG, "Enabling LED RMT peripheral");
+
+    esp_err_t ret = ESP_OK;
+    for (int strip = 0; strip < LED_DRV_NUM_STRIPS; strip++) {
+        if (strip == LED_DRV_NUM_STRIPS - 1) {
+            break;  // Skip last strip (currently disabled)
+        }
+
+        if (led_channels[strip] == NULL) {
+            ESP_LOGW(TAG, "LED strip %d not initialized, skipping enable", strip);
+            continue;
+        }
+
+        ret = rmt_enable(led_channels[strip]);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to enable RMT channel for strip %d: %s",
+                     strip, esp_err_to_name(ret));
+            return ret;
+        }
+    }
+
+    ESP_LOGI(TAG, "LED RMT peripheral enabled successfully");
+    return ESP_OK;
+}
+
+esp_err_t led_drv_disable(void)
+{
+    ESP_LOGI(TAG, "Disabling LED RMT peripheral to save power");
+
+    esp_err_t ret = ESP_OK;
+    for (int strip = 0; strip < LED_DRV_NUM_STRIPS; strip++) {
+        if (strip == LED_DRV_NUM_STRIPS - 1) {
+            break;  // Skip last strip (currently disabled)
+        }
+
+        if (led_channels[strip] == NULL) {
+            ESP_LOGW(TAG, "LED strip %d not initialized, skipping disable", strip);
+            continue;
+        }
+
+        ret = rmt_disable(led_channels[strip]);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to disable RMT channel for strip %d: %s",
+                     strip, esp_err_to_name(ret));
+            return ret;
+        }
+    }
+
+    ESP_LOGI(TAG, "LED RMT peripheral disabled successfully");
+    return ESP_OK;
 }

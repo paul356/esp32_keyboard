@@ -96,6 +96,31 @@ esp_err_t led_drv_set_led(uint16_t index, led_drv_color_t color);
  */
 esp_err_t led_drv_update(void);
 
+/**
+ * @brief Enable the LED strip RMT peripheral
+ *
+ * This function enables the RMT peripheral for all LED strips, allowing
+ * LED updates to be transmitted. The peripheral should be enabled before
+ * calling led_drv_update().
+ *
+ * @return esp_err_t ESP_OK on success, error code otherwise
+ */
+esp_err_t led_drv_enable(void);
+
+/**
+ * @brief Disable the LED strip RMT peripheral
+ *
+ * This function disables the RMT peripheral for all LED strips to save power.
+ * Call this when LEDs are not in use (e.g., during long idle periods).
+ * The LED buffer is preserved, so you can re-enable and update later.
+ *
+ * Note: Call led_drv_clear() and led_drv_update() before disabling to ensure
+ * LEDs are turned off before the peripheral is disabled.
+ *
+ * @return esp_err_t ESP_OK on success, error code otherwise
+ */
+esp_err_t led_drv_disable(void);
+
 #ifdef __cplusplus
 }
 #endif

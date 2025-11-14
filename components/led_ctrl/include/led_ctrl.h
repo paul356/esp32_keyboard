@@ -69,6 +69,39 @@ esp_err_t led_ctrl_get_pattern(led_pattern_type_e *pattern_type, uint32_t *param
  */
 esp_err_t led_ctrl_keystroke(uint8_t row, uint8_t col, bool pressed);
 
+/**
+ * @brief Set global LED brightness
+ *
+ * This function sets the global brightness level for all LEDs.
+ * The brightness is applied as a multiplier when setting LED colors.
+ * Use brightness=0 to effectively turn off all LEDs.
+ *
+ * @param brightness Brightness level (0-100, where 0 is off and 100 is full brightness)
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG if brightness > 100, ESP_ERR_INVALID_STATE if not initialized
+ */
+esp_err_t led_ctrl_set_brightness(uint8_t brightness);
+
+/**
+ * @brief Get current global LED brightness
+ *
+ * This function retrieves the current global brightness level.
+ *
+ * @param brightness Pointer to store the current brightness level (0-100)
+ * @return ESP_OK on success, ESP_ERR_INVALID_ARG if pointer is NULL, ESP_ERR_INVALID_STATE if not initialized
+ */
+esp_err_t led_ctrl_get_brightness(uint8_t *brightness);
+
+/**
+ * @brief Clear all LEDs
+ *
+ * This function immediately turns off all LEDs by setting them to black
+ * and updating the LED strip. This is useful for power management or
+ * resetting the LED state.
+ *
+ * @return ESP_OK on success, ESP_ERR_INVALID_STATE if not initialized
+ */
+esp_err_t led_ctrl_clear(void);
+
 #ifdef __cplusplus
 }
 #endif

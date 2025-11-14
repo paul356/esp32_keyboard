@@ -109,7 +109,7 @@ void display_power_mgmt_update(idle_state_t idle_state)
         profile = &battery_profiles[idle_state];
 
         uint8_t battery_percentage = 0;
-        if (miscs_get_battery_percentage(&battery_percentage) == ESP_OK) {
+        if (miscs_get_battery_percentage(&battery_percentage, false) == ESP_OK) {
             battery_scale = get_battery_brightness_scale(battery_percentage);
             ESP_LOGD(TAG, "Using battery profile (%u%%) for state: %s, scale: %u%%",
                      battery_percentage, idle_get_state_string(), battery_scale);
@@ -120,14 +120,4 @@ void display_power_mgmt_update(idle_state_t idle_state)
 
     // Apply the selected profile
     apply_display_profile(profile, battery_scale);
-}
-
-void display_power_mgmt_force_wake(void)
-{
-    // Force display to active state immediately (e.g., on key press)
-    ESP_LOGI(TAG, "Forcing display wake");
-
-    keyboard_gui_display_on_off(true);
-    keyboard_gui_set_brightness(100);
-    keyboard_gui_set_update_rate(250);  // Full speed
 }

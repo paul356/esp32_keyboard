@@ -146,7 +146,7 @@ void test_miscs(void)
     bool charging = miscs_is_battery_charging();
     ESP_LOGI(TAG, "Battery Charging: %s", charging ? "Yes" : "No");
     uint8_t battery_percentage = 0;
-    esp_err_t ret = miscs_get_battery_percentage(&battery_percentage);
+    esp_err_t ret = miscs_get_battery_percentage(&battery_percentage, false);
     if (ret == ESP_OK) {
         ESP_LOGI(TAG, "Battery Percentage: %u%%", battery_percentage);
     } else {
@@ -253,7 +253,14 @@ void app_main()
     log_memory_usage("Keyboard initialization complete");
 
     encoder_last_pos = miscs_encoder_get_position();
+    int count = 0;
     while (1) {
+        uint8_t battery_percentage = 0;
+        if (count % 500 == 0)
+        {
+            ret = miscs_get_battery_percentage(&battery_percentage, true);
+        }
+        ++count;
         detect_user_actions();
         vTaskDelay(5 / portTICK_PERIOD_MS);
     }

@@ -26,15 +26,6 @@ extern "C" {
  */
 void display_power_mgmt_update(idle_state_t idle_state);
 
-/**
- * @brief Force display to wake up and become fully active
- *
- * Call this when user interaction is detected to immediately restore
- * full display brightness and refresh rate, bypassing the idle state.
- * The idle detection system should be reset separately.
- */
-void display_power_mgmt_force_wake(void);
-
 #ifdef __cplusplus
 }
 #endif

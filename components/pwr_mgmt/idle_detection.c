@@ -14,6 +14,7 @@
 
 #include "idle_detection.h"
 #include "display_power_mgmt.h"
+#include "led_power_mgmt.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 
@@ -102,6 +103,9 @@ void pwr_mgmt_process(void) {
 
         // Apply display power management based on idle state
         display_power_mgmt_update(current_state);
+
+        // Apply LED power management based on idle state
+        led_power_mgmt_update(current_state);
 
         last_processed_state = current_state;
     }

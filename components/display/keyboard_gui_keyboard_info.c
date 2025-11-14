@@ -267,7 +267,7 @@ static void update_keyboard_info_display(keyboard_info_gui_t *gui)
     uint8_t battery_percent = 0;
 
     // Get battery percentage
-    miscs_get_battery_percentage(&battery_percent);
+    miscs_get_battery_percentage(&battery_percent, false);
 
     if (is_usb_powered && !is_charging) {
         // USB powered, not charging

@@ -55,7 +55,7 @@ bool miscs_is_battery_charging(void);
  * @param percentage Pointer to store battery percentage (0-100)
  * @return esp_err_t ESP_OK on success, error code otherwise
  */
-esp_err_t miscs_get_battery_percentage(uint8_t *percentage);
+esp_err_t miscs_get_battery_percentage(uint8_t *percentage, bool log_voltage);
 
 /**
  * @brief Get current encoder position

@@ -261,7 +261,7 @@ static esp_err_t miscs_read_battery_voltage(uint32_t *voltage_mv)
     return ESP_OK;
 }
 
-esp_err_t miscs_get_battery_percentage(uint8_t *percentage)
+esp_err_t miscs_get_battery_percentage(uint8_t *percentage, bool log_voltage)
 {
     if (percentage == NULL) {
         return ESP_ERR_INVALID_ARG;
@@ -292,7 +292,10 @@ esp_err_t miscs_get_battery_percentage(uint8_t *percentage)
         *percentage = (uint8_t)((offset * 100) / range);
     }
 
-    ESP_LOGI(TAG, "Battery voltage is %lu, calculated percentag is %u", voltage_mv, *percentage);
+    if (log_voltage)
+    {
+        ESP_LOGI(TAG, "Battery voltage is %lu, calculated percentag is %u", voltage_mv, *percentage);
+    }
 
     return ESP_OK;
 }

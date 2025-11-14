@@ -55,7 +55,7 @@ static led_pattern_config_t s_current_pattern = {
 // Forward declarations
 static void led_ctrl_event_handler(void *event_handler_arg, esp_event_base_t event_base,
                                    int32_t event_id, void *event_data);
-static void update_led_pattern(uint8_t row, uint8_t col);
+static void update_led_pattern(uint32_t frame);
 static void refresh_led_pattern(void);
 
 esp_err_t led_ctrl_init(void) {
@@ -171,7 +171,7 @@ static led_drv_color_t apply_brightness(led_drv_color_t color, uint8_t brightnes
 
 static void draw_hit_key_pattern(uint32_t index)
 {
-    int prev = index - 1;
+    uint32_t prev = index - 1;
     // Example: Increment a counter for demonstration purposes
     if (prev >= LED_DRV_NUM_LEDS) {
         prev = LED_DRV_NUM_LEDS - 1;
@@ -193,13 +193,13 @@ static void draw_hit_key_pattern(uint32_t index)
  */
 static uint32_t current_frame;
 static void update_led_pattern(uint32_t frame) {
-    ESP_LOGD(TAG, "Updating LED pattern: row=%d, col=%d", row, col);
+    ESP_LOGD(TAG, "Updating LED pattern: frame=%lu", frame);
 
     current_frame = frame;
     uint32_t index = frame % LED_DRV_NUM_LEDS;
     draw_hit_key_pattern(index);
 
-    ESP_LOGD(TAG, "Keystroke count: %d", count);
+    ESP_LOGD(TAG, "Keystroke count: %lu", frame);
 }
 
 /**
@@ -209,7 +209,7 @@ static void update_led_pattern(uint32_t frame) {
 static void refresh_led_pattern(void) {
     ESP_LOGI(TAG, "Refreshing LED pattern with brightness=%d", s_current_pattern.brightness);
 
-    uint32_t index = curr_frame % LED_DRV_NUM_LEDS;
+    uint32_t index = current_frame % LED_DRV_NUM_LEDS;
     draw_hit_key_pattern(index);
 }
 
