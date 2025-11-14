@@ -11,7 +11,8 @@
  */
 typedef enum {
     LED_CTRL_EVENT_KEYSTROKE,  // Keystroke event received
-    LED_CTRL_EVENT_CLEAR_LEDS,  // Pattern update event
+    LED_CTRL_EVENT_CLEAR_LEDS,  // Clear all LEDs event
+    LED_CTRL_EVENT_UPDATE_LEDS,  // Update/refresh LEDs event
     LED_CTRL_EVENT_MAX
 } led_ctrl_event_id_t;
 
@@ -54,6 +55,8 @@ static led_pattern_config_t s_current_pattern = {
 // Forward declarations
 static void led_ctrl_event_handler(void *event_handler_arg, esp_event_base_t event_base,
                                    int32_t event_id, void *event_data);
+static void update_led_pattern(uint8_t row, uint8_t col);
+static void refresh_led_pattern(void);
 
 esp_err_t led_ctrl_init(void) {
     if (s_initialized) {
@@ -155,41 +158,118 @@ esp_err_t led_ctrl_keystroke(uint8_t row, uint8_t col, bool pressed) {
     drv_loop_post_event(LED_CTRL_EVENTS, LED_CTRL_EVENT_CLEAR_LEDS, NULL, 0, 0);
 }*/
 
-static int count = 0;
-static void handle_keystroke_event(uint8_t row, uint8_t col, bool pressed) {
-    // This function can be used to handle keystroke events
-    // For now, we just log the event
-    ESP_LOGD(TAG, "Keystroke event: row=%d, col=%d, pressed=%d", row, col, pressed);
+/**
+ * @brief Apply brightness scaling to a color
+ */
+static led_drv_color_t apply_brightness(led_drv_color_t color, uint8_t brightness) {
+    led_drv_color_t result;
+    result.red = (color.red * brightness) >> 8;
+    result.green = (color.green * brightness) >> 8;
+    result.blue = (color.blue * brightness) >> 8;
+    return result;
+}
 
-    int prev = count++;
+static void draw_hit_key_pattern(uint32_t index)
+{
+    int prev = index - 1;
     // Example: Increment a counter for demonstration purposes
-    if (count >= LED_DRV_NUM_LEDS) {
-        count = 0; // Reset count if it exceeds MAX_LEDS
+    if (prev >= LED_DRV_NUM_LEDS) {
         prev = LED_DRV_NUM_LEDS - 1;
     }
 
+    // Apply brightness to colors
+    led_drv_color_t blue_brightness = apply_brightness(LED_COLOR_BLUE, s_current_pattern.brightness);
+
+    // Update LEDs with brightness-adjusted colors
     led_drv_set_led(prev, LED_COLOR_BLACK);
-    led_drv_set_led(count, LED_COLOR_BLUE); // Set the LED at index 'count' to white
+    led_drv_set_led(index, blue_brightness); // Set the LED at index 'count' to blue
 
     led_drv_update(); // Update the LED strip with the new colors
+}
 
-    // Create a one-shot timer to clear LEDs after 5ms
-    /*esp_timer_handle_t clear_timer;
-    const esp_timer_create_args_t clear_timer_args = {
-        .callback = &clear_leds_timer_callback,
-        .arg = NULL,
-        .name = "clear_leds_timer"
-    };
+/**
+ * @brief Update LED pattern based on keystroke
+ * This function updates the LED pattern based on the current pattern configuration
+ */
+static uint32_t current_frame;
+static void update_led_pattern(uint32_t frame) {
+    ESP_LOGD(TAG, "Updating LED pattern: row=%d, col=%d", row, col);
 
-    esp_err_t timer_ret = esp_timer_create(&clear_timer_args, &clear_timer);
-    if (timer_ret == ESP_OK) {
-        esp_timer_start_once(clear_timer, s_current_pattern.param1 * 1000); // 5ms in microseconds
-        ESP_LOGD(TAG, "Clear LEDs timer started (5ms)");
-    } else {
-        ESP_LOGE(TAG, "Failed to create clear LEDs timer: %s", esp_err_to_name(timer_ret));
-    }*/
+    current_frame = frame;
+    uint32_t index = frame % LED_DRV_NUM_LEDS;
+    draw_hit_key_pattern(index);
 
     ESP_LOGD(TAG, "Keystroke count: %d", count);
+}
+
+/**
+ * @brief Refresh the current LED pattern
+ * This function refreshes all LEDs with the current brightness setting
+ */
+static void refresh_led_pattern(void) {
+    ESP_LOGI(TAG, "Refreshing LED pattern with brightness=%d", s_current_pattern.brightness);
+
+    uint32_t index = curr_frame % LED_DRV_NUM_LEDS;
+    draw_hit_key_pattern(index);
+}
+
+static uint32_t s_count = 0;
+static void handle_keystroke_event(uint8_t row, uint8_t col, bool pressed) {
+    // This function handles keystroke events by delegating to update_led_pattern
+    ESP_LOGD(TAG, "Keystroke event: row=%d, col=%d, pressed=%d", row, col, pressed);
+
+    // Update the LED pattern based on current configuration
+    update_led_pattern(s_count);
+    ++s_count;
+}
+
+esp_err_t led_ctrl_set_brightness(uint8_t brightness) {
+    if (!s_initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (brightness > 100) {
+        ESP_LOGE(TAG, "Brightness %d out of range (0-100)", brightness);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Convert from 0-100 range to 0-255 range for internal use
+    s_current_pattern.brightness = (brightness * 255) / 100;
+
+    ESP_LOGI(TAG, "LED brightness set to %u%%", brightness);
+
+    // Trigger a pattern refresh
+    drv_loop_post_event(LED_CTRL_EVENTS, LED_CTRL_EVENT_UPDATE_LEDS, NULL, 0, 0);
+
+    return ESP_OK;
+}
+
+esp_err_t led_ctrl_get_brightness(uint8_t *brightness) {
+    if (!s_initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    if (brightness == NULL) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Convert from 0-255 range to 0-100 range for external use
+    *brightness = (s_current_pattern.brightness * 100) / 255;
+
+    return ESP_OK;
+}
+
+esp_err_t led_ctrl_clear(void) {
+    if (!s_initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG, "Clearing all LEDs");
+
+    // Trigger a pattern refresh if needed
+    drv_loop_post_event(LED_CTRL_EVENTS, LED_CTRL_EVENT_CLEAR_LEDS, NULL, 0, 0);
+
+    return ESP_OK;
 }
 
 // Main event handler
@@ -216,6 +296,12 @@ static void led_ctrl_event_handler(void *event_handler_arg, esp_event_base_t eve
             led_drv_clear();
             led_drv_update();
             ESP_LOGI(TAG, "Clearing all LEDs");
+            break;
+        }
+
+        case LED_CTRL_EVENT_UPDATE_LEDS: {
+            refresh_led_pattern();
+            ESP_LOGI(TAG, "Refreshing LED pattern");
             break;
         }
 
