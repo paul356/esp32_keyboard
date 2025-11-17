@@ -252,15 +252,9 @@ void app_main()
 
     log_memory_usage("Keyboard initialization complete");
 
+    // Set the initial encoder position
     encoder_last_pos = miscs_encoder_get_position();
-    int count = 0;
     while (1) {
-        uint8_t battery_percentage = 0;
-        if (count % 500 == 0)
-        {
-            ret = miscs_get_battery_percentage(&battery_percentage, true);
-        }
-        ++count;
         detect_user_actions();
         vTaskDelay(pdMS_TO_TICKS(5));
     }
