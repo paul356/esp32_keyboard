@@ -262,6 +262,6 @@ void app_main()
         }
         ++count;
         detect_user_actions();
-        vTaskDelay(5 / portTICK_PERIOD_MS);
+        vTaskDelay(pdMS_TO_TICKS(5));
     }
 }

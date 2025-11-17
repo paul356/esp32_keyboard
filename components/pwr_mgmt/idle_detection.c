@@ -15,10 +15,19 @@
 #include "idle_detection.h"
 #include "display_power_mgmt.h"
 #include "led_power_mgmt.h"
+#include "drv_loop.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 
 #define TAG "pwr_mgmt"
+
+// Define event base for power management events
+ESP_EVENT_DEFINE_BASE(PWR_MGMT_EVENTS);
+
+typedef enum {
+    PWR_MGMT_PERIODIC_EVENT,
+    PWR_MGMT_EVENT_MAX
+} pwr_mgmt_event_id_t;
 
 // Idle state timestamps (in microseconds from esp_timer_get_time())
 static uint64_t last_activity_time = 0;
@@ -27,14 +36,24 @@ static bool idle_detection_initialized = false;
 // Power management state tracking
 static idle_state_t last_processed_state = IDLE_STATE_ACTIVE;
 
-// Forward declaration
+// Forward declarations
 static const char* state_to_string(idle_state_t state);
+static void pwr_mgmt_event_handler(void* event_handler_arg, esp_event_base_t event_base,
+                                   int32_t event_id, void* event_data);
 
 // Implementation of idle detection functions (declarations in idle_detection.h)
 
 void idle_detection_init(void) {
     last_activity_time = esp_timer_get_time();
     idle_detection_initialized = true;
+
+    // Register event handler with drv_loop
+    esp_err_t ret = drv_loop_register_handler(PWR_MGMT_EVENTS, PWR_MGMT_PERIODIC_EVENT,
+                                              pwr_mgmt_event_handler, NULL);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register power management event handler: %s", esp_err_to_name(ret));
+    }
+
     ESP_LOGI(TAG, "Idle detection system initialized");
 }
 
@@ -88,6 +107,24 @@ static const char* state_to_string(idle_state_t state) {
 }
 
 void pwr_mgmt_process(void) {
+    // Post event to drv_loop for asynchronous processing
+    drv_loop_post_event(PWR_MGMT_EVENTS, PWR_MGMT_PERIODIC_EVENT, NULL, 0, 0);
+}
+
+/**
+ * @brief Event handler for power management periodic event
+ *
+ * This handler is called when PWR_MGMT_PERIODIC_EVENT is posted to the drv_loop.
+ * It checks the current idle state and takes appropriate power-saving actions
+ * when state transitions occur.
+ */
+static void pwr_mgmt_event_handler(void* event_handler_arg, esp_event_base_t event_base,
+                                   int32_t event_id, void* event_data) {
+    // Verify this is our event
+    if (event_base != PWR_MGMT_EVENTS || event_id != PWR_MGMT_PERIODIC_EVENT) {
+        return;
+    }
+
     if (!idle_detection_initialized) {
         return;
     }
