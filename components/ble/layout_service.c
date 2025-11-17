@@ -31,10 +31,7 @@
 
 #define TAG "layout_service"
 
-// Define task stack size and priority
-#define LAYOUT_UPDATE_TASK_STACK_SIZE 4096
-#define LAYOUT_UPDATE_TASK_PRIORITY 5
-#define LAYOUT_UPDATE_QUEUE_SIZE 3
+#define LAYOUT_UPDATE_POST_TIMEOUT pdMS_TO_TICKS(50)
 
 // Define BLE default MTU size (23 bytes according to BLE specification)
 #define BLE_DEFAULT_MTU_SIZE 23
@@ -270,7 +267,7 @@ static esp_err_t layout_post_update_event(uint8_t* json_data, size_t data_len)
     esp_err_t err = drv_loop_post_event(LAYOUT_EVENTS,
                                        LAYOUT_UPDATE_EVENT,
                                        &event_data, sizeof(event_data),
-                                       portMAX_DELAY);
+                                       LAYOUT_UPDATE_POST_TIMEOUT);
 
     if (err != ESP_OK) {
         // Free the allocated memory if posting failed

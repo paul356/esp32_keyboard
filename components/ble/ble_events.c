@@ -25,6 +25,8 @@
 #include "ble_events_prv.h"
 #include "hid_desc.h"
 
+#define BLE_EVENTS_POST_TIMEOUT pdMS_TO_TICKS(50)
+
 static const char* TAG = "ble_events";
 
 // BLE Event data structures
@@ -57,10 +59,13 @@ esp_err_t ble_post_battery_event(uint8_t battery_level)
         .battery_level = battery_level
     };
 
-    return drv_loop_post_event(BLE_EVENTS,
-                              BLE_BATTERY_UPDATE_EVENT,
-                              &event_data, sizeof(event_data),
-                              portMAX_DELAY);
+    esp_err_t err = drv_loop_post_event(BLE_EVENTS, BLE_BATTERY_UPDATE_EVENT, &event_data, sizeof(event_data),
+                                        BLE_EVENTS_POST_TIMEOUT);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Fail to post battery events timeout: %s", esp_err_to_name(err));
+    }
+    return err;
 }
 
 esp_err_t ble_post_keyboard_event(const uint8_t* report_data, size_t report_len, bool nkro_bits)
@@ -76,10 +81,13 @@ esp_err_t ble_post_keyboard_event(const uint8_t* report_data, size_t report_len,
     };
     memcpy(event_data.report_data, report_data, report_len);
 
-    return drv_loop_post_event(BLE_EVENTS,
-                              BLE_KEYBOARD_REPORT_EVENT,
-                              &event_data, sizeof(event_data),
-                              portMAX_DELAY);
+    esp_err_t err = drv_loop_post_event(BLE_EVENTS, BLE_KEYBOARD_REPORT_EVENT, &event_data, sizeof(event_data),
+                                        BLE_EVENTS_POST_TIMEOUT);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Fail to post keyboard events timeout: %s", esp_err_to_name(err));
+    }
+    return err;
 }
 
 esp_err_t ble_events_init(void)

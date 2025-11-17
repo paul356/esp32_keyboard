@@ -116,10 +116,17 @@ static void deep_sleep(void *pvParameters) {
 #endif
 
 static int32_t encoder_last_pos;
+static bool pos_inited = false;
 //How to handle key reports
 static void detect_user_actions(void)
 {
     keyboard_task();
+
+    // Set the initial encoder position
+    if (!pos_inited) {
+        encoder_last_pos = miscs_encoder_get_position();
+        pos_inited = true;
+    }
 
     int32_t curr_pos = miscs_encoder_get_position();
     if (curr_pos != encoder_last_pos) {
@@ -133,9 +140,6 @@ static void detect_user_actions(void)
 
         idle_detection_reset();
     }
-
-    // Process power management based on idle state
-    pwr_mgmt_process();
 }
 
 // for test only
@@ -252,10 +256,17 @@ void app_main()
 
     log_memory_usage("Keyboard initialization complete");
 
-    // Set the initial encoder position
-    encoder_last_pos = miscs_encoder_get_position();
+    uint32_t count = 0;
     while (1) {
         detect_user_actions();
+
+        if (((count++) % 1000) == 0) {
+            // Process power management based on idle state
+            pwr_mgmt_process();
+            uint8_t percentage;
+            miscs_get_battery_percentage(&percentage, true);
+        }
+
         vTaskDelay(pdMS_TO_TICKS(5));
     }
 }
