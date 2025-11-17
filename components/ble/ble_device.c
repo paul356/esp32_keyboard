@@ -157,7 +157,6 @@ void top_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
 /*
  * CONTROLLER INIT
  * */
-
 static esp_err_t init_bt_controller(uint8_t mode)
 {
     esp_err_t ret;
@@ -166,7 +165,7 @@ static esp_err_t init_bt_controller(uint8_t mode)
     bt_cfg.mode = mode;
 #endif
     {
-        ret = esp_bt_controller_mem_release(ESP_BT_MODE_CLASSIC_BT);
+        ret = esp_bt_mem_release(ESP_BT_MODE_CLASSIC_BT);
         if (ret) {
             ESP_LOGE(TAG, "esp_bt_controller_mem_release failed: %d", ret);
             return ret;
@@ -205,8 +204,13 @@ static esp_err_t init_bt_controller(uint8_t mode)
 
 /** @brief Main init function to start HID interface (C interface)
  * @see hid_ble */
-esp_err_t halBLEInit(const char *adv_name)
+esp_err_t init_ble_device(const char *adv_name)
 {
+    if (ble_ready) {
+        ESP_LOGW(TAG, "BLE already initialized");
+        return ESP_OK;
+    }
+
     ESP_LOGI(TAG, "setting hid gap, mode:%d", ESP_BT_MODE_BLE);
     esp_err_t ret = init_bt_controller(ESP_BT_MODE_BLE);
     ESP_ERROR_CHECK( ret );
@@ -270,4 +274,68 @@ esp_err_t halBLEInit(const char *adv_name)
     ble_ready = true;
 
     return ESP_OK;
+}
+
+/** @brief Deinitialize BLE and free resources
+ *
+ * Properly shuts down the BLE stack in reverse order of initialization.
+ * Can be called to turn off BLE dynamically to save power.
+ *
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t deinit_ble_device(void)
+{
+    esp_err_t ret = ESP_OK;
+
+    if (!ble_ready) {
+        ESP_LOGW(TAG, "BLE not initialized, nothing to deinit");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Deinitializing BLE device");
+
+    // Stop advertising if active
+    ret = esp_ble_gap_stop_advertising();
+    if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+        ESP_LOGW(TAG, "Failed to stop advertising: %s", esp_err_to_name(ret));
+    }
+
+    // Deinitialize HID device
+    if (hid_dev != NULL) {
+        ret = esp_hidd_dev_deinit(hid_dev);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to deinit HID device: %s", esp_err_to_name(ret));
+        }
+        hid_dev = NULL;
+    }
+
+    // Note: layout_service and ble_events don't have deinit functions yet
+    // If they are added in the future, call them here
+
+    // Disable and deinitialize Bluedroid stack
+    ret = esp_bluedroid_disable();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_bluedroid_disable failed: %s", esp_err_to_name(ret));
+    }
+
+    ret = esp_bluedroid_deinit();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_bluedroid_deinit failed: %s", esp_err_to_name(ret));
+    }
+
+    // Disable and deinitialize BT controller
+    ret = esp_bt_controller_disable();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_bt_controller_disable failed: %s", esp_err_to_name(ret));
+    }
+
+    ret = esp_bt_controller_deinit();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "esp_bt_controller_deinit failed: %s", esp_err_to_name(ret));
+    }
+
+    ble_ready = false;
+    ESP_LOGI(TAG, "BLE device deinitialized");
+
+    return ret;
 }

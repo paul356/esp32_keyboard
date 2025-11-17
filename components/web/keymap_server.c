@@ -408,7 +408,7 @@ static esp_err_t modify_functions(httpd_req_t* req)
         }
 
         if (enabledItem || nameItem) {
-            ESP_GOTO_ON_ERROR(update_ble_state(enabled, name), err_out, TAG, "fail to update ble state");
+            ESP_GOTO_ON_ERROR(update_ble_state_async(enabled, name), err_out, TAG, "fail to update ble state");
         }
     } else if (strcmp(last_token, "USB") == 0) {
         cJSON_bool enabled = false;

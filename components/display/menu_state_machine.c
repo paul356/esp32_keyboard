@@ -478,7 +478,7 @@ static void menu_setup_tree(void)
     menu_item_add_child(keyboard_mode_menu, keyboard_reset_meter);
 
     // Create Bluetooth submenu items
-    struct menu_item *bt_toggle = menu_item_create("Toggle Bluetooth", &switch_icon, keyboard_gui_prepare_bt_toggle, keyboard_gui_post_bt_toggle, NULL, NULL);
+    struct menu_item *bt_toggle = menu_item_create("Toggle Bluetooth", &switch_icon, keyboard_gui_prepare_bt_toggle, keyboard_gui_post_bt_toggle, NULL, keyboard_gui_bt_toggle_action);
     struct menu_item *bt_pair_kb = menu_item_create("Pair Keyboard", &bluetooth_pc_pair, keyboard_gui_prepare_bt_pair_kb, keyboard_gui_post_bt_pair_kb, keyboard_gui_bt_pair_kb_handle_input, keyboard_gui_bt_pair_kb_action);
 
     menu_item_add_child(bluetooth_menu, bt_toggle);

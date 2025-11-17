@@ -106,6 +106,15 @@ esp_err_t keyboard_gui_prepare_bt_toggle(struct menu_item *self);
 esp_err_t keyboard_gui_post_bt_toggle(struct menu_item *self);
 
 /**
+ * @brief Bluetooth toggle user action function
+ * This function is called when the user presses Enter on the Bluetooth toggle menu item
+ * Toggles Bluetooth on/off and updates the display accordingly
+ * @param user_ctx User context data for the action
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_bt_toggle_action(void *user_ctx);
+
+/**
  * @brief Prepare wifi_toggle GUI function for menu items
  * Creates and shows WiFi toggle interface with icon and dynamic label
  * @param self Menu item that displays WiFi toggle functionality

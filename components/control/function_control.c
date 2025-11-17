@@ -29,6 +29,7 @@
 #include "wifi_intf.h"
 #include "memory_debug.h"
 #include "led_ctrl.h"
+#include "drv_loop.h"
 
 #define TAG "FUNC_CTRL"
 #define FUNCTION_CTRL_NAMESPACE "FUNC_CTRL"
@@ -160,6 +161,24 @@ static function_config_t function_config_entries[] = {
 
 static control_state_t function_state;
 
+// BLE Control Events - for async BLE state changes via drv_loop
+ESP_EVENT_DEFINE_BASE(BLE_CONTROL_EVENTS);
+
+enum {
+    BLE_STATE_CHANGE_EVENT,  // Event to enable/disable BLE
+};
+
+#define BLE_CONTROL_POST_TIMEOUT pdMS_TO_TICKS(100)
+
+// Event data structure for BLE state changes
+typedef struct {
+    bool enabled;
+    char name[MAX_CONFIG_VALUE_LEN];
+} ble_state_event_data_t;
+
+// Forward declaration
+static void ble_state_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data);
+
 static const char* function_config_prefix[] = {"WIFI_", "BLE_", "USB_", "LED_"};
 
 esp_err_t load_config_value(
@@ -276,7 +295,16 @@ esp_err_t restore_saved_state(void)
 {
     log_memory_usage("BEFORE restore_saved_state");
 
-    esp_err_t ret = recover_persisted_config();
+    // Register BLE state event handler with drv_loop for async BLE on/off control
+    esp_err_t ret = drv_loop_register_handler(BLE_CONTROL_EVENTS, BLE_STATE_CHANGE_EVENT,
+                                              ble_state_event_handler, NULL);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register BLE state event handler: %s", esp_err_to_name(ret));
+        return ret;
+    }
+    ESP_LOGI(TAG, "BLE state event handler registered");
+
+    ret = recover_persisted_config();
     if (ret != ESP_OK) {
         return ret;
     }
@@ -292,14 +320,14 @@ esp_err_t restore_saved_state(void)
 
     if (function_state.ble.enabled) {
         // Init BLE anyway
-        ret = halBLEInit(function_state.ble.name);
+        ret = init_ble_device(function_state.ble.name);
         if (ret != ESP_OK)
         {
             return ret;
         }
     }
 
-    log_memory_usage("After halBLEInit");
+    log_memory_usage("After init_ble_device");
 
     if (function_state.led.enabled) {
         ret = led_ctrl_set_pattern(function_state.led.pattern, 0, 0);
@@ -416,34 +444,85 @@ wifi_mode_t str_to_wifi_mode(const char* str)
     }
 }
 
-esp_err_t update_ble_state(bool enabled, const char* name)
+static void update_ble_state(ble_state_event_data_t* ble_data)
 {
-    bool last_enabled = function_state.ble.enabled;
-    function_state.ble.enabled = enabled;
 
-    if (name && strlen(name) > 0) {
-        snprintf(function_state.ble.name, sizeof(function_state.ble.name), "%s", name);
+    bool last_enabled = function_state.ble.enabled;
+    bool new_enabled = ble_data->enabled;
+
+    function_state.ble.enabled = new_enabled;
+
+    if (strlen(ble_data->name) > 0) {
+        snprintf(function_state.ble.name, sizeof(function_state.ble.name), "%s", ble_data->name);
     }
 
     esp_err_t ret = update_persisted_config(BLE);
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "fail to update BLE state, err=%d", ret);
+        return;
+    }
+
+    ESP_LOGI(TAG, "BLE state change event: last=%d, new=%d, name=%s",
+             last_enabled, new_enabled, ble_data->name);
+
+    // Initialize BLE if transitioning from disabled to enabled
+    if (new_enabled && !last_enabled) {
+        esp_err_t ret = init_ble_device(ble_data->name);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to init BLE device: %s", esp_err_to_name(ret));
+            return;
+        }
+        ESP_LOGI(TAG, "BLE device initialized successfully");
+    }
+
+    // Deinitialize BLE if transitioning from enabled to disabled
+    if (last_enabled && !new_enabled) {
+        esp_err_t ret = deinit_ble_device();
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to deinit BLE device: %s", esp_err_to_name(ret));
+            return;
+        }
+        ESP_LOGI(TAG, "BLE device deinitialized successfully");
+    }
+}
+
+/**
+ * @brief Event handler for BLE state changes
+ *
+ * This handler is called asynchronously by drv_loop when a BLE state change event is posted.
+ * It performs the actual BLE initialization or deinitialization in the drv_loop task context.
+ */
+static void ble_state_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data)
+{
+    if (id != BLE_STATE_CHANGE_EVENT) {
+        return;
+    }
+
+    update_ble_state((ble_state_event_data_t*)event_data);
+}
+
+esp_err_t update_ble_state_async(bool enabled, const char* name)
+{
+    // Prepare event data
+    ble_state_event_data_t event_data = {
+        .enabled = enabled
+    };
+    if (name && strlen(name) > 0) {
+        snprintf(event_data.name, sizeof(event_data.name), "%s", name);
+    } else {
+        snprintf(event_data.name, sizeof(event_data.name), "%s", function_state.ble.name);
+    }
+
+    // Post event to drv_loop for async processing
+    esp_err_t ret = drv_loop_post_event(BLE_CONTROL_EVENTS, BLE_STATE_CHANGE_EVENT, &event_data, sizeof(event_data),
+                                        BLE_CONTROL_POST_TIMEOUT);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to post BLE state change event: %s", esp_err_to_name(ret));
         return ret;
     }
 
-    if (function_state.ble.enabled && !last_enabled) {
-        ret = halBLEInit(function_state.ble.name);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "fail to init BLE, err=%d", ret);
-            return ret;
-        }
-    }
-
-    if (last_enabled && !function_state.ble.enabled) {
-        // reboot to get a clean state
-        vTaskDelay(1500 / portTICK_PERIOD_MS);
-        esp_restart();
-    }
+    ESP_LOGI(TAG, "BLE state change event posted: enabled=%d, name=%s", enabled, event_data.name);
 
     return ESP_OK;
 }

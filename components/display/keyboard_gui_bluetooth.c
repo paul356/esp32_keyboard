@@ -419,6 +419,50 @@ esp_err_t keyboard_gui_post_bt_toggle(struct menu_item *self)
     return post_bt_toggle_gui(self);
 }
 
+esp_err_t keyboard_gui_bt_toggle_action(void *user_ctx)
+{
+    ESP_LOGI(TAG, "Bluetooth toggle action triggered");
+
+    if (!user_ctx) {
+        ESP_LOGE(TAG, "Invalid Bluetooth toggle user context");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    bt_toggle_gui_t *gui = (bt_toggle_gui_t *)user_ctx;
+
+    // Toggle Bluetooth state
+    if (is_ble_enabled()) {
+        // Bluetooth is currently enabled, disable it
+        ESP_LOGI(TAG, "Disabling Bluetooth");
+        esp_err_t ret = update_ble_state_async(false, NULL);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to disable Bluetooth: %s", esp_err_to_name(ret));
+            return ret;
+        }
+
+        // Update GUI to reflect disabled state
+        lv_label_set_text(gui->status_label, "Open");
+        lv_obj_set_style_image_recolor_opa(gui->bluetooth_icon, LV_OPA_50, 0);
+        lv_obj_set_style_image_recolor(gui->bluetooth_icon, lv_color_hex(0x808080), 0);
+    } else {
+        // Bluetooth is currently disabled, enable it
+        ESP_LOGI(TAG, "Enabling Bluetooth");
+        const char *ble_name = get_ble_name();
+        esp_err_t ret = update_ble_state_async(true, ble_name);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to enable Bluetooth: %s", esp_err_to_name(ret));
+            return ret;
+        }
+
+        // Update GUI to reflect enabled state
+        lv_label_set_text(gui->status_label, "Close");
+        lv_obj_set_style_image_recolor_opa(gui->bluetooth_icon, LV_OPA_TRANSP, 0);
+    }
+
+    ESP_LOGI(TAG, "Bluetooth toggle action completed successfully");
+    return ESP_OK;
+}
+
 esp_err_t keyboard_gui_prepare_bt_pair_kb(struct menu_item *self)
 {
     return prepare_bt_pair_kb_gui(self);

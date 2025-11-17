@@ -35,7 +35,7 @@ const char* get_wifi_ssid(void);
 const char* wifi_mode_to_str(wifi_mode_t mode);
 wifi_mode_t str_to_wifi_mode(const char* str);
 
-esp_err_t update_ble_state(bool enabled, const char* name);
+esp_err_t update_ble_state_async(bool enabled, const char* name);
 bool is_ble_enabled(void);
 const char* get_ble_name(void);
 

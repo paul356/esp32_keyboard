@@ -24,6 +24,7 @@
 #include "ble_device.h"
 #include "ble_events_prv.h"
 #include "hid_desc.h"
+#include "hal_ble.h"
 
 #define BLE_EVENTS_POST_TIMEOUT pdMS_TO_TICKS(50)
 
@@ -108,6 +109,11 @@ esp_err_t ble_events_init(void)
 static void battery_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data) {
     ble_battery_event_t* battery_data = (ble_battery_event_t*)event_data;
 
+    if (!is_ble_ready()) {
+        ESP_LOGW(TAG, "Skip BLE battery level update because ble is turned off.");
+        return;
+    }
+
     esp_hidd_dev_t* hid_dev = ble_get_hid_dev();
     if (!hid_dev || !esp_hidd_dev_connected(hid_dev))
         return;
@@ -119,6 +125,11 @@ static void battery_event_handler(void* handler_args, esp_event_base_t base, int
 
 static void keyboard_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data) {
     ble_keyboard_event_t* kbd_data = (ble_keyboard_event_t*)event_data;
+
+    if (!is_ble_ready()) {
+        ESP_LOGW(TAG, "Skip BLE keyboard report because ble is turned off.");
+        return;
+    }
 
     esp_hidd_dev_t* hid_dev = ble_get_hid_dev();
     if (!hid_dev || !esp_hidd_dev_connected(hid_dev))
