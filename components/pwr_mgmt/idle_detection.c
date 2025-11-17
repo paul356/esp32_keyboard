@@ -59,6 +59,10 @@ void idle_detection_init(void) {
 
 void idle_detection_reset(void) {
     last_activity_time = esp_timer_get_time();
+
+    // Only take action when state changes (reentrant safe)
+    if (last_processed_state != IDLE_STATE_ACTIVE)
+        pwr_mgmt_process();
 }
 
 uint32_t idle_get_time_ms(void) {
@@ -108,7 +112,10 @@ static const char* state_to_string(idle_state_t state) {
 
 void pwr_mgmt_process(void) {
     // Post event to drv_loop for asynchronous processing
-    drv_loop_post_event(PWR_MGMT_EVENTS, PWR_MGMT_PERIODIC_EVENT, NULL, 0, 0);
+    esp_err_t err = drv_loop_post_event(PWR_MGMT_EVENTS, PWR_MGMT_PERIODIC_EVENT, NULL, 0, 0);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Fail to post power management events: %s", esp_err_to_name(err));
+    }
 }
 
 /**

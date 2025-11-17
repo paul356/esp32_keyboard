@@ -102,6 +102,29 @@ esp_err_t led_ctrl_get_brightness(uint8_t *brightness);
  */
 esp_err_t led_ctrl_clear(void);
 
+/**
+ * @brief Enable the LED RMT hardware
+ *
+ * This function posts an event to enable the RMT hardware for LED control.
+ * The operation is performed asynchronously in the drv_loop context.
+ * After enabling, LED updates will be transmitted to the LED strips.
+ *
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t led_ctrl_enable_rmt(void);
+
+/**
+ * @brief Disable the LED RMT hardware
+ *
+ * This function posts an event to disable the RMT hardware to save power.
+ * The operation is performed asynchronously in the drv_loop context.
+ * After disabling, LED update requests will be queued but not transmitted
+ * until RMT is re-enabled.
+ *
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t led_ctrl_disable_rmt(void);
+
 #ifdef __cplusplus
 }
 #endif

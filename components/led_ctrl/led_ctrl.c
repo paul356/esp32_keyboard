@@ -13,6 +13,8 @@ typedef enum {
     LED_CTRL_EVENT_KEYSTROKE,  // Keystroke event received
     LED_CTRL_EVENT_CLEAR_LEDS,  // Clear all LEDs event
     LED_CTRL_EVENT_UPDATE_LEDS,  // Update/refresh LEDs event
+    LED_CTRL_EVENT_ENABLE_RMT,  // Enable RMT hardware
+    LED_CTRL_EVENT_DISABLE_RMT,  // Disable RMT hardware
     LED_CTRL_EVENT_MAX
 } led_ctrl_event_id_t;
 
@@ -36,6 +38,7 @@ typedef struct {
 
 // Component state
 static bool s_initialized = false;
+static bool s_rmt_enabled = false;  // Track RMT hardware state (initially enabled)
 
 static const char *TAG = "led_ctrl";
 
@@ -72,6 +75,7 @@ esp_err_t led_ctrl_init(void) {
         ESP_LOGE(TAG, "Failed to initialize LED driver: %s", esp_err_to_name(ret));
         return ret;
     }
+    s_rmt_enabled = true;
 
     // Register event handler with drv_loop
     ret = drv_loop_register_handler(LED_CTRL_EVENTS, ESP_EVENT_ANY_ID,
@@ -151,13 +155,6 @@ esp_err_t led_ctrl_keystroke(uint8_t row, uint8_t col, bool pressed) {
                               &keystroke, sizeof(keystroke), 0);
 }
 
-
-// Timer callback function to clear LEDs
-/*static void clear_leds_timer_callback(void* arg) {
-    ESP_LOGD(TAG, "Timer callback: posting clear LED event");
-    drv_loop_post_event(LED_CTRL_EVENTS, LED_CTRL_EVENT_CLEAR_LEDS, NULL, 0, 0);
-}*/
-
 /**
  * @brief Apply brightness scaling to a color
  */
@@ -184,7 +181,12 @@ static void draw_hit_key_pattern(uint32_t index)
     led_drv_set_led(prev, LED_COLOR_BLACK);
     led_drv_set_led(index, blue_brightness); // Set the LED at index 'count' to blue
 
-    led_drv_update(); // Update the LED strip with the new colors
+    // Only update LED strip if RMT hardware is enabled
+    if (s_rmt_enabled) {
+        led_drv_update(); // Update the LED strip with the new colors
+    } else {
+        ESP_LOGD(TAG, "Skipping LED update - RMT disabled");
+    }
 }
 
 /**
@@ -209,8 +211,24 @@ static void update_led_pattern(uint32_t frame) {
 static void refresh_led_pattern(void) {
     ESP_LOGI(TAG, "Refreshing LED pattern with brightness=%d", s_current_pattern.brightness);
 
+    // Only refresh if RMT is enabled
+    if (!s_rmt_enabled) {
+        ESP_LOGD(TAG, "Skipping pattern refresh - RMT disabled");
+        return;
+    }
+
     uint32_t index = current_frame % LED_DRV_NUM_LEDS;
     draw_hit_key_pattern(index);
+}
+
+static void clear_all_leds(void)
+{
+    led_drv_clear();
+    // Only update if RMT is enabled
+    if (s_rmt_enabled)
+    {
+        led_drv_update();
+    }
 }
 
 static uint32_t s_count = 0;
@@ -272,6 +290,28 @@ esp_err_t led_ctrl_clear(void) {
     return ESP_OK;
 }
 
+esp_err_t led_ctrl_enable_rmt(void) {
+    if (!s_initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG, "Requesting RMT enable via event");
+
+    // Post event to enable RMT in drv_loop context
+    return drv_loop_post_event(LED_CTRL_EVENTS, LED_CTRL_EVENT_ENABLE_RMT, NULL, 0, 0);
+}
+
+esp_err_t led_ctrl_disable_rmt(void) {
+    if (!s_initialized) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    ESP_LOGI(TAG, "Requesting RMT disable via event");
+
+    // Post event to disable RMT in drv_loop context
+    return drv_loop_post_event(LED_CTRL_EVENTS, LED_CTRL_EVENT_DISABLE_RMT, NULL, 0, 0);
+}
+
 // Main event handler
 static void led_ctrl_event_handler(void *event_handler_arg, esp_event_base_t event_base,
                                    int32_t event_id, void *event_data) {
@@ -293,8 +333,7 @@ static void led_ctrl_event_handler(void *event_handler_arg, esp_event_base_t eve
         }
 
         case LED_CTRL_EVENT_CLEAR_LEDS: {
-            led_drv_clear();
-            led_drv_update();
+            clear_all_leds();
             ESP_LOGI(TAG, "Clearing all LEDs");
             break;
         }
@@ -302,6 +341,36 @@ static void led_ctrl_event_handler(void *event_handler_arg, esp_event_base_t eve
         case LED_CTRL_EVENT_UPDATE_LEDS: {
             refresh_led_pattern();
             ESP_LOGI(TAG, "Refreshing LED pattern");
+            break;
+        }
+
+        case LED_CTRL_EVENT_ENABLE_RMT: {
+            if (!s_rmt_enabled) {
+                esp_err_t ret = led_drv_enable();
+                if (ret == ESP_OK) {
+                    s_rmt_enabled = true;
+                    ESP_LOGI(TAG, "RMT hardware enabled");
+                } else {
+                    ESP_LOGE(TAG, "Failed to enable RMT hardware: %s", esp_err_to_name(ret));
+                }
+            } else {
+                ESP_LOGD(TAG, "RMT hardware already enabled");
+            }
+            break;
+        }
+
+        case LED_CTRL_EVENT_DISABLE_RMT: {
+            if (s_rmt_enabled) {
+                esp_err_t ret = led_drv_disable();
+                if (ret == ESP_OK) {
+                    s_rmt_enabled = false;
+                    ESP_LOGI(TAG, "RMT hardware disabled");
+                } else {
+                    ESP_LOGE(TAG, "Failed to disable RMT hardware: %s", esp_err_to_name(ret));
+                }
+            } else {
+                ESP_LOGD(TAG, "RMT hardware already disabled");
+            }
             break;
         }
 
