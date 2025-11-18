@@ -32,7 +32,7 @@ static const display_power_profile_t usb_profiles[] = {
 static const display_power_profile_t battery_profiles[] = {
     [IDLE_STATE_ACTIVE]     = { .refresh_period_ms = 250,  .brightness = 80,  .display_on = true },
     [IDLE_STATE_SHORT]      = { .refresh_period_ms = 500,  .brightness = 60,  .display_on = true },
-    [IDLE_STATE_LONG]       = { .refresh_period_ms = 0, .brightness = 40,  .display_on = false },
+    [IDLE_STATE_LONG]       = { .refresh_period_ms = 0,    .brightness = 0,   .display_on = false },
 };
 
 // Battery-level based brightness scaling (applied on top of idle profiles)
@@ -62,12 +62,11 @@ static void apply_display_profile(const display_power_profile_t *profile, uint8_
     }
 
     // Apply brightness (scaled by battery level if on battery)
-    if (profile->display_on) {
-        uint8_t scaled_brightness = (profile->brightness * battery_scale) / 100;
-        ret = keyboard_gui_set_brightness(scaled_brightness);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to set brightness: %s", esp_err_to_name(ret));
-        }
+    uint8_t scaled_brightness = (profile->brightness * battery_scale) / 100;
+    ret = keyboard_gui_set_brightness(scaled_brightness);
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Failed to set brightness: %s", esp_err_to_name(ret));
     }
 
     // Apply refresh rate

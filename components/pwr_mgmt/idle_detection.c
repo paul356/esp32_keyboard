@@ -15,9 +15,13 @@
 #include "idle_detection.h"
 #include "display_power_mgmt.h"
 #include "led_power_mgmt.h"
+#include "ble_power_mgmt.h"
 #include "drv_loop.h"
 #include "esp_timer.h"
+#include "esp_sleep.h"
 #include "esp_log.h"
+#include "miscs.h"
+#include "hal_ble.h"
 
 #define TAG "pwr_mgmt"
 
@@ -35,6 +39,7 @@ static bool idle_detection_initialized = false;
 
 // Power management state tracking
 static idle_state_t last_processed_state = IDLE_STATE_ACTIVE;
+static bool last_usb_powered_state = true;  // Track last known power source
 
 // Forward declarations
 static const char* state_to_string(idle_state_t state);
@@ -116,8 +121,8 @@ void pwr_mgmt_process(void) {
  * @brief Event handler for power management periodic event
  *
  * This handler is called when PWR_MGMT_PERIODIC_EVENT is posted to the drv_loop.
- * It checks the current idle state and takes appropriate power-saving actions
- * when state transitions occur.
+ * It checks the current idle state and power source, taking appropriate power-saving
+ * actions when state transitions or power source changes occur.
  */
 static void pwr_mgmt_event_handler(void* event_handler_arg, esp_event_base_t event_base,
                                    int32_t event_id, void* event_data) {
@@ -131,13 +136,28 @@ static void pwr_mgmt_event_handler(void* event_handler_arg, esp_event_base_t eve
     }
 
     idle_state_t current_state = idle_get_state();
+    bool current_usb_powered = miscs_is_usb_powered();
 
-    // Only take action when state changes (reentrant safe)
-    if (current_state != last_processed_state) {
-        ESP_LOGI(TAG, "Idle state changed: %s -> %s (idle for %lu ms)",
-                 state_to_string(last_processed_state),
-                 state_to_string(current_state),
-                 (unsigned long)idle_get_time_ms());
+    // Check for power source change
+    bool power_source_changed = (current_usb_powered != last_usb_powered_state);
+
+    if (power_source_changed) {
+        ESP_LOGI(TAG, "Power source changed: %s -> %s (current state: %s)",
+                 last_usb_powered_state ? "USB" : "BATTERY",
+                 current_usb_powered ? "USB" : "BATTERY",
+                 state_to_string(current_state));
+
+        last_usb_powered_state = current_usb_powered;
+    }
+
+    // Take action when state changes OR power source changes
+    if (current_state != last_processed_state || power_source_changed) {
+        if (current_state != last_processed_state && !power_source_changed) {
+            ESP_LOGI(TAG, "Idle state changed: %s -> %s (idle for %lu ms)",
+                     state_to_string(last_processed_state),
+                     state_to_string(current_state),
+                     (unsigned long)idle_get_time_ms());
+        }
 
         // Apply display power management based on idle state
         display_power_mgmt_update(current_state);
@@ -145,6 +165,20 @@ static void pwr_mgmt_event_handler(void* event_handler_arg, esp_event_base_t eve
         // Apply LED power management based on idle state
         led_power_mgmt_update(current_state);
 
+        // Apply BLE power management based on idle state
+        ble_power_mgmt_update(current_state);
+
         last_processed_state = current_state;
+    }
+
+    // When last state is the long idle state and power is from battery, we will enter light sleep.
+    if (last_processed_state == IDLE_STATE_LONG && last_usb_powered_state == false && is_ble_ready() == false)
+    {
+        esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
+        esp_err_t ret = esp_light_sleep_start();
+        if (ret != ESP_OK)
+        {
+            ESP_LOGW(TAG, "Fail to enter light sleep: %s", esp_err_to_name(ret));
+        }
     }
 }

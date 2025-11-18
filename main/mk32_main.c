@@ -62,58 +62,7 @@ extern esp_err_t start_file_server();
 extern void wifi_init_softap(void);
 extern void rtc_matrix_deinit(void);
 
-#define KEY_REPORT_TAG "KEY_REPORT"
-#define SYSTEM_REPORT_TAG "KEY_REPORT"
-#define TRUNC_SIZE 20
-#define USEC_TO_SEC 1000000
-#define SEC_TO_MIN 60
 #define TAG "main"
-#define KEYBOARD_TASK_PERIOD 5000 // 5ms
-
-bool DEEP_SLEEP = true; // flag to check if we need to go to deep sleep
-
-/*If no key press has been recieved in SLEEP_MINS amount of minutes, put device into deep sleep
- *  wake up on touch on GPIO pin 2
- *  */
-#ifdef SLEEP_MINS
-static void deep_sleep(void *pvParameters) {
-    uint64_t initial_time = esp_timer_get_time(); // notice that timer returns time passed in microseconds!
-    uint64_t current_time_passed = 0;
-    while (1) {
-
-        current_time_passed = (esp_timer_get_time() - initial_time);
-
-        if (DEEP_SLEEP == false) {
-            current_time_passed = 0;
-            initial_time = esp_timer_get_time();
-            DEEP_SLEEP = true;
-        }
-
-        if (((double)current_time_passed/USEC_TO_SEC) >= (double)  (SEC_TO_MIN * SLEEP_MINS)) {
-            if (DEEP_SLEEP == true) {
-                ESP_LOGE(SYSTEM_REPORT_TAG, "going to sleep!");
-#ifdef OLED_ENABLE
-                vTaskDelay(20 / portTICK_PERIOD_MS);
-                vTaskSuspend(xOledTask);
-                deinit_oled();
-#endif
-                // wake up esp32 using rtc gpio
-                rtc_matrix_setup();
-                esp_sleep_enable_touchpad_wakeup();
-                esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
-                esp_deep_sleep_start();
-
-            }
-            if (DEEP_SLEEP == false) {
-                current_time_passed = 0;
-                initial_time = esp_timer_get_time();
-                DEEP_SLEEP = true;
-            }
-        }
-
-    }
-}
-#endif
 
 static int32_t encoder_last_pos;
 static bool pos_inited = false;
