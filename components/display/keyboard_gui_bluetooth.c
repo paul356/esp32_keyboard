@@ -24,7 +24,7 @@
 #include "function_control.h"
 #include "hal_ble.h"
 #include "keyboard_gui_widgets.h"
-#include "lcd_hardware.h"
+#include "display_hardware_info.h"
 #include "lvgl.h"
 #include "menu_icons.h"
 #include "menu_state_machine.h"

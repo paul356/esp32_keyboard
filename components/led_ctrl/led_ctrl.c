@@ -312,6 +312,10 @@ esp_err_t led_ctrl_disable_rmt(void) {
     return drv_loop_post_event(LED_CTRL_EVENTS, LED_CTRL_EVENT_DISABLE_RMT, NULL, 0, 0);
 }
 
+bool led_ctrl_rmt_enabled(void) {
+    return s_rmt_enabled;
+}
+
 // Main event handler
 static void led_ctrl_event_handler(void *event_handler_arg, esp_event_base_t event_base,
                                    int32_t event_id, void *event_data) {

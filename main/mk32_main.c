@@ -193,7 +193,7 @@ void app_main()
     while (1) {
         detect_user_actions();
 
-        if (((count++) % 1000) == 0) {
+        if (((count++) % 200) == 0) {
             // Process power management based on idle state
             pwr_mgmt_process();
             uint8_t percentage;

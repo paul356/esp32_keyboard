@@ -24,7 +24,7 @@
 #include "esp_log.h"
 #include "esp_wifi.h"
 #include "lvgl.h"
-#include "lcd_hardware.h"
+#include "display_hardware_info.h"
 #include "menu_state_machine.h"
 #include "keyboard_gui_widgets.h"
 #include "menu_icons.h"

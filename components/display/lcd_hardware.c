@@ -18,7 +18,6 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
-#include "lcd_hardware.h"
 #include "esp_log.h"
 #include "esp_check.h"
 #include "esp_timer.h"
@@ -29,24 +28,8 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lvgl_port.h"
 #include "lvgl.h"
+#include "lcd_hardware_internal.h"
 #include "keyboard_gui.h"
-
-#define LCD_BIT_PER_PIXEL   16
-
-// GPIO Pin Definitions
-#define LCD_PIN_MOSI        11
-#define LCD_PIN_CLK         12
-#define LCD_PIN_CS          10
-#define LCD_PIN_DC          13
-#define LCD_PIN_RST         9
-#define LCD_PIN_BL          14
-
-// SPI Configuration
-#define LCD_SPI_HOST        SPI2_HOST
-#define LCD_PIXEL_CLOCK_HZ  (20 * 1000 * 1000)  // 20MHz
-#define DRAW_BUFFER_SIZE    (LCD_WIDTH * LCD_HEIGHT * sizeof(lv_color16_t) / 10)
-#define SCREEN_OFFSET_X     18  // Offset for X coordinate, adjust as needed
-#define SCREEN_OFFSET_Y     82
 
 /**
  * @brief LCD hardware interface structure

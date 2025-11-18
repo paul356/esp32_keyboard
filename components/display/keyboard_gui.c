@@ -29,7 +29,7 @@
 #include "key_definitions.h"
 #include "action_code.h"
 #include "keyboard_gui.h"
-#include "lcd_hardware.h"
+#include "lcd_hardware_internal.h"
 #include "menu_state_machine.h"
 #include "keyboard_gui_widgets.h"
 

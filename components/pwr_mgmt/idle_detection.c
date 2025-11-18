@@ -25,6 +25,8 @@
 #include "config.h"
 #include "driver/gpio.h"
 #include "matrix.h"
+#include "display_hardware_info.h"
+#include "led_ctrl.h"
 
 #define TAG "pwr_mgmt"
 
@@ -125,7 +127,7 @@ static const char* state_to_string(idle_state_t state) {
  * the diode and row pin, triggering the wakeup.
  */
 // Matrix pin definitions for wakeup configuration
-static esp_err_t configure_gpio_wakeup(void) {
+static esp_err_t configure_gpio_for_sleep(void) {
     esp_err_t ret;
 
     // Set all row pins to output low
@@ -184,11 +186,18 @@ static esp_err_t configure_gpio_wakeup(void) {
                  MATRIX_ROWS, MATRIX_COLS);
     }
 
+    ret = gpio_hold_en(LCD_PIN_BL);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Couldn't hold the back light pin for sleep.");
+    }
+
     return ESP_OK;
 }
 
-static void deconfigure_gpio_wakeup()
+static void deconfigure_gpio_after_wakeup()
 {
+    gpio_hold_dis(LCD_PIN_BL);
+
     for (int i = 0; i < MATRIX_ROWS; i++)
     {
         gpio_hold_dis(row_pins[i]);
@@ -260,7 +269,7 @@ static void pwr_mgmt_event_handler(void* event_handler_arg, esp_event_base_t eve
     }
 
     // When last state is the long idle state and power is from battery, we will enter light sleep.
-    if (last_processed_state == IDLE_STATE_LONG && last_usb_powered_state == false && is_ble_ready() == false)
+    if (last_processed_state == IDLE_STATE_LONG && last_usb_powered_state == false && is_ble_ready() == false && led_ctrl_rmt_enabled() == false)
     {
         ESP_LOGI(TAG, "Entering light sleep with GPIO wakeup...");
 
@@ -268,7 +277,7 @@ static void pwr_mgmt_event_handler(void* event_handler_arg, esp_event_base_t eve
         esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
 
         // Configure GPIO wakeup sources (matrix keyboard pins)
-        esp_err_t ret = configure_gpio_wakeup();
+        esp_err_t ret = configure_gpio_for_sleep();
         if (ret != ESP_OK)
         {
             ESP_LOGW(TAG, "Skip light sleep due to a gpio configuration error.");
@@ -283,7 +292,7 @@ static void pwr_mgmt_event_handler(void* event_handler_arg, esp_event_base_t eve
             {
                 ESP_LOGI(TAG, "Woke up from light sleep");
 
-                deconfigure_gpio_wakeup();
+                deconfigure_gpio_after_wakeup();
 
                 // Reset idle detection timer after wakeup
                 idle_detection_reset();

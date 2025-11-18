@@ -19,15 +19,15 @@ extern "C" {
 
 // Idle state enumeration
 typedef enum {
-    IDLE_STATE_ACTIVE = 0,      // Currently active (< 5s idle)
-    IDLE_STATE_SHORT,           // Short idle (5s - 30s)
-    IDLE_STATE_LONG             // Long idle (> 30s)
+    IDLE_STATE_ACTIVE = 0,      // Currently active (< 3s idle)
+    IDLE_STATE_SHORT,           // Short idle (3s)
+    IDLE_STATE_LONG             // Long idle (> 10s)
 } idle_state_t;
 
 // Idle thresholds (in milliseconds) - exposed for component-specific checks
 #define IDLE_THRESHOLD_ACTIVE     0       // 0ms - Currently active
-#define IDLE_THRESHOLD_SHORT      5000    // 5 seconds - Just went idle
-#define IDLE_THRESHOLD_LONG       30000   // 30 seconds - Long idle
+#define IDLE_THRESHOLD_SHORT      3000    // 3 seconds - Just went idle
+#define IDLE_THRESHOLD_LONG       10000   // 10 seconds - Long idle
 
 /**
  * @brief Initialize idle detection system

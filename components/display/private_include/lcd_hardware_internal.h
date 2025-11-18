@@ -22,16 +22,7 @@
 
 #include <stdbool.h>
 #include "esp_err.h"
-
-//#define TEST_HARDWARE
-#ifdef TEST_HARDWARE
-#define LCD_WIDTH           280
-#define LCD_HEIGHT          240
-#else
-// LCD Configuration
-#define LCD_WIDTH           284
-#define LCD_HEIGHT          76
-#endif
+#include "display_hardware_info.h"
 
 /**
  * @brief Initialize ST7789 LCD hardware

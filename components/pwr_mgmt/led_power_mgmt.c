@@ -10,6 +10,7 @@
 #include "idle_detection.h"
 #include "led_ctrl.h"
 #include "led_drv.h"
+#include "function_control.h"
 #include "esp_log.h"
 #include "miscs.h"
 
@@ -51,28 +52,28 @@ static uint8_t get_battery_brightness_scale(uint8_t battery_percentage)
     }
 }
 
-// Track current RMT state to avoid redundant enable/disable calls
-static bool s_rmt_currently_enabled = true;
-
 static void apply_led_profile(const led_power_profile_t *profile, uint8_t battery_scale)
 {
     esp_err_t ret;
+    bool led_enabled = is_led_enabled();
+    bool rmt_enabled = led_ctrl_rmt_enabled();
 
     // Calculate scaled brightness (battery scale applied on top of profile brightness)
     uint8_t scaled_brightness = (profile->brightness * battery_scale) / 100;
 
-    // STEP 1: Enable RMT first if needed (before any LED operations)
-    if (profile->rmt_enabled && !s_rmt_currently_enabled) {
+    // In configuration LED is on, but it could be turned off by power management.
+    if (profile->rmt_enabled && led_enabled && !rmt_enabled) {
+        // Need to enable RMT hardware
         ret = led_ctrl_enable_rmt();
         if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to request LED RMT enable: %s", esp_err_to_name(ret));
+            ESP_LOGE(TAG, "Failed to enable LED RMT: %s", esp_err_to_name(ret));
             return; // Can't proceed without RMT enabled
+        } else {
+            ESP_LOGI(TAG, "LED RMT enabled (power save mode ended)");
         }
-        s_rmt_currently_enabled = true;
-        ESP_LOGI(TAG, "LED RMT peripheral enable requested");
     }
 
-    // STEP 2: Now set brightness and update LEDs (RMT is enabled if needed)
+    // Now set brightness and update LEDs (RMT is enabled if needed)
     ret = led_ctrl_set_brightness(scaled_brightness);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to set brightness: %s", esp_err_to_name(ret));
@@ -90,15 +91,13 @@ static void apply_led_profile(const led_power_profile_t *profile, uint8_t batter
                  scaled_brightness, profile->brightness);
     }
 
-    // STEP 3: Disable RMT after LED operations if not needed
-    // This maximizes power savings by keeping RMT enabled only when LEDs are active
-    if (!profile->rmt_enabled && s_rmt_currently_enabled) {
+    if (!profile->rmt_enabled && rmt_enabled) {
+        // Need to disable RMT hardware
         ret = led_ctrl_disable_rmt();
         if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "Failed to request LED RMT disable: %s", esp_err_to_name(ret));
+            ESP_LOGE(TAG, "Failed to disable LED RMT: %s", esp_err_to_name(ret));
         } else {
-            s_rmt_currently_enabled = false;
-            ESP_LOGI(TAG, "LED RMT peripheral disable requested (power save mode)");
+            ESP_LOGI(TAG, "LED RMT disabled (power save mode)");
         }
     }
 }

@@ -125,6 +125,15 @@ esp_err_t led_ctrl_enable_rmt(void);
  */
 esp_err_t led_ctrl_disable_rmt(void);
 
+/**
+ * @brief Check if the LED RMT hardware is enabled
+ *
+ * This function returns the current state of the RMT hardware used for LED control.
+ *
+ * @return true if RMT hardware is enabled, false otherwise
+ */
+bool led_ctrl_rmt_enabled(void);
+
 #ifdef __cplusplus
 }
 #endif
