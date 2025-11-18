@@ -79,14 +79,10 @@ idle_state_t idle_get_state(void) {
 
     if (idle_ms < IDLE_THRESHOLD_SHORT) {
         return IDLE_STATE_ACTIVE;
-    } else if (idle_ms < IDLE_THRESHOLD_MEDIUM) {
-        return IDLE_STATE_SHORT;
     } else if (idle_ms < IDLE_THRESHOLD_LONG) {
-        return IDLE_STATE_MEDIUM;
-    } else if (idle_ms < IDLE_THRESHOLD_VERY_LONG) {
-        return IDLE_STATE_LONG;
+        return IDLE_STATE_SHORT;
     } else {
-        return IDLE_STATE_VERY_LONG;
+        return IDLE_STATE_LONG;
     }
 }
 
@@ -103,9 +99,7 @@ static const char* state_to_string(idle_state_t state) {
     switch (state) {
         case IDLE_STATE_ACTIVE:     return "ACTIVE";
         case IDLE_STATE_SHORT:      return "SHORT_IDLE";
-        case IDLE_STATE_MEDIUM:     return "MEDIUM_IDLE";
         case IDLE_STATE_LONG:       return "LONG_IDLE";
-        case IDLE_STATE_VERY_LONG:  return "VERY_LONG_IDLE";
         default:                     return "UNKNOWN";
     }
 }

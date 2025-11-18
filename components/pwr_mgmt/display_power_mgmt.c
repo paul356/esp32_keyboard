@@ -21,22 +21,18 @@ typedef struct {
     bool display_on;             // Display on/off state
 } display_power_profile_t;
 
-// Power profiles for USB-powered mode
+// Power profiles for USB-powered mode (no power saving)
 static const display_power_profile_t usb_profiles[] = {
-    [IDLE_STATE_ACTIVE]     = { .refresh_period_ms = 250,  .brightness = 100, .display_on = true  },
-    [IDLE_STATE_SHORT]      = { .refresh_period_ms = 250,  .brightness = 100, .display_on = true  },
-    [IDLE_STATE_MEDIUM]     = { .refresh_period_ms = 500,  .brightness = 80,  .display_on = true  },
-    [IDLE_STATE_LONG]       = { .refresh_period_ms = 1000, .brightness = 50,  .display_on = true  },
-    [IDLE_STATE_VERY_LONG]  = { .refresh_period_ms = 0,    .brightness = 0,   .display_on = false },
+    [IDLE_STATE_ACTIVE]     = { .refresh_period_ms = 250,  .brightness = 100, .display_on = true },
+    [IDLE_STATE_SHORT]      = { .refresh_period_ms = 250,  .brightness = 100, .display_on = true },
+    [IDLE_STATE_LONG]       = { .refresh_period_ms = 500,  .brightness = 60,  .display_on = true },
 };
 
-// Power profiles for battery-powered mode (more aggressive)
+// Power profiles for battery-powered mode (aggressive power saving)
 static const display_power_profile_t battery_profiles[] = {
-    [IDLE_STATE_ACTIVE]     = { .refresh_period_ms = 250,  .brightness = 80,  .display_on = true  },
-    [IDLE_STATE_SHORT]      = { .refresh_period_ms = 500,  .brightness = 60,  .display_on = true  },
-    [IDLE_STATE_MEDIUM]     = { .refresh_period_ms = 1000, .brightness = 40,  .display_on = true  },
-    [IDLE_STATE_LONG]       = { .refresh_period_ms = 2000, .brightness = 20,  .display_on = true  },
-    [IDLE_STATE_VERY_LONG]  = { .refresh_period_ms = 0,    .brightness = 0,   .display_on = false },
+    [IDLE_STATE_ACTIVE]     = { .refresh_period_ms = 250,  .brightness = 80,  .display_on = true },
+    [IDLE_STATE_SHORT]      = { .refresh_period_ms = 500,  .brightness = 60,  .display_on = true },
+    [IDLE_STATE_LONG]       = { .refresh_period_ms = 0, .brightness = 40,  .display_on = false },
 };
 
 // Battery-level based brightness scaling (applied on top of idle profiles)
@@ -101,11 +97,11 @@ void display_power_mgmt_update(idle_state_t idle_state)
     uint8_t battery_scale = 100;
 
     if (usb_powered) {
-        // USB powered - use less aggressive profiles
+        // USB powered - use full performance profiles
         profile = &usb_profiles[idle_state];
         ESP_LOGD(TAG, "Using USB power profile for state: %s", idle_get_state_string());
     } else {
-        // Battery powered - use aggressive profiles with battery scaling
+        // Battery powered - use power saving profiles with battery scaling
         profile = &battery_profiles[idle_state];
 
         uint8_t battery_percentage = 0;

@@ -21,22 +21,18 @@ typedef struct {
     bool rmt_enabled;       // Whether RMT hardware should be enabled
 } led_power_profile_t;
 
-// Power profiles for USB-powered mode
+// Power profiles for USB-powered mode (no power saving)
 static const led_power_profile_t usb_profiles[] = {
     [IDLE_STATE_ACTIVE]     = { .brightness = 100, .rmt_enabled = true  },
-    [IDLE_STATE_SHORT]      = { .brightness = 80,  .rmt_enabled = true  },
-    [IDLE_STATE_MEDIUM]     = { .brightness = 60,  .rmt_enabled = true  },
-    [IDLE_STATE_LONG]       = { .brightness = 40,  .rmt_enabled = true  },
-    [IDLE_STATE_VERY_LONG]  = { .brightness = 0,   .rmt_enabled = false },  // Disable RMT when off
+    [IDLE_STATE_SHORT]      = { .brightness = 100, .rmt_enabled = true  },
+    [IDLE_STATE_LONG]       = { .brightness = 60, .rmt_enabled = true  },
 };
 
-// Power profiles for battery-powered mode (more aggressive)
+// Power profiles for battery-powered mode (aggressive power saving)
 static const led_power_profile_t battery_profiles[] = {
-    [IDLE_STATE_ACTIVE]     = { .brightness = 50,  .rmt_enabled = true  },
+    [IDLE_STATE_ACTIVE]     = { .brightness = 60,  .rmt_enabled = true  },
     [IDLE_STATE_SHORT]      = { .brightness = 30,  .rmt_enabled = true  },
-    [IDLE_STATE_MEDIUM]     = { .brightness = 20,  .rmt_enabled = true  },
-    [IDLE_STATE_LONG]       = { .brightness = 10,  .rmt_enabled = true  },
-    [IDLE_STATE_VERY_LONG]  = { .brightness = 0,   .rmt_enabled = false },  // Disable RMT when off
+    [IDLE_STATE_LONG]       = { .brightness = 0,   .rmt_enabled = false },
 };
 
 // Battery-level based brightness scaling (applied on top of idle profiles)
@@ -117,11 +113,11 @@ void led_power_mgmt_update(idle_state_t idle_state)
     uint8_t battery_scale = 100;
 
     if (usb_powered) {
-        // USB powered - use less aggressive profiles
+        // USB powered - use full brightness profiles
         profile = &usb_profiles[idle_state];
         ESP_LOGD(TAG, "Using USB power profile for state: %s", idle_get_state_string());
     } else {
-        // Battery powered - use aggressive profiles with battery scaling
+        // Battery powered - use power saving profiles with battery scaling
         profile = &battery_profiles[idle_state];
 
         uint8_t battery_percentage = 0;

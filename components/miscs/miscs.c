@@ -23,6 +23,8 @@
 #define MISCS_ADC_ATTEN         ADC_ATTEN_DB_6
 #define MISCS_ADC_BITWIDTH      ADC_BITWIDTH_12
 #define MISCS_ADC_READ_TIMES    5 // Number of samples to read for battery voltage
+#define MISCS_CHARG_READ_TIMES  5
+
 
 /**
  * Battery Voltage Divider Configuration
@@ -203,7 +205,11 @@ bool miscs_is_usb_powered(void)
 // Battery Charge Status Functions
 bool miscs_is_battery_charging(void)
 {
-    return gpio_get_level(MISCS_BATTERY_CHARGE_GPIO) == 0; // Low means charging
+    bool charging = true;
+    for (int i = 0; i < MISCS_BATTERY_CHARGE_GPIO && charging; i++) {
+        charging = charging && (gpio_get_level(MISCS_BATTERY_CHARGE_GPIO) == 0);
+    }
+    return charging; // Low means charging
 }
 
 // Battery Voltage ADC Functions
