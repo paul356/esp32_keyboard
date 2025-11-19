@@ -193,7 +193,7 @@ esp_err_t lcd_hardware_set_backlight(uint8_t brightness)
     }
 
     // Simple on/off control - could be enhanced with PWM for brightness control
-    bool level = brightness > 50 ? 1 : 0;
+    bool level = brightness > 40 ? 1 : 0;
     return gpio_set_level(LCD_PIN_BL, level);
 }
 

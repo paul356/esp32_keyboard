@@ -5,6 +5,7 @@
 #include "esp_adc/adc_cali_scheme.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "drv_loop.h"
 
 /**
  * GPIO Pin Definitions
@@ -23,7 +24,12 @@
 #define MISCS_ADC_ATTEN         ADC_ATTEN_DB_6
 #define MISCS_ADC_BITWIDTH      ADC_BITWIDTH_12
 #define MISCS_ADC_READ_TIMES    5 // Number of samples to read for battery voltage
-#define MISCS_CHARG_READ_TIMES  5
+
+/**
+ * Battery Charge Detection Configuration
+ */
+#define MISCS_CHARGE_READ_TIMES  20 // Number of consecutive reads to confirm charging state
+#define MISCS_CHARGE_READ_DELAY_MS  10 // Delay between reads in milliseconds
 
 
 /**
@@ -40,6 +46,15 @@
 
 static const char *TAG = "MISCS";
 
+// Define event base for MISCS events
+ESP_EVENT_DEFINE_BASE(MISCS_EVENTS);
+
+// Event IDs for MISCS
+typedef enum {
+    MISCS_EVENT_CHECK_CHARGING = 0,
+    MISCS_EVENT_MAX
+} miscs_event_id_t;
+
 // Static variables for ADC and encoder
 static adc_oneshot_unit_handle_t adc1_handle = NULL;
 static adc_cali_handle_t adc1_cali_handle = NULL;
@@ -51,8 +66,14 @@ static volatile int32_t encoder_raw_position = 0;  // Raw position before divisi
 static volatile miscs_encoder_direction_t encoder_direction = MISCS_ENCODER_STOPPED;
 static volatile uint8_t encoder_last_state = 0;
 
+// Battery charging state variables
+static bool cached_charging_state = false;
+static volatile bool charging_read_state;
+static volatile uint8_t charging_read_counter = 0;
+
 static esp_err_t miscs_encoder_init(void);
 static esp_err_t miscs_gpio_config(gpio_num_t gpio_num, gpio_mode_t mode, gpio_pull_mode_t pull_mode);
+static void miscs_charging_check_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data);
 
 // Encoder interrupt handler
 static void IRAM_ATTR encoder_isr_handler(void* arg)
@@ -83,6 +104,42 @@ static void IRAM_ATTR encoder_isr_handler(void* arg)
     }
 
     encoder_last_state = current_state;
+}
+
+/**
+ * Event handler for periodic battery charging status check
+ * This handler is called in the drv_loop context to perform multiple GPIO reads
+ */
+static void miscs_charging_check_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data)
+{
+    if (id != MISCS_EVENT_CHECK_CHARGING) {
+        return;
+    }
+
+    if (charging_read_counter >= MISCS_CHARGE_READ_TIMES) {
+        // Start a new round of charging checks
+        charging_read_counter = 0;
+        charging_read_state = true;
+    }
+
+    // Read the charging GPIO
+    bool is_charging_now = (gpio_get_level(MISCS_BATTERY_CHARGE_GPIO) == 0);
+    charging_read_state = charging_read_state && is_charging_now;
+
+    charging_read_counter++;
+    if (!charging_read_state || charging_read_counter >= MISCS_CHARGE_READ_TIMES) {
+        cached_charging_state = charging_read_state;
+        charging_read_counter = MISCS_CHARGE_READ_TIMES;
+    } else {
+        // Continue checking - post another event after delay
+        vTaskDelay(pdMS_TO_TICKS(MISCS_CHARGE_READ_DELAY_MS));
+        esp_err_t ret = drv_loop_post_event(MISCS_EVENTS, MISCS_EVENT_CHECK_CHARGING, NULL, 0, pdMS_TO_TICKS(MISCS_CHARGE_READ_DELAY_MS));
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Fail to post the CHECK_CHARGING event: %s", esp_err_to_name(ret));
+            // Reset counter for the next trigger
+            charging_read_counter = MISCS_CHARGE_READ_TIMES;
+        }
+    }
 }
 
 esp_err_t miscs_init(void)
@@ -149,6 +206,14 @@ esp_err_t miscs_init(void)
         return ret;
     }
 
+    // Register event handler for battery charging check
+    ret = drv_loop_register_handler(MISCS_EVENTS, MISCS_EVENT_CHECK_CHARGING,
+                                     miscs_charging_check_event_handler, NULL);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to register charging check event handler");
+        return ret;
+    }
+
     ESP_LOGI(TAG, "Miscellaneous peripheral hardware initialized successfully");
     return ESP_OK;
 }
@@ -156,6 +221,10 @@ esp_err_t miscs_init(void)
 esp_err_t miscs_deinit(void)
 {
     ESP_LOGI(TAG, "Deinitializing miscellaneous peripheral hardware");
+
+    // Unregister charging check event handler
+    drv_loop_unregister_handler(MISCS_EVENTS, MISCS_EVENT_CHECK_CHARGING,
+                                miscs_charging_check_event_handler);
 
     // Disable encoder interrupts
     gpio_isr_handler_remove(MISCS_ENCODER_A_GPIO);
@@ -205,11 +274,16 @@ bool miscs_is_usb_powered(void)
 // Battery Charge Status Functions
 bool miscs_is_battery_charging(void)
 {
-    bool charging = true;
-    for (int i = 0; i < MISCS_BATTERY_CHARGE_GPIO && charging; i++) {
-        charging = charging && (gpio_get_level(MISCS_BATTERY_CHARGE_GPIO) == 0);
+    // Trigger a new round of charging detection if not already in progress
+    if (charging_read_counter >= MISCS_CHARGE_READ_TIMES) {
+        esp_err_t ret = drv_loop_post_event(MISCS_EVENTS, MISCS_EVENT_CHECK_CHARGING, NULL, 0, 0);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to trigger charging check event");
+        }
     }
-    return charging; // Low means charging
+
+    // Return the cached charging state
+    return cached_charging_state;
 }
 
 // Battery Voltage ADC Functions
