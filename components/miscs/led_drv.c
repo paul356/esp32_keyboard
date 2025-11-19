@@ -344,10 +344,6 @@ esp_err_t led_drv_enable(void)
 
     esp_err_t ret = ESP_OK;
     for (int strip = 0; strip < LED_DRV_NUM_STRIPS; strip++) {
-        if (strip == LED_DRV_NUM_STRIPS - 1) {
-            break;  // Skip last strip (currently disabled)
-        }
-
         if (led_channels[strip] == NULL) {
             ESP_LOGW(TAG, "LED strip %d not initialized, skipping enable", strip);
             continue;
@@ -371,10 +367,6 @@ esp_err_t led_drv_disable(void)
 
     esp_err_t ret = ESP_OK;
     for (int strip = 0; strip < LED_DRV_NUM_STRIPS; strip++) {
-        if (strip == LED_DRV_NUM_STRIPS - 1) {
-            break;  // Skip last strip (currently disabled)
-        }
-
         if (led_channels[strip] == NULL) {
             ESP_LOGW(TAG, "LED strip %d not initialized, skipping disable", strip);
             continue;
