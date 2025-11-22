@@ -53,4 +53,8 @@ bool is_boot_protocol(void);
 
 void set_boot_protocol(bool boot);
 
+bool get_nkro_flag(void);
+
+void set_nkro_flag(bool nkro);
+
 #endif

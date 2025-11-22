@@ -189,11 +189,20 @@ void enable_usb_hid(void)
         .string_descriptor_count = 5,
         .external_phy = false
     };
-#ifdef NKRO_ENABLE
-    keymap_config.nkro = 1;
-#endif
+
+    keymap_config.nkro = 0;
 
     ESP_ERROR_CHECK(tinyusb_driver_install(&tusb_cfg));
+}
+
+void set_nkro_flag(bool nkro)
+{
+    keymap_config.nkro = nkro ? 1 : 0;
+}
+
+bool get_nkro_flag(void)
+{
+    return keymap_config.nkro ? true : false;
 }
 
 uint8_t const *tud_hid_descriptor_report_cb(uint8_t itf)

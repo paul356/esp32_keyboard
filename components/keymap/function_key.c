@@ -23,6 +23,7 @@
 #include "function_key.h"
 #include "quantum.h"
 #include "wifi_intf.h"
+#include "hid_desc.h"
 #include "function_control.h"
 
 #define TAG "FunctionKey"
@@ -31,7 +32,8 @@
 const char* function_key_strs[FUNCTION_KEY_NUM] = {
     "info",
     "intro",
-    "hotspot"
+    "hotspot",
+    "toggle_nkro"
 };
 
 static char ip_str[20];
@@ -161,6 +163,15 @@ esp_err_t process_function_key(uint16_t keycode)
         break;
     case FUNCTION_KEY_HOTSPOT:
         turn_on_hotspot();
+        break;
+    case FUNCTION_KEY_TOGGLE_NKRO:
+        if (get_nkro_flag()) {
+            set_nkro_flag(false);
+            ESP_LOGI(TAG, "NKRO Disabled!");
+        } else {
+            set_nkro_flag(true);
+            ESP_LOGI(TAG, "NKRO Enabled!");
+        }
         break;
     default:
         SEND_STRING("Unkonwn function key!");
