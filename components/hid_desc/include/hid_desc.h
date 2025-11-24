@@ -39,7 +39,7 @@ enum {
     ITF_NUM_TOTAL
 };
 
-#define HID_REPORT_DESC_NUM 3
+#define HID_REPORT_DESC_MAX_NUM 3
 
 void enable_usb_hid(void);
 

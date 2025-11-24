@@ -52,7 +52,7 @@ esp_hidd_dev_t* ble_get_hid_dev(void) {
     return hid_dev;
 }
 
-static esp_hid_raw_report_map_t report_maps[HID_REPORT_DESC_NUM];
+static esp_hid_raw_report_map_t report_maps[HID_REPORT_DESC_MAX_NUM];
 
 static esp_hid_device_config_t ble_hid_config = {
     .vendor_id          = 0x16C0,
@@ -227,17 +227,17 @@ esp_err_t init_ble_device(const char *adv_name)
     }
 
     ESP_LOGI(TAG, "setting hid service");
-    const uint8_t* starts[HID_REPORT_DESC_NUM];
-    size_t len[HID_REPORT_DESC_NUM];
-    get_hid_report_desc(starts, len, HID_REPORT_DESC_NUM);
-    for (int i = 0; i < HID_REPORT_DESC_NUM; i++)
+    const uint8_t* starts[HID_REPORT_DESC_MAX_NUM];
+    size_t len[HID_REPORT_DESC_MAX_NUM];
+    int report_num = get_hid_report_desc(starts, len, HID_REPORT_DESC_MAX_NUM);
+    for (int i = 0; i < report_num; i++)
     {
         report_maps[i].data = starts[i];
         report_maps[i].len = len[i];
     }
 
     ble_hid_config.report_maps = &report_maps[0];
-    ble_hid_config.report_maps_len = HID_REPORT_DESC_NUM;
+    ble_hid_config.report_maps_len = report_num;
     ESP_ERROR_CHECK(
         esp_hidd_dev_init(&ble_hid_config, ESP_HID_TRANSPORT_BLE, ble_hidd_event_callback, &hid_dev));
 

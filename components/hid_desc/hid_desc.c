@@ -144,7 +144,7 @@ void set_boot_protocol(bool boot)
 
 int get_hid_report_desc(const uint8_t** report_start, size_t* report_len, int arr_len)
 {
-    if (!report_start || !report_len || arr_len < HID_REPORT_DESC_NUM) {
+    if (!report_start || !report_len || arr_len < HID_REPORT_DESC_MAX_NUM) {
         return 0;
     }
 
