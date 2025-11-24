@@ -424,7 +424,7 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
             layout_uuid.uuid.uuid16 = LAYOUT_CHAR_UUID;
 
             esp_err_t ret = esp_ble_gatts_add_char(
-                layout_service_handle, &layout_uuid, ESP_GATT_PERM_READ,
+                layout_service_handle, &layout_uuid, ESP_GATT_PERM_READ_ENCRYPTED,
                 ESP_GATT_CHAR_PROP_BIT_READ, NULL, NULL);
 
             if (ret != ESP_OK)
@@ -451,7 +451,7 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                 layout_offset_uuid.uuid.uuid16 = LAYOUT_OFFSET_CHAR_UUID;
 
                 esp_ble_gatts_add_char(layout_service_handle, &layout_offset_uuid,
-                                      ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+                                      ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED,
                                       ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE,
                                       NULL, NULL);
             }
@@ -464,7 +464,7 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                 keycode_uuid.len = ESP_UUID_LEN_16;
                 keycode_uuid.uuid.uuid16 = KEYCODE_CHAR_UUID;
 
-                esp_ble_gatts_add_char(layout_service_handle, &keycode_uuid, ESP_GATT_PERM_READ,
+                esp_ble_gatts_add_char(layout_service_handle, &keycode_uuid, ESP_GATT_PERM_READ_ENCRYPTED,
                                        ESP_GATT_CHAR_PROP_BIT_READ,
                                        NULL, NULL);
             }
@@ -478,7 +478,7 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                 keycode_offset_uuid.uuid.uuid16 = KEYCODE_OFFSET_CHAR_UUID;
 
                 esp_ble_gatts_add_char(layout_service_handle, &keycode_offset_uuid,
-                                      ESP_GATT_PERM_READ | ESP_GATT_PERM_WRITE,
+                                      ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED,
                                       ESP_GATT_CHAR_PROP_BIT_READ | ESP_GATT_CHAR_PROP_BIT_WRITE,
                                       NULL, NULL);
             }
@@ -493,7 +493,7 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                 layout_update_uuid.uuid.uuid16 = LAYOUT_UPDATE_CHAR_UUID;
 
                 esp_ble_gatts_add_char(layout_service_handle, &layout_update_uuid,
-                                      ESP_GATT_PERM_WRITE,  // Write-only permission
+                                      ESP_GATT_PERM_WRITE_ENCRYPTED,  // Write-only permission
                                       ESP_GATT_CHAR_PROP_BIT_WRITE,
                                       NULL, NULL);
             }
@@ -508,7 +508,7 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                 macro_id_uuid.uuid.uuid16 = MACRO_ID_CHAR_UUID;
 
                 esp_ble_gatts_add_char(layout_service_handle, &macro_id_uuid,
-                                      ESP_GATT_PERM_WRITE,
+                                      ESP_GATT_PERM_WRITE_ENCRYPTED,
                                       ESP_GATT_CHAR_PROP_BIT_WRITE,
                                       NULL, NULL);
             }
@@ -523,7 +523,7 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                 macro_uuid.uuid.uuid16 = MACRO_CHAR_UUID;
 
                 esp_ble_gatts_add_char(layout_service_handle, &macro_uuid,
-                                      ESP_GATT_PERM_READ,
+                                      ESP_GATT_PERM_READ_ENCRYPTED,
                                       ESP_GATT_CHAR_PROP_BIT_READ,
                                       NULL, NULL);
             }
@@ -538,7 +538,7 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                 macro_offset_uuid.uuid.uuid16 = MACRO_OFFSET_CHAR_UUID;
 
                 esp_ble_gatts_add_char(layout_service_handle, &macro_offset_uuid,
-                                      ESP_GATT_PERM_WRITE,
+                                      ESP_GATT_PERM_WRITE_ENCRYPTED,
                                       ESP_GATT_CHAR_PROP_BIT_WRITE,
                                       NULL, NULL);
             }
@@ -553,7 +553,7 @@ void layout_service_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatt
                 macro_update_uuid.uuid.uuid16 = MACRO_UPDATE_CHAR_UUID;
 
                 esp_ble_gatts_add_char(layout_service_handle, &macro_update_uuid,
-                                      ESP_GATT_PERM_WRITE,
+                                      ESP_GATT_PERM_WRITE_ENCRYPTED,
                                       ESP_GATT_CHAR_PROP_BIT_WRITE,
                                       NULL, NULL);
             }
