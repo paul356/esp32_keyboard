@@ -488,7 +488,7 @@ static void menu_setup_tree(void)
 
     // Create WiFi submenu items
     struct menu_item *wifi_toggle = menu_item_create("Toggle WiFi", &switch_icon, keyboard_gui_prepare_wifi_toggle, keyboard_gui_post_wifi_toggle, NULL, keyboard_gui_wifi_toggle_action);
-    struct menu_item *wifi_settings = menu_item_create("WiFi Settings", &wifi_setting_icon, keyboard_gui_prepare_wifi_settings, keyboard_gui_post_wifi_settings, keyboard_gui_wifi_settings_handle_input, NULL);
+    struct menu_item *wifi_settings = menu_item_create("WiFi Settings", &wifi_setting_icon, keyboard_gui_prepare_wifi_settings, keyboard_gui_post_wifi_settings, keyboard_gui_wifi_settings_handle_input, keyboard_gui_wifi_settings_action);
 
     menu_item_add_child(wifi_menu, wifi_toggle);
     menu_item_add_child(wifi_menu, wifi_settings);

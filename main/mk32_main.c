@@ -57,8 +57,8 @@
 #include "drv_loop.h"
 #include "led_ctrl.h"
 #include "idle_detection.h"
+#include "keymap_server.h"
 
-extern esp_err_t start_file_server();
 extern void wifi_init_softap(void);
 extern void rtc_matrix_deinit(void);
 

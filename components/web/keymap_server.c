@@ -38,6 +38,7 @@
 
 static time_t s_init_version;
 static char recv_buf[RECV_BUF_SIZE];
+static httpd_handle_t s_server = NULL;
 
 static esp_err_t parse_http_req(httpd_req_t* req, cJSON** root)
 {
@@ -508,7 +509,11 @@ static struct {
 
 esp_err_t start_file_server()
 {
-    httpd_handle_t server = NULL;
+    if (s_server != NULL) {
+        ESP_LOGW(TAG, "File server already running");
+        return ESP_OK;
+    }
+
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     // The default max handler number is 8
     config.max_uri_handlers = ARRAY_LEN(handler_uris);
@@ -519,8 +524,9 @@ esp_err_t start_file_server()
     config.uri_match_fn = httpd_uri_match_wildcard;
 
     ESP_LOGI(TAG, "Starting HTTP Server on port: '%d'", config.server_port);
-    if (httpd_start(&server, &config) != ESP_OK) {
+    if (httpd_start(&s_server, &config) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to start file server!");
+        s_server = NULL;
         return ESP_FAIL;
     }
 
@@ -531,8 +537,28 @@ esp_err_t start_file_server()
             .handler  = handler_uris[i].handler,
             .user_ctx = handler_uris[i].user_ctx
         };
-        httpd_register_uri_handler(server, &uri);
+        httpd_register_uri_handler(s_server, &uri);
     }
 
+    ESP_LOGI(TAG, "File server started successfully");
     return ESP_OK;
+}
+
+esp_err_t stop_file_server()
+{
+    if (s_server == NULL) {
+        ESP_LOGW(TAG, "File server is not running");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Stopping HTTP Server");
+    esp_err_t ret = httpd_stop(s_server);
+    if (ret == ESP_OK) {
+        s_server = NULL;
+        ESP_LOGI(TAG, "File server stopped successfully");
+    } else {
+        ESP_LOGE(TAG, "Failed to stop file server: %s", esp_err_to_name(ret));
+    }
+
+    return ret;
 }

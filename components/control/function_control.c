@@ -30,6 +30,7 @@
 #include "memory_debug.h"
 #include "led_ctrl.h"
 #include "drv_loop.h"
+#include "keymap_server.h"
 
 #define TAG "FUNC_CTRL"
 #define FUNCTION_CTRL_NAMESPACE "FUNC_CTRL"
@@ -348,13 +349,30 @@ esp_err_t update_wifi_switch(bool flag)
     esp_err_t err;
     if (flag) {
         err = wifi_update(function_state.wifi.mode, function_state.wifi.ssid, function_state.wifi.passwd);
-    } else {
-        err = wifi_stop();
-    }
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "fail to enable wifi");
+            return err;
+        }
 
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "fail to %s wifi", flag ? "enable" : "disable");
-        return err;
+        // Start file server when WiFi is enabled
+        err = start_file_server();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "fail to start file server");
+            // Don't fail the WiFi enable operation if file server fails
+        }
+    } else {
+        // Stop file server when WiFi is disabled
+        err = stop_file_server();
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "fail to stop file server");
+            // Continue with WiFi stop even if file server stop fails
+        }
+
+        err = wifi_stop();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "fail to disable wifi");
+            return err;
+        }
     }
 
     return update_persisted_config(WIFI);
@@ -388,12 +406,30 @@ esp_err_t update_wifi_mode(wifi_mode_t mode, const char* ssid, const char* passw
 
     if (function_state.wifi.enabled) {
         err = wifi_update(mode, function_state.wifi.ssid, function_state.wifi.passwd);
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "fail to update wifi state, mode=%d err=%d", mode, err);
+            return err;
+        }
+
+        // Start file server when WiFi is enabled
+        err = start_file_server();
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "fail to start file server");
+            // Don't fail the WiFi operation if file server fails
+        }
     } else {
+        // Stop file server when WiFi is disabled
+        err = stop_file_server();
+        if (err != ESP_OK) {
+            ESP_LOGW(TAG, "fail to stop file server");
+            // Continue with WiFi stop even if file server stop fails
+        }
+
         err = wifi_stop();
-    }
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "fail to update wifi state, mode=%d err=%d", mode, err);
-        return err;
+        if (err != ESP_OK) {
+            ESP_LOGE(TAG, "fail to stop wifi, err=%d", err);
+            return err;
+        }
     }
 
     return update_persisted_config(WIFI);

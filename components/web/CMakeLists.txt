@@ -2,6 +2,7 @@ set(SRC_FILES
     keymap_server.c)
 set(INC_DIRS
     ./
+    include
     ${CMAKE_SOURCE_DIR}/main
     )
 idf_component_register(SRCS ${SRC_FILES}
