@@ -35,7 +35,7 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
     int report_id;
 
 #ifdef NKRO_ENABLE
-    if (is_boot_protocol() == false && keymap_config.nkro)
+    if (!is_boot_protocol() && keymap_config.nkro)
     {
         // Check if the report was modified, if so send it
         report_state[0] = report->nkro.mods;
@@ -65,8 +65,16 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
 
         report_len = BOOT_REPORT_LEN;
         report_data_offset = BOOT_REPORT_OFFSET;
-        intf_num = ITF_NUM_BOOT_KB;
-        report_id = 0; // must be set to 0 here
+        if (is_boot_protocol())
+        {
+            intf_num = ITF_NUM_BOOT_KB;
+            report_id = 0; // In boot protocol, report ID is not used
+        }
+        else
+        {
+            intf_num = ITF_NUM_COMPOSITE;
+            report_id = REPORT_ID_KEYBOARD;
+        }
     }
 
     if (keyboard_gui_handle_key_input(report_state[0], &report_state[report_data_offset], report_len - report_data_offset, report_id == REPORT_ID_NKRO)) {

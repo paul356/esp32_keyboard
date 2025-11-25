@@ -82,16 +82,14 @@ enum {
 
 // Helper macros to calculate descriptor sizes
 #define BOOT_KEYBOARD_DESC_SIZE sizeof((uint8_t[]){TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(REPORT_ID_KEYBOARD))})
-#define MOUSE_DESC_SIZE sizeof((uint8_t[]){TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(REPORT_ID_MOUSE))})
 #ifdef NKRO_ENABLE
 #define NKRO_KEYBOARD_DESC_SIZE sizeof((uint8_t[]){TUD_HID_REPORT_DESC_NKRO_KEYBOARD(HID_REPORT_ID(REPORT_ID_NKRO))})
 #endif
 
 uint8_t const desc_hid_report[] = {
     TUD_HID_REPORT_DESC_KEYBOARD(HID_REPORT_ID(REPORT_ID_KEYBOARD)),
-    TUD_HID_REPORT_DESC_MOUSE(HID_REPORT_ID(REPORT_ID_MOUSE) ),
 #ifdef NKRO_ENABLE
-    TUD_HID_REPORT_DESC_NKRO_KEYBOARD(HID_REPORT_ID(REPORT_ID_NKRO) )
+    TUD_HID_REPORT_DESC_NKRO_KEYBOARD(HID_REPORT_ID(REPORT_ID_NKRO))
 #endif
 };
 
@@ -103,7 +101,6 @@ uint8_t const desc_boot_report[] ={
 
 static uint8_t const descriptor_hid_default[] = {
     TUD_CONFIG_DESCRIPTOR(1, ITF_NUM_TOTAL, 0, TUSB_DESC_TOTAL_LEN, TUSB_DESC_CONFIG_ATT_REMOTE_WAKEUP, 500),
-
     TUD_HID_DESCRIPTOR(ITF_NUM_BOOT_KB, STRID_HID, 1, sizeof(desc_boot_report), 0x80 | EPNUM_HID1, ESP32S3_EPSIZE, 10),
     TUD_HID_DESCRIPTOR(ITF_NUM_COMPOSITE, STRID_HID, 0, sizeof(desc_hid_report), 0x80 | EPNUM_HID2, ESP32S3_EPSIZE, 10)
 };
@@ -156,14 +153,6 @@ int get_hid_report_desc(const uint8_t** report_start, size_t* report_len, int ar
         report_start[report_count] = &desc_hid_report[offset];
         report_len[report_count] = BOOT_KEYBOARD_DESC_SIZE;
         offset += BOOT_KEYBOARD_DESC_SIZE;
-        report_count++;
-    }
-
-    // Mouse Report Descriptor
-    if (report_count < arr_len) {
-        report_start[report_count] = &desc_hid_report[offset];
-        report_len[report_count] = MOUSE_DESC_SIZE;
-        offset += MOUSE_DESC_SIZE;
         report_count++;
     }
 

@@ -135,10 +135,11 @@ static void keyboard_event_handler(void* handler_args, esp_event_base_t base, in
     if (!hid_dev || !esp_hidd_dev_connected(hid_dev))
         return;
 
+    // Hard code the positions of reports in the report maps
     if (kbd_data->nkro) {
-        esp_hidd_dev_input_set(hid_dev, REPORT_ID_NKRO - 1, REPORT_ID_NKRO, kbd_data->report_data, kbd_data->report_len);
+        esp_hidd_dev_input_set(hid_dev, 1, REPORT_ID_NKRO, kbd_data->report_data, kbd_data->report_len);
     } else {
         // If it is 6nkro, use the failback report id in the report maps
-        esp_hidd_dev_input_set(hid_dev, REPORT_ID_KEYBOARD - 1, REPORT_ID_KEYBOARD, kbd_data->report_data, kbd_data->report_len);
+        esp_hidd_dev_input_set(hid_dev, 0, REPORT_ID_KEYBOARD, kbd_data->report_data, kbd_data->report_len);
     }
 }

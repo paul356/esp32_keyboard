@@ -196,8 +196,8 @@ void app_main()
         if (((count++) % 200) == 0) {
             // Process power management based on idle state
             pwr_mgmt_process();
-            uint8_t percentage;
-            miscs_get_battery_percentage(&percentage, true);
+            //uint8_t percentage;
+            //miscs_get_battery_percentage(&percentage, true);
         }
 
         vTaskDelay(pdMS_TO_TICKS(5));

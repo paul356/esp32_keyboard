@@ -15,6 +15,7 @@
 #include "ble_gap.h"
 #include "hal_ble.h"
 #include "esp_bt_device.h"
+#include "function_control.h"
 
 static const char *TAG = "BLE_GAP";
 
@@ -123,12 +124,21 @@ void ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t 
             if (passkey_callback) {
                 passkey_callback(passkey_callback_arg, PASSKEY_FAILURE, param->ble_security.auth_cmpl.bd_addr);
             }
+
+            // Restart advertising to allow reconnection
+            const char *ble_name = get_ble_name();
+            esp_err_t ret = ble_gap_adv_to_any(ble_name);
+            if (ret != ESP_OK)
+            {
+                ESP_LOGE(TAG, "Failed to start advertising for bonded devices: %s", esp_err_to_name(ret));
+            }
         } else {
             ESP_LOGI(TAG, "BLE GAP AUTH SUCCESS");
             if (passkey_callback) {
                 passkey_callback(passkey_callback_arg, PASSKEY_SUCCESS, param->ble_security.auth_cmpl.bd_addr);
             }
         }
+
         break;
 
     case ESP_GAP_BLE_KEY_EVT: //shows the ble key info share with peer device to the user.

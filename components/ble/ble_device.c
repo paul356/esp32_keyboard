@@ -134,15 +134,6 @@ void top_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
     if ((event == ESP_GATTS_REG_EVT && param->reg.app_id == LAYOUT_SERVICE_UUID) ||
         (event != ESP_GATTS_REG_EVT && gatts_if != ESP_GATT_IF_NONE && gatts_if == layout_service_get_gatts_if()))
     {
-        if (event == ESP_GATTS_CONNECT_EVT)
-        {
-            const char* ble_name = get_ble_name();
-            esp_err_t ret = ble_gap_adv_to_any(ble_name);
-            if (ret != ESP_OK) {
-                ESP_LOGE(TAG, "Failed to start advertising for bonded devices: %s", esp_err_to_name(ret));
-            }
-        }
-
         // Pass to our layout service handler
         ESP_LOGI(TAG, "GATTS event: %d, GATTS interface: %d, to custom", event, gatts_if);
         layout_service_event_handler(event, gatts_if, param);
