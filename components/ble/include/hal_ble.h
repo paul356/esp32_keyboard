@@ -28,6 +28,8 @@
 #include <esp_err.h>
 #include "esp_gap_ble_api.h"
 
+// Forward declaration
+struct esp_hidd_dev_s;
 
 enum passkey_event_e {
     PASSKEY_CHALLENGE = 0,  // Passkey challenge event
@@ -56,10 +58,18 @@ esp_err_t init_ble_device(const char *adv_name);
  */
 esp_err_t deinit_ble_device(void);
 
-esp_err_t ble_gap_adv_to_any(const char* adv_name);
+esp_err_t ble_gap_adv_to_any(const char* adv_name, bool slow);
 
 void ble_gap_set_passkey_callback(ble_passkey_callback callback, void* arg);
 
 bool is_ble_ready();
+
+/** @brief Get the HID device handle
+ *
+ * Returns the esp_hidd_dev_t handle for accessing connection information.
+ *
+ * @return esp_hidd_dev_t* pointer, or NULL if BLE is not initialized
+ */
+struct esp_hidd_dev_s* ble_get_hid_dev(void);
 
 #endif /* _HAL_BLE_H_ */

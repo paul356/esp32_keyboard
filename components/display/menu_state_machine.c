@@ -480,9 +480,11 @@ static void menu_setup_tree(void)
     // Create Bluetooth submenu items
     struct menu_item *bt_toggle = menu_item_create("Toggle Bluetooth", &switch_icon, keyboard_gui_prepare_bt_toggle, keyboard_gui_post_bt_toggle, NULL, keyboard_gui_bt_toggle_action);
     struct menu_item *bt_pair_kb = menu_item_create("Pair Keyboard", &bluetooth_pc_pair, keyboard_gui_prepare_bt_pair_kb, keyboard_gui_post_bt_pair_kb, keyboard_gui_bt_pair_kb_handle_input, keyboard_gui_bt_pair_kb_action);
+    struct menu_item *report_target = menu_item_create("Report Target", &bluetooth_target, keyboard_gui_prepare_report_target, keyboard_gui_post_report_target, keyboard_gui_report_target_handle_input, keyboard_gui_report_target_action);
 
     menu_item_add_child(bluetooth_menu, bt_toggle);
     menu_item_add_child(bluetooth_menu, bt_pair_kb);
+    menu_item_add_child(bluetooth_menu, report_target);
 
     ble_gap_set_passkey_callback(&prompt_for_passkey_callback, bt_pair_kb);
 

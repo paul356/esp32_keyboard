@@ -9,6 +9,7 @@
 #include "hid_desc.h"
 #include "keycode_config.h"
 #include "report.h"
+#include "function_control.h"
 
 static void send_keyboard_to_queue(report_keyboard_t*);
 static uint8_t keyboard_leds_status(void);
@@ -82,8 +83,11 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
         return;
     }
 
-    // hardcoded HID interface 0, keyboard id 1
-    if (tud_ready()) {
+    // Get the target device for sending reports
+    target_conn_e target = get_report_target();
+
+    // Send to USB if target is USB or broadcast
+    if ((target == TARGET_USB || target == TARGET_BROADCAST || !is_ble_enabled()) && tud_ready()) {
         // endpoint may be busy
         while (!tud_hid_n_ready(0)) {
             wait_ms(1);
@@ -100,7 +104,8 @@ static void send_keyboard_to_queue(report_keyboard_t *report)
         } while (tud_hid_n_ready(0));
     }
 
-    if (is_ble_ready()) {
+    // Send to BLE if target is BLE or broadcast
+    if ((target == TARGET_BLE || target == TARGET_BROADCAST) && is_ble_ready()) {
         ble_post_keyboard_event(report_state, report_len, report_id == REPORT_ID_NKRO);
     }
 }

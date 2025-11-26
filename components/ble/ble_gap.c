@@ -127,7 +127,7 @@ void ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t 
 
             // Restart advertising to allow reconnection
             const char *ble_name = get_ble_name();
-            esp_err_t ret = ble_gap_adv_to_any(ble_name);
+            esp_err_t ret = ble_gap_adv_to_any(ble_name, false);
             if (ret != ESP_OK)
             {
                 ESP_LOGE(TAG, "Failed to start advertising for bonded devices: %s", esp_err_to_name(ret));
@@ -265,7 +265,7 @@ static esp_err_t ble_gap_config_adv_data(const char* adv_name)
     return ESP_OK;
 }
 
-esp_err_t ble_gap_adv_to_any(const char* adv_name)
+esp_err_t ble_gap_adv_to_any(const char* adv_name, bool slow)
 {
     esp_err_t ret = ble_gap_config_adv_data(adv_name);
     if (ret != ESP_OK) {
@@ -274,13 +274,19 @@ esp_err_t ble_gap_adv_to_any(const char* adv_name)
     }
 
     static esp_ble_adv_params_t hidd_adv_params = {
-        .adv_int_min        = 0x20,
-        .adv_int_max        = 0x30,
+        .adv_int_min        = 0x50,
+        .adv_int_max        = 0xA0,
         .adv_type           = ADV_TYPE_IND,
         .own_addr_type      = BLE_ADDR_TYPE_PUBLIC,
         .channel_map        = ADV_CHNL_ALL,
         .adv_filter_policy  = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
     };
+
+    if (slow) {
+        hidd_adv_params.adv_int_min = 0x320; // 500ms
+        hidd_adv_params.adv_int_max = 0x640; // 1s
+    }
+
 
     return esp_ble_gap_start_advertising(&hidd_adv_params);
 }

@@ -28,6 +28,7 @@
 #include "lvgl.h"
 #include "menu_icons.h"
 #include "menu_state_machine.h"
+#include "esp_hidd.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -62,6 +63,18 @@ typedef struct
     uint32_t last_timeout_ms;
 } bt_pair_admin_gui_t;
 
+// Report target selector GUI context structure
+typedef struct {
+    lv_obj_t *container;
+    lv_obj_t *target_selector;      // Button matrix for target selection (USB/BLE)
+    lv_obj_t *conn_info_label;      // Label for connection info
+    int selected_target;            // 0=USB, 1=BLE
+    int ble_device_index;           // Current BLE device index (0-based)
+    int ble_device_count;           // Total number of BLE devices
+    uint16_t ble_conn_id;           // Current BLE connection ID (if TARGET_BLE)
+    esp_bd_addr_t ble_bda;          // Current BLE device address (if TARGET_BLE)
+} report_target_gui_t;
+
 // Static function declarations
 static bt_toggle_gui_t *create_bt_toggle_gui(void);
 static bt_pair_kb_gui_t *create_bt_pair_kb_gui(void);
@@ -71,6 +84,12 @@ static esp_err_t prepare_bt_pair_kb_gui(struct menu_item *self);
 static esp_err_t post_bt_pair_kb_gui(struct menu_item *self);
 static void update_passkey_display(bt_pair_kb_gui_t *gui);
 static bool bt_pair_kb_handle_input_key(void *user_ctx, input_event_e input_event, char key_code);
+static report_target_gui_t* create_report_target_gui(void);
+static esp_err_t prepare_report_target_gui(struct menu_item *self);
+static esp_err_t post_report_target_gui(struct menu_item *self);
+static bool report_target_handle_input_key(void *user_ctx, input_event_e input_event, char key_code);
+static void update_report_target_focus_style(report_target_gui_t *gui);
+static void update_conn_info_display(report_target_gui_t *gui);
 
 static bt_toggle_gui_t *create_bt_toggle_gui(void)
 {
@@ -581,5 +600,327 @@ esp_err_t keyboard_gui_bt_pair_kb_action(void *user_ctx)
 
     // If not in passkey mode, this could initiate pairing or perform other actions
     ESP_LOGI(TAG, "BT pair keyboard action completed");
+    return ESP_OK;
+}
+
+// ============================================================================
+// Report Target Selector GUI Implementation
+// ============================================================================
+
+static const char* target_conn_to_str(target_conn_e target)
+{
+    switch (target) {
+        case TARGET_USB:
+            return "USB";
+        case TARGET_BLE:
+            return "BLE";
+        case TARGET_BROADCAST:
+            return "Broadcast";
+        default:
+            return "Unknown";
+    }
+}
+
+static void update_conn_info_display(report_target_gui_t *gui)
+{
+    if (!gui) return;
+
+    if (gui->selected_target == 1) { // TARGET_BLE
+        // Get current BLE connections
+        esp_hidd_dev_t* hid_dev = ble_get_hid_dev();
+        if (hid_dev) {
+            esp_hidd_conn_info_t conn_list[CONFIG_BT_ACL_CONNECTIONS];
+            size_t count = 0;
+            esp_err_t ret = esp_hidd_dev_get_connections(hid_dev, conn_list, CONFIG_BT_ACL_CONNECTIONS, &count);
+
+            if (ret == ESP_OK && count > 0) {
+                // Store total device count
+                gui->ble_device_count = count;
+
+                // Clamp device index to valid range
+                if (gui->ble_device_index >= count) {
+                    gui->ble_device_index = count - 1;
+                }
+                if (gui->ble_device_index < 0) {
+                    gui->ble_device_index = 0;
+                }
+
+                // Display selected connection info
+                gui->ble_conn_id = conn_list[gui->ble_device_index].conn_id;
+                memcpy(gui->ble_bda, conn_list[gui->ble_device_index].remote_bda, sizeof(esp_bd_addr_t));
+
+                char info_text[80];
+                snprintf(info_text, sizeof(info_text), "[%d/%d] ID:%d BDA:%02X:%02X:%02X:%02X:%02X:%02X",
+                         gui->ble_device_index + 1, (int)count,
+                         gui->ble_conn_id,
+                         gui->ble_bda[0], gui->ble_bda[1], gui->ble_bda[2],
+                         gui->ble_bda[3], gui->ble_bda[4], gui->ble_bda[5]);
+                lv_label_set_text(gui->conn_info_label, info_text);
+            } else {
+                gui->ble_device_count = 0;
+                gui->ble_device_index = 0;
+                lv_label_set_text(gui->conn_info_label, "No BLE connection");
+            }
+        } else {
+            gui->ble_device_count = 0;
+            gui->ble_device_index = 0;
+            lv_label_set_text(gui->conn_info_label, "BLE not ready");
+        }
+    } else {
+        lv_label_set_text(gui->conn_info_label, "USB");
+    }
+}
+
+static void update_report_target_focus_style(report_target_gui_t *gui)
+{
+    if (!gui) return;
+
+    // Set focused widget border
+    lv_obj_set_style_border_width(gui->target_selector, 2, 0);
+    lv_obj_set_style_border_color(gui->target_selector, lv_color_hex(0x0080FF), 0);
+}
+
+static report_target_gui_t* create_report_target_gui(void)
+{
+    report_target_gui_t *gui = malloc(sizeof(report_target_gui_t));
+    if (!gui) {
+        ESP_LOGE(TAG, "Failed to allocate report_target GUI");
+        return NULL;
+    }
+
+    // Initialize GUI state
+    target_conn_e current_target = get_report_target();
+    gui->selected_target = (current_target == TARGET_USB) ? 0 : 1;
+    gui->ble_device_index = 0;
+    gui->ble_device_count = 0;
+    gui->ble_conn_id = 0;
+    memset(gui->ble_bda, 0, sizeof(esp_bd_addr_t));
+
+    // Create main container
+    gui->container = lv_obj_create(lv_screen_active());
+    lv_obj_set_size(gui->container, LCD_WIDTH, LCD_HEIGHT);
+    lv_obj_set_pos(gui->container, 0, 0);
+    lv_obj_set_style_bg_color(gui->container, lv_color_black(), 0);
+    lv_obj_set_style_border_width(gui->container, 0, 0);
+    lv_obj_set_style_pad_all(gui->container, 2, 0);
+    lv_obj_clear_flag(gui->container, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+
+    // Set horizontal layout - buttons on left, info on right
+    lv_obj_set_flex_flow(gui->container, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(gui->container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+
+    // Left section: Target label and selector buttons
+    lv_obj_t *left_section = lv_obj_create(gui->container);
+    lv_obj_set_size(left_section, 80, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(left_section, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(left_section, 0, 0);
+    lv_obj_set_style_pad_all(left_section, 0, 0);
+    lv_obj_set_flex_flow(left_section, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(left_section, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+
+    gui->target_selector = lv_buttonmatrix_create(left_section);
+    static const char * target_map[] = {"USB", "BLE", ""};
+    lv_buttonmatrix_set_map(gui->target_selector, target_map);
+    lv_buttonmatrix_set_button_ctrl_all(gui->target_selector, LV_BUTTONMATRIX_CTRL_CHECKABLE);
+    lv_buttonmatrix_set_one_checked(gui->target_selector, true);
+    lv_buttonmatrix_set_button_ctrl(gui->target_selector, gui->selected_target, LV_BUTTONMATRIX_CTRL_CHECKED);
+    lv_obj_set_size(gui->target_selector, 70, 28);
+
+    // Style the button matrix - smaller font
+    lv_obj_set_style_bg_color(gui->target_selector, lv_color_hex(0x333333), 0);
+    lv_obj_set_style_text_color(gui->target_selector, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->target_selector, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_pad_all(gui->target_selector, 1, 0);
+    lv_obj_set_style_pad_gap(gui->target_selector, 2, 0);
+
+    // Style unselected buttons
+    lv_obj_set_style_bg_color(gui->target_selector, lv_color_hex(0x555555), LV_PART_ITEMS);
+    lv_obj_set_style_text_color(gui->target_selector, lv_color_white(), LV_PART_ITEMS);
+    lv_obj_set_style_border_width(gui->target_selector, 1, LV_PART_ITEMS);
+    lv_obj_set_style_border_color(gui->target_selector, lv_color_hex(0x777777), LV_PART_ITEMS);
+
+    // Style selected buttons
+    lv_obj_set_style_bg_color(gui->target_selector, lv_color_hex(0x0080FF), LV_PART_ITEMS | LV_STATE_CHECKED);
+    lv_obj_set_style_text_color(gui->target_selector, lv_color_white(), LV_PART_ITEMS | LV_STATE_CHECKED);
+    lv_obj_set_style_border_width(gui->target_selector, 2, LV_PART_ITEMS | LV_STATE_CHECKED);
+    lv_obj_set_style_border_color(gui->target_selector, lv_color_hex(0x00AAFF), LV_PART_ITEMS | LV_STATE_CHECKED);
+
+    // Right section: Connection info label
+    gui->conn_info_label = lv_label_create(gui->container);
+    lv_obj_set_style_text_color(gui->conn_info_label, lv_color_white(), 0);
+    lv_obj_set_style_text_font(gui->conn_info_label, &lv_font_montserrat_10, 0);
+    lv_obj_set_style_margin_left(gui->conn_info_label, 5, 0);
+    lv_obj_set_width(gui->conn_info_label, LCD_WIDTH - 90);
+    lv_label_set_long_mode(gui->conn_info_label, LV_LABEL_LONG_DOT);
+    lv_label_set_text(gui->conn_info_label, "");
+
+    // Set initial focus styling
+    update_report_target_focus_style(gui);
+
+    return gui;
+}
+
+static esp_err_t prepare_report_target_gui(struct menu_item *self)
+{
+    ESP_LOGI(TAG, "Preparing report target GUI");
+
+    if (!self) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    // Create GUI if not already created
+    if (!self->user_ctx) {
+        self->user_ctx = create_report_target_gui();
+        if (!self->user_ctx) {
+            ESP_LOGE(TAG, "Failed to create report target GUI");
+            return ESP_ERR_NO_MEM;
+        }
+        ESP_LOGI(TAG, "Created new report target GUI");
+    }
+
+    report_target_gui_t *gui = (report_target_gui_t *)self->user_ctx;
+
+    // Update to reflect current state
+    target_conn_e current_target = get_report_target();
+    gui->selected_target = (current_target == TARGET_USB) ? 0 : 1;
+    lv_buttonmatrix_clear_button_ctrl(gui->target_selector, 0, LV_BUTTONMATRIX_CTRL_CHECKED);
+    lv_buttonmatrix_clear_button_ctrl(gui->target_selector, 1, LV_BUTTONMATRIX_CTRL_CHECKED);
+    lv_buttonmatrix_set_button_ctrl(gui->target_selector, gui->selected_target, LV_BUTTONMATRIX_CTRL_CHECKED);
+
+    update_conn_info_display(gui);
+
+    // Show the container
+    lv_obj_remove_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+    ESP_LOGI(TAG, "Showed report target container");
+
+    return ESP_OK;
+}
+
+static esp_err_t post_report_target_gui(struct menu_item *self)
+{
+    ESP_LOGD(TAG, "Post report target GUI cleanup");
+
+    if (!self || !self->user_ctx) {
+        return ESP_OK;
+    }
+
+    report_target_gui_t *gui = (report_target_gui_t *)self->user_ctx;
+
+    // Hide the container
+    lv_obj_add_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
+    ESP_LOGI(TAG, "Hidden report target container");
+
+    return ESP_OK;
+}
+
+static bool report_target_handle_input_key(void *user_ctx, input_event_e input_event, char key_code)
+{
+    report_target_gui_t *gui = (report_target_gui_t *)user_ctx;
+
+    if (!gui) {
+        ESP_LOGE(TAG, "GUI context is NULL");
+        return false;
+    }
+
+    switch (input_event) {
+        case INPUT_EVENT_LEFT_ARROW:
+            if (gui->selected_target == 0) {
+                // Already on USB, do nothing
+                return true;
+            } else if (gui->selected_target == 1) {
+                // On BLE - check if we should switch to previous BLE device or USB
+                if (gui->ble_device_index > 0) {
+                    // Switch to previous BLE device
+                    gui->ble_device_index--;
+                    update_conn_info_display(gui);
+                } else {
+                    // At first BLE device, switch to USB
+                    gui->selected_target = 0;
+                    lv_buttonmatrix_clear_button_ctrl(gui->target_selector, 1, LV_BUTTONMATRIX_CTRL_CHECKED);
+                    lv_buttonmatrix_set_button_ctrl(gui->target_selector, 0, LV_BUTTONMATRIX_CTRL_CHECKED);
+                    update_conn_info_display(gui);
+                }
+            }
+            return true;
+
+        case INPUT_EVENT_RIGHT_ARROW:
+            if (gui->selected_target == 0) {
+                // On USB, move to first BLE device
+                gui->selected_target = 1;
+                gui->ble_device_index = 0;
+                lv_buttonmatrix_clear_button_ctrl(gui->target_selector, 0, LV_BUTTONMATRIX_CTRL_CHECKED);
+                lv_buttonmatrix_set_button_ctrl(gui->target_selector, 1, LV_BUTTONMATRIX_CTRL_CHECKED);
+                update_conn_info_display(gui);
+            } else if (gui->selected_target == 1) {
+                // On BLE - switch to next BLE device if available
+                if (gui->ble_device_index < gui->ble_device_count - 1) {
+                    gui->ble_device_index++;
+                    update_conn_info_display(gui);
+                }
+            }
+            return true;
+
+        default:
+            break;
+    }
+
+    return false;
+}
+
+esp_err_t keyboard_gui_prepare_report_target(struct menu_item *self)
+{
+    return prepare_report_target_gui(self);
+}
+
+esp_err_t keyboard_gui_post_report_target(struct menu_item *self)
+{
+    return post_report_target_gui(self);
+}
+
+bool keyboard_gui_report_target_handle_input(void *user_ctx, input_event_e input_event, char key_code)
+{
+    return report_target_handle_input_key(user_ctx, input_event, key_code);
+}
+
+esp_err_t keyboard_gui_report_target_action(void *user_ctx)
+{
+    ESP_LOGI(TAG, "Report target action triggered");
+
+    if (!user_ctx) {
+        ESP_LOGE(TAG, "Invalid report target user context");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    report_target_gui_t *gui = (report_target_gui_t *)user_ctx;
+
+    target_conn_e target = (gui->selected_target == 0) ? TARGET_USB : TARGET_BLE;
+
+    esp_err_t ret = ESP_OK;
+
+    if (target == TARGET_BLE) {
+        // Get IRK from current BLE connection
+        const char* irk = get_ble_irk();
+
+        // Set active connection (ble_conn_id can be 0, which is valid)
+        esp_hidd_dev_t* hid_dev = ble_get_hid_dev();
+        if (hid_dev) {
+            ret = esp_hidd_dev_set_active_conn(hid_dev, gui->ble_conn_id);
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to set active BLE connection: %s", esp_err_to_name(ret));
+            }
+        }
+
+        ret = update_report_target(target, (const uint8_t*)irk, ESP_BT_OCTET16_LEN);
+    } else {
+        ret = update_report_target(target, NULL, 0);
+    }
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to update report target: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    ESP_LOGI(TAG, "Report target updated to %s", target_conn_to_str(target));
     return ESP_OK;
 }

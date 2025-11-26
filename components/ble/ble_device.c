@@ -130,6 +130,15 @@ bool is_ble_ready()
  */
 void top_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
+    if (event == ESP_GATTS_CONNECT_EVT) {
+        // Restart advertising to allow reconnection
+        const char *ble_name = get_ble_name();
+        esp_err_t ret = ble_gap_adv_to_any(ble_name, true);
+        if (ret != ESP_OK)
+        {
+            ESP_LOGE(TAG, "Failed to start advertising for bonded devices: %s", esp_err_to_name(ret));
+        }
+    }
     // Check if this is a registration event for our custom service
     if ((event == ESP_GATTS_REG_EVT && param->reg.app_id == LAYOUT_SERVICE_UUID) ||
         (event != ESP_GATTS_REG_EVT && gatts_if != ESP_GATT_IF_NONE && gatts_if == layout_service_get_gatts_if()))
@@ -253,7 +262,7 @@ esp_err_t init_ble_device(const char *adv_name)
         return ret;
     }
 
-    ret = ble_gap_adv_to_any(adv_name);
+    ret = ble_gap_adv_to_any(adv_name, false);
     if (ret != ESP_OK) {
         ESP_LOGW(TAG, "GAP adv_start failed: %d", ret);
     }

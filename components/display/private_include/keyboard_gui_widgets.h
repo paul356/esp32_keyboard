@@ -230,6 +230,41 @@ void keyboard_gui_bt_pair_kb_prompt_for_passkey(struct menu_item *self, enum pas
 esp_err_t keyboard_gui_bt_pair_kb_action(void *user_ctx);
 
 /**
+ * @brief Prepare report target selector GUI function for menu items
+ * Creates and shows report target selector with button matrix for USB/BLE selection
+ * @param self Menu item that displays report target selector
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_prepare_report_target(struct menu_item *self);
+
+/**
+ * @brief Post report target selector GUI function for menu items
+ * Cleanup function for report target selector interface
+ * @param self Menu item that had report target selector interface
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_post_report_target(struct menu_item *self);
+
+/**
+ * @brief Handle input events for report target selector GUI
+ * Processes left/right arrow keys to switch between USB and BLE targets
+ * @param user_ctx Report target GUI context
+ * @param input_event Input event type
+ * @param key_code Character code (unused)
+ * @return bool true if event was handled, false otherwise
+ */
+bool keyboard_gui_report_target_handle_input(void *user_ctx, input_event_e input_event, char key_code);
+
+/**
+ * @brief Report target selector action function
+ * This function is called when the user presses Enter on the report target menu item
+ * Updates the report target using update_report_target interface
+ * @param user_ctx Report target GUI context
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_report_target_action(void *user_ctx);
+
+/**
  * @brief Prepare WiFi settings GUI function for menu items
  * Creates and shows WiFi settings interface with mode selector, SSID and password fields
  * @param self Menu item that displays WiFi settings

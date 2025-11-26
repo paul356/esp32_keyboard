@@ -22,9 +22,18 @@
 #define __FUNCTION_CONTROL_H__
 
 #include <stdbool.h>
+#include <stdint.h>
 #include "esp_err.h"
 #include "esp_wifi.h"
 #include "led_ctrl.h"
+#include "esp_gap_ble_api.h"
+
+typedef enum _target_conn_e {
+    TARGET_USB,
+    TARGET_BLE,
+    TARGET_BROADCAST,
+    TARGET_BUTT
+} target_conn_e;
 
 esp_err_t update_wifi_switch(bool flag);
 esp_err_t update_wifi_mode(wifi_mode_t mode, const char* ssid, const char* passwd);
@@ -46,6 +55,10 @@ esp_err_t update_led_switch(bool flag);
 esp_err_t update_led_pattern(led_pattern_type_e pattern);
 bool is_led_enabled(void);
 led_pattern_type_e get_led_pattern(void);
+
+esp_err_t update_report_target(target_conn_e target, const uint8_t* irk, uint32_t irk_len);
+target_conn_e get_report_target(void);
+const char* get_ble_irk(void);
 
 esp_err_t restore_saved_state(void);
 

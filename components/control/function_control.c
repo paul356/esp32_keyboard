@@ -62,6 +62,7 @@ typedef enum _function_control_e {
     BLE,
     USB,
     LED,
+    REPORT_TARGET,
     FUNCTION_BUTT
 } function_control_e;
 
@@ -83,6 +84,10 @@ typedef struct _control_state_t {
         bool enabled;
         led_pattern_type_e pattern;
     } led;
+    struct {
+        target_conn_e target;
+        char ble_irk[ESP_BT_OCTET16_LEN];
+    } report_target;
 } control_state_t;
 
 typedef esp_err_t (*read_item_func)(function_control_e function, const char* item_name, control_state_t* config);
@@ -110,6 +115,8 @@ static void set_default_ble_name(control_state_t* config);
 static void set_default_usb_enabled(control_state_t* config);
 static void set_default_led_enabled(control_state_t* config);
 static void set_default_led_pattern(control_state_t* config);
+static void set_default_report_target_target(control_state_t* config);
+static void set_default_report_target_ble_irk(control_state_t* config);
 
 static esp_err_t load_config_value(function_control_e function, const char* item_name, void* config_value, size_t* len);
 static esp_err_t save_config_value(function_control_e function, const char* item_name, const void* config_value, size_t len);
@@ -123,6 +130,8 @@ CONFIG_VALUE_GETTER_SETTER(ble, name)
 CONFIG_VALUE_GETTER_SETTER(usb, enabled)
 CONFIG_VALUE_GETTER_SETTER(led, enabled)
 CONFIG_VALUE_GETTER_SETTER(led, pattern)
+CONFIG_VALUE_GETTER_SETTER(report_target, target)
+CONFIG_VALUE_GETTER_SETTER(report_target, ble_irk)
 
 static config_item_t wifi_config[] = {
     {"enabled", &load_wifi_enabled, &save_wifi_enabled, set_default_wifi_enabled},
@@ -145,6 +154,11 @@ static config_item_t led_config[] = {
     {"pattern", &load_led_pattern,  &save_led_pattern, set_default_led_pattern}
 };
 
+static config_item_t report_target_config[] = {
+    {"target",  &load_report_target_target,  &save_report_target_target,  set_default_report_target_target},
+    {"ble_irk", &load_report_target_ble_irk, &save_report_target_ble_irk, set_default_report_target_ble_irk}
+};
+
 static function_config_t function_config_entries[] = {
     {
         ARRAY_LEN(wifi_config), wifi_config
@@ -157,6 +171,9 @@ static function_config_t function_config_entries[] = {
     },
     {
         ARRAY_LEN(led_config), led_config
+    },
+    {
+        ARRAY_LEN(report_target_config), report_target_config
     }
 };
 
@@ -180,7 +197,7 @@ typedef struct {
 // Forward declaration
 static void ble_state_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data);
 
-static const char* function_config_prefix[] = {"WIFI_", "BLE_", "USB_", "LED_"};
+static const char* function_config_prefix[] = {"WIFI_", "BLE_", "USB_", "LED_", "REPORT_TARGET_"};
 
 esp_err_t load_config_value(
     function_control_e function,
@@ -256,6 +273,16 @@ void set_default_led_enabled(control_state_t* state)
 void set_default_led_pattern(control_state_t* state)
 {
     state->led.pattern = LED_PATTERN_HIT_KEY;
+}
+
+void set_default_report_target_target(control_state_t* state)
+{
+    state->report_target.target = TARGET_USB;
+}
+
+void set_default_report_target_ble_irk(control_state_t* state)
+{
+    memset(state->report_target.ble_irk, 0, sizeof(state->report_target.ble_irk));
 }
 
 static esp_err_t recover_persisted_config()
@@ -619,5 +646,35 @@ bool is_led_enabled(void)
 led_pattern_type_e get_led_pattern(void)
 {
     return function_state.led.pattern;
+}
+
+esp_err_t update_report_target(target_conn_e target, const uint8_t* irk, uint32_t irk_len)
+{
+    if (target < TARGET_USB || target >= TARGET_BUTT) {
+        ESP_LOGE(TAG, "Invalid report target: %d", target);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (target == TARGET_BLE && (irk == NULL || irk_len != ESP_BT_OCTET16_LEN)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (target == TARGET_BLE) {
+        memcpy(function_state.report_target.ble_irk, irk, ESP_BT_OCTET16_LEN);
+    }
+
+    function_state.report_target.target = target;
+
+    return update_persisted_config(REPORT_TARGET);
+}
+
+target_conn_e get_report_target(void)
+{
+    return function_state.report_target.target;
+}
+
+const char* get_ble_irk(void)
+{
+    return function_state.report_target.ble_irk;
 }
 
