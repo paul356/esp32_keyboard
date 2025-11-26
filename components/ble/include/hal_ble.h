@@ -58,9 +58,22 @@ esp_err_t init_ble_device(const char *adv_name);
  */
 esp_err_t deinit_ble_device(void);
 
+/** @brief Set passkey callback for BLE pairing
+ *
+ * Registers a callback function to handle passkey events during BLE pairing.
+ *
+ * @param callback The callback function to handle passkey events
+ * @param arg User-defined argument passed to the callback
+ */
 void ble_gap_set_passkey_callback(ble_passkey_callback callback, void* arg);
 
-bool is_ble_ready();
+/** @brief Check if BLE is initialized and ready
+ *
+ * Returns the initialization status of the BLE device.
+ *
+ * @return true if BLE is initialized and ready, false otherwise
+ */
+bool is_ble_ready(void);
 
 /** @brief Get the HID device handle
  *

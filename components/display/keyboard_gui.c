@@ -170,7 +170,7 @@ static void keyboard_gui_handle_single_keycode(uint8_t mods, uint8_t keycode) {
     if (input_event != INPUT_EVENT_KEYCODE) {
         keyboard_gui_post_input_event_isr(input_event, 0);
     } else {
-        char printable = scancode_to_printable_char(mods & MOD_LSFT | MOD_RSFT, keycode);
+        char printable = scancode_to_printable_char(mods & (MOD_LSFT | MOD_RSFT), keycode);
         if (printable != '\0') {
             keyboard_gui_post_input_event_isr(INPUT_EVENT_KEYCODE, printable);
         }
