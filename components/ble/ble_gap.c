@@ -7,6 +7,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <inttypes.h>
+#include <stdlib.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -289,4 +290,50 @@ esp_err_t ble_gap_adv_to_any(const char* adv_name, bool slow)
 
 
     return esp_ble_gap_start_advertising(&hidd_adv_params);
+}
+
+esp_err_t ble_clear_all_bonds(void)
+{
+    int dev_num = esp_ble_get_bond_device_num();
+
+    if (dev_num < 0) {
+        ESP_LOGE(TAG, "Failed to get bonded device number");
+        return ESP_FAIL;
+    }
+
+    if (dev_num == 0) {
+        ESP_LOGI(TAG, "No bonded devices to clear");
+        return ESP_OK;
+    }
+
+    ESP_LOGI(TAG, "Clearing %d bonded device(s)", dev_num);
+
+    esp_ble_bond_dev_t *dev_list = (esp_ble_bond_dev_t *)malloc(sizeof(esp_ble_bond_dev_t) * dev_num);
+    if (!dev_list) {
+        ESP_LOGE(TAG, "Failed to allocate memory for bonded device list");
+        return ESP_ERR_NO_MEM;
+    }
+
+    esp_err_t ret = esp_ble_get_bond_device_list(&dev_num, dev_list);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to get bonded device list: %s", esp_err_to_name(ret));
+        free(dev_list);
+        return ret;
+    }
+
+    // Remove each bonded device
+    for (int i = 0; i < dev_num; i++) {
+        ret = esp_ble_remove_bond_device(dev_list[i].bd_addr);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to remove bond device %d: %s", i, esp_err_to_name(ret));
+        } else {
+            ESP_LOGI(TAG, "Removed bonded device %d: " ESP_BD_ADDR_STR,
+                     i, ESP_BD_ADDR_HEX(dev_list[i].bd_addr));
+        }
+    }
+
+    free(dev_list);
+    ESP_LOGI(TAG, "Successfully cleared all bonded devices");
+
+    return ESP_OK;
 }

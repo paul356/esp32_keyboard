@@ -58,8 +58,6 @@ esp_err_t init_ble_device(const char *adv_name);
  */
 esp_err_t deinit_ble_device(void);
 
-esp_err_t ble_gap_adv_to_any(const char* adv_name, bool slow);
-
 void ble_gap_set_passkey_callback(ble_passkey_callback callback, void* arg);
 
 bool is_ble_ready();

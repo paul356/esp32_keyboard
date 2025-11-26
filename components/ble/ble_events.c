@@ -23,6 +23,7 @@
 #include "esp_event.h"
 #include "ble_device.h"
 #include "ble_events_prv.h"
+#include "ble_gap.h"
 #include "hid_desc.h"
 #include "hal_ble.h"
 
@@ -45,6 +46,7 @@ typedef struct {
 enum {
     BLE_BATTERY_UPDATE_EVENT,     // Battery level update event
     BLE_KEYBOARD_REPORT_EVENT,    // Keyboard report event
+    BLE_CLEAR_BONDS_EVENT,        // Clear all bonded devices event
 };
 
 // BLE event base definition
@@ -53,6 +55,7 @@ ESP_EVENT_DEFINE_BASE(BLE_EVENTS);
 // Forward declarations for event handlers
 static void battery_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data);
 static void keyboard_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data);
+static void clear_bonds_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data);
 
 esp_err_t ble_post_battery_event(uint8_t battery_level)
 {
@@ -91,6 +94,17 @@ esp_err_t ble_post_keyboard_event(const uint8_t* report_data, size_t report_len,
     return err;
 }
 
+esp_err_t ble_post_clear_bonds_event(void)
+{
+    esp_err_t err = drv_loop_post_event(BLE_EVENTS, BLE_CLEAR_BONDS_EVENT, NULL, 0,
+                                        BLE_EVENTS_POST_TIMEOUT);
+    if (err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Fail to post clear bonds event timeout: %s", esp_err_to_name(err));
+    }
+    return err;
+}
+
 esp_err_t ble_events_init(void)
 {
     ESP_LOGI(TAG, "Initializing BLE events");
@@ -100,6 +114,8 @@ esp_err_t ble_events_init(void)
                                              battery_event_handler, NULL));
     ESP_ERROR_CHECK(drv_loop_register_handler(BLE_EVENTS, BLE_KEYBOARD_REPORT_EVENT,
                                              keyboard_event_handler, NULL));
+    ESP_ERROR_CHECK(drv_loop_register_handler(BLE_EVENTS, BLE_CLEAR_BONDS_EVENT,
+                                             clear_bonds_event_handler, NULL));
 
     ESP_LOGI(TAG, "BLE event handlers registered");
     return ESP_OK;
@@ -141,5 +157,21 @@ static void keyboard_event_handler(void* handler_args, esp_event_base_t base, in
     } else {
         // If it is 6nkro, use the failback report id in the report maps
         esp_hidd_dev_input_set(hid_dev, 0, REPORT_ID_KEYBOARD, kbd_data->report_data, kbd_data->report_len);
+    }
+}
+
+static void clear_bonds_event_handler(void* handler_args, esp_event_base_t base, int32_t id, void* event_data) {
+    ESP_LOGI(TAG, "Clearing all bonded BLE devices");
+
+    if (!is_ble_ready()) {
+        ESP_LOGW(TAG, "Skip clearing bonds because BLE is turned off.");
+        return;
+    }
+
+    esp_err_t ret = ble_clear_all_bonds();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to clear bonded devices: %s", esp_err_to_name(ret));
+    } else {
+        ESP_LOGI(TAG, "Successfully cleared all bonded devices");
     }
 }

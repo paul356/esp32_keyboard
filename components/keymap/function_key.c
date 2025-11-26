@@ -25,6 +25,7 @@
 #include "wifi_intf.h"
 #include "hid_desc.h"
 #include "function_control.h"
+#include "ble_events.h"
 
 #define TAG "FunctionKey"
 
@@ -33,7 +34,8 @@ const char* function_key_strs[FUNCTION_KEY_NUM] = {
     "info",
     "intro",
     "hotspot",
-    "toggle_nkro"
+    "toggle_nkro",
+    "clear_ble_bonds"
 };
 
 static char ip_str[20];
@@ -172,6 +174,10 @@ esp_err_t process_function_key(uint16_t keycode)
             set_nkro_flag(true);
             ESP_LOGI(TAG, "NKRO Enabled!");
         }
+        break;
+    case FUNCTION_KEY_CLEAR_BLE_BONDS:
+        ESP_LOGI(TAG, "Clearing all BLE bonds");
+        ble_post_clear_bonds_event();
         break;
     default:
         SEND_STRING("Unkonwn function key!");

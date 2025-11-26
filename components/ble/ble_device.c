@@ -149,7 +149,6 @@ void top_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if,
         return;
     }
 
-    ESP_LOGI(TAG, "GATTS event: %d, GATTS interface: %d, to keyboard", event, gatts_if);
     // For all other events, pass to ESP-IDF HID handler
     esp_hidd_gatts_event_handler(event, gatts_if, param);
 }

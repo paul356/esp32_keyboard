@@ -32,6 +32,16 @@ esp_err_t ble_post_battery_event(uint8_t battery_level);
  */
 esp_err_t ble_post_keyboard_event(const uint8_t* report_data, size_t report_len, bool nkro_bits);
 
+/**
+ * @brief Post an event to clear all bonded BLE devices
+ *
+ * This function posts an event to the driver loop to clear all bonded devices.
+ * The actual clearing happens asynchronously in the event handler.
+ *
+ * @return ESP_OK on success, error code otherwise
+ */
+esp_err_t ble_post_clear_bonds_event(void);
+
 #ifdef __cplusplus
 }
 #endif
