@@ -30,7 +30,7 @@
 #include "macros.h"
 #include "function_key.h"
 
-#define MAX_TOKEN_LEN 12
+#define MAX_TOKEN_LEN 20
 #define LAYER_MASK 0xf
 #define BASIC_CODE_MASK 0xff
 #define MOD_MASK 0x1f

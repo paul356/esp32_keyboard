@@ -26,16 +26,20 @@
 #include "hid_desc.h"
 #include "function_control.h"
 #include "ble_events.h"
+#include "hal_ble.h"
+#include "esp_hidd.h"
 
 #define TAG "FunctionKey"
 
 // need a string for each function key code
+// string should be strictly less than MAX_TOKEN_LEN
 const char* function_key_strs[FUNCTION_KEY_NUM] = {
     "info",
     "intro",
     "hotspot",
     "toggle_nkro",
-    "clear_ble_bonds"
+    "clear_bonds",
+    "toggle_broadcast"
 };
 
 static char ip_str[20];
@@ -179,6 +183,27 @@ esp_err_t process_function_key(uint16_t keycode)
         ESP_LOGI(TAG, "Clearing all BLE bonds");
         ble_post_clear_bonds_event();
         break;
+    case FUNCTION_KEY_TOGGLE_BROADCAST_MODE: {
+        esp_hidd_dev_t* hid_dev = ble_get_hid_dev();
+        if (hid_dev) {
+            bool current_mode = false;
+            esp_err_t err = esp_hidd_dev_is_broadcast_mode(hid_dev, &current_mode);
+            if (err == ESP_OK) {
+                bool new_mode = !current_mode;
+                err = esp_hidd_dev_set_broadcast_mode(hid_dev, new_mode);
+                if (err == ESP_OK) {
+                    ESP_LOGI(TAG, "BLE HID Broadcast Mode %s", new_mode ? "Enabled" : "Disabled");
+                } else {
+                    ESP_LOGE(TAG, "Failed to set broadcast mode: %s", esp_err_to_name(err));
+                }
+            } else {
+                ESP_LOGE(TAG, "Failed to get broadcast mode: %s", esp_err_to_name(err));
+            }
+        } else {
+            ESP_LOGE(TAG, "HID device not available");
+        }
+        break;
+    }
     default:
         SEND_STRING("Unkonwn function key!");
     }
