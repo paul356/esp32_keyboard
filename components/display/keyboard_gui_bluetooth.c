@@ -73,6 +73,7 @@ typedef struct {
     int ble_device_count;           // Total number of BLE devices
     uint16_t ble_conn_id;           // Current BLE connection ID (if TARGET_BLE)
     esp_bd_addr_t ble_bda;          // Current BLE device address (if TARGET_BLE)
+    bool is_broadcast_mode;         // True if BLE is in broadcast mode
 } report_target_gui_t;
 
 // Static function declarations
@@ -90,6 +91,7 @@ static esp_err_t post_report_target_gui(struct menu_item *self);
 static bool report_target_handle_input_key(void *user_ctx, input_event_e input_event, char key_code);
 static void update_report_target_focus_style(report_target_gui_t *gui);
 static void update_conn_info_display(report_target_gui_t *gui);
+static void init_conn_info_display(report_target_gui_t *gui);
 
 static bt_toggle_gui_t *create_bt_toggle_gui(void)
 {
@@ -621,54 +623,126 @@ static const char* target_conn_to_str(target_conn_e target)
     }
 }
 
-static void update_conn_info_display(report_target_gui_t *gui)
+// Helper function to fetch and display BLE connection info
+// If initialize_index is true, finds and sets the active connection index
+// If initialize_index is false, uses the current ble_device_index (clamped to valid range)
+static void fetch_and_display_conn_info(report_target_gui_t *gui, bool initialize_index)
 {
     if (!gui) return;
 
-    if (gui->selected_target == 1) { // TARGET_BLE
-        // Get current BLE connections
-        esp_hidd_dev_t* hid_dev = ble_get_hid_dev();
-        if (hid_dev) {
-            esp_hidd_conn_info_t conn_list[CONFIG_BT_ACL_CONNECTIONS];
-            size_t count = 0;
-            esp_err_t ret = esp_hidd_dev_get_connections(hid_dev, conn_list, CONFIG_BT_ACL_CONNECTIONS, &count);
+    // Initialize broadcast mode state
+    gui->is_broadcast_mode = false;
 
-            if (ret == ESP_OK && count > 0) {
-                // Store total device count
-                gui->ble_device_count = count;
+    if (gui->selected_target != 1) { // Not TARGET_BLE
+        lv_label_set_text(gui->conn_info_label, "USB selected");
+        return;
+    }
 
-                // Clamp device index to valid range
-                if (gui->ble_device_index >= count) {
-                    gui->ble_device_index = count - 1;
+    // TARGET_BLE - Get current BLE connections
+    esp_hidd_dev_t* hid_dev = ble_get_hid_dev();
+    if (!hid_dev) {
+        gui->ble_device_count = 0;
+        gui->ble_device_index = 0;
+        lv_label_set_text(gui->conn_info_label, "BLE not ready");
+        return;
+    }
+
+    // Check if in broadcast mode
+    esp_err_t ret = esp_hidd_dev_is_broadcast_mode(hid_dev, &gui->is_broadcast_mode);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "Failed to query broadcast mode: %s", esp_err_to_name(ret));
+        gui->is_broadcast_mode = false;
+    }
+
+    if (gui->is_broadcast_mode) {
+        // In broadcast mode - no specific connection info
+        gui->ble_device_count = 0;
+        gui->ble_device_index = 0;
+        gui->ble_conn_id = 0;
+        memset(gui->ble_bda, 0, sizeof(esp_bd_addr_t));
+        lv_label_set_text(gui->conn_info_label, "HID Broadcast Mode");
+        if (initialize_index) {
+            ESP_LOGI(TAG, "BLE in broadcast mode");
+        }
+        return;
+    }
+
+    // In unicast mode - get connections
+    if (initialize_index) {
+        gui->ble_device_count = 0;
+        gui->ble_device_index = 0;
+    }
+
+    esp_hidd_conn_info_t conn_list[CONFIG_BT_ACL_CONNECTIONS];
+    size_t count = 0;
+    ret = esp_hidd_dev_get_connections(hid_dev, conn_list, CONFIG_BT_ACL_CONNECTIONS, &count);
+
+    if (ret != ESP_OK) {
+        gui->ble_device_count = 0;
+        gui->ble_device_index = 0;
+        lv_label_set_text(gui->conn_info_label, "BLE error");
+        return;
+    }
+
+    if (count == 0) {
+        gui->ble_device_count = 0;
+        gui->ble_device_index = 0;
+        lv_label_set_text(gui->conn_info_label, "No BLE connection");
+        return;
+    }
+
+    // We have connections
+    gui->ble_device_count = count;
+
+    if (initialize_index) {
+        // Find the active connection to set initial device index
+        uint16_t active_conn_id = 0;
+        ret = esp_hidd_dev_get_active_conn(hid_dev, &active_conn_id);
+        if (ret == ESP_OK) {
+            // Find the index of the active connection
+            bool found = false;
+            for (size_t i = 0; i < count; i++) {
+                if (conn_list[i].conn_id == active_conn_id) {
+                    gui->ble_device_index = i;
+                    found = true;
+                    break;
                 }
-                if (gui->ble_device_index < 0) {
-                    gui->ble_device_index = 0;
-                }
-
-                // Display selected connection info
-                gui->ble_conn_id = conn_list[gui->ble_device_index].conn_id;
-                memcpy(gui->ble_bda, conn_list[gui->ble_device_index].remote_bda, sizeof(esp_bd_addr_t));
-
-                char info_text[80];
-                snprintf(info_text, sizeof(info_text), "[%d/%d] ID:%d BDA:%02X:%02X:%02X:%02X:%02X:%02X",
-                         gui->ble_device_index + 1, (int)count,
-                         gui->ble_conn_id,
-                         gui->ble_bda[0], gui->ble_bda[1], gui->ble_bda[2],
-                         gui->ble_bda[3], gui->ble_bda[4], gui->ble_bda[5]);
-                lv_label_set_text(gui->conn_info_label, info_text);
-            } else {
-                gui->ble_device_count = 0;
-                gui->ble_device_index = 0;
-                lv_label_set_text(gui->conn_info_label, "No BLE connection");
+            }
+            if (found) {
+                ESP_LOGI(TAG, "Active connection ID: %d at index %d", active_conn_id, gui->ble_device_index);
             }
         } else {
-            gui->ble_device_count = 0;
-            gui->ble_device_index = 0;
-            lv_label_set_text(gui->conn_info_label, "BLE not ready");
+            ESP_LOGW(TAG, "Failed to get active connection: %s, using first connection", esp_err_to_name(ret));
         }
     } else {
-        lv_label_set_text(gui->conn_info_label, "USB");
+        // Clamp device index to valid range
+        if (gui->ble_device_index >= count) {
+            gui->ble_device_index = count - 1;
+        }
+        if (gui->ble_device_index < 0) {
+            gui->ble_device_index = 0;
+        }
     }
+
+    gui->ble_conn_id = conn_list[gui->ble_device_index].conn_id;
+    memcpy(gui->ble_bda, conn_list[gui->ble_device_index].remote_bda, sizeof(esp_bd_addr_t));
+
+    char info_text[80];
+    snprintf(info_text, sizeof(info_text), "[%d/%d] ID:%d BDA:%02X:%02X:%02X:%02X:%02X:%02X",
+             gui->ble_device_index + 1, (int)count, gui->ble_conn_id,
+             gui->ble_bda[0], gui->ble_bda[1], gui->ble_bda[2],
+             gui->ble_bda[3], gui->ble_bda[4], gui->ble_bda[5]);
+    lv_label_set_text(gui->conn_info_label, info_text);
+}
+
+static void update_conn_info_display(report_target_gui_t *gui)
+{
+    fetch_and_display_conn_info(gui, false);
+}
+
+static void init_conn_info_display(report_target_gui_t *gui)
+{
+    fetch_and_display_conn_info(gui, true);
 }
 
 static void update_report_target_focus_style(report_target_gui_t *gui)
@@ -694,6 +768,7 @@ static report_target_gui_t* create_report_target_gui(void)
     gui->ble_device_index = 0;
     gui->ble_device_count = 0;
     gui->ble_conn_id = 0;
+    gui->is_broadcast_mode = false;
     memset(gui->ble_bda, 0, sizeof(esp_bd_addr_t));
 
     // Create main container
@@ -788,7 +863,7 @@ static esp_err_t prepare_report_target_gui(struct menu_item *self)
     lv_buttonmatrix_clear_button_ctrl(gui->target_selector, 1, LV_BUTTONMATRIX_CTRL_CHECKED);
     lv_buttonmatrix_set_button_ctrl(gui->target_selector, gui->selected_target, LV_BUTTONMATRIX_CTRL_CHECKED);
 
-    update_conn_info_display(gui);
+    init_conn_info_display(gui);
 
     // Show the container
     lv_obj_remove_flag(gui->container, LV_OBJ_FLAG_HIDDEN);
@@ -829,17 +904,26 @@ static bool report_target_handle_input_key(void *user_ctx, input_event_e input_e
                 // Already on USB, do nothing
                 return true;
             } else if (gui->selected_target == 1) {
-                // On BLE - check if we should switch to previous BLE device or USB
-                if (gui->ble_device_index > 0) {
-                    // Switch to previous BLE device
-                    gui->ble_device_index--;
-                    update_conn_info_display(gui);
-                } else {
-                    // At first BLE device, switch to USB
+                // On BLE - check if in broadcast mode first
+                if (gui->is_broadcast_mode) {
+                    // In broadcast mode, only allow switching to USB
                     gui->selected_target = 0;
                     lv_buttonmatrix_clear_button_ctrl(gui->target_selector, 1, LV_BUTTONMATRIX_CTRL_CHECKED);
                     lv_buttonmatrix_set_button_ctrl(gui->target_selector, 0, LV_BUTTONMATRIX_CTRL_CHECKED);
                     update_conn_info_display(gui);
+                } else {
+                    // In unicast mode - check if we should switch to previous BLE device or USB
+                    if (gui->ble_device_index > 0) {
+                        // Switch to previous BLE device
+                        gui->ble_device_index--;
+                        update_conn_info_display(gui);
+                    } else {
+                        // At first BLE device, switch to USB
+                        gui->selected_target = 0;
+                        lv_buttonmatrix_clear_button_ctrl(gui->target_selector, 1, LV_BUTTONMATRIX_CTRL_CHECKED);
+                        lv_buttonmatrix_set_button_ctrl(gui->target_selector, 0, LV_BUTTONMATRIX_CTRL_CHECKED);
+                        update_conn_info_display(gui);
+                    }
                 }
             }
             return true;
@@ -853,8 +937,9 @@ static bool report_target_handle_input_key(void *user_ctx, input_event_e input_e
                 lv_buttonmatrix_set_button_ctrl(gui->target_selector, 1, LV_BUTTONMATRIX_CTRL_CHECKED);
                 update_conn_info_display(gui);
             } else if (gui->selected_target == 1) {
-                // On BLE - switch to next BLE device if available
-                if (gui->ble_device_index < gui->ble_device_count - 1) {
+                // On BLE - only allow switching between devices if not in broadcast mode
+                if (!gui->is_broadcast_mode && gui->ble_device_index < gui->ble_device_count - 1) {
+                    // Switch to next BLE device
                     gui->ble_device_index++;
                     update_conn_info_display(gui);
                 }
