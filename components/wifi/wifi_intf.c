@@ -116,7 +116,7 @@ static esp_err_t start_softap(const char* ssid, const char* passwd)
         return ret;
     }
 
-    wifi_state_bits |= WIFI_STATION_CONNECTED;
+    wifi_state_bits |= WIFI_HOTSPOT_ENABLED;
     ESP_LOGI(TAG, "wifi_init_softap finished. SSID:%s password:XXX channel:%d",
              ssid, EXAMPLE_ESP_WIFI_CHANNEL);
     // hard coded 192.168.4.1

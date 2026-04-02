@@ -40,6 +40,7 @@ esp_err_t update_wifi_mode(wifi_mode_t mode, const char* ssid, const char* passw
 bool is_wifi_enabled(void);
 wifi_mode_t get_wifi_mode(void);
 const char* get_wifi_ssid(void);
+const char* get_wifi_passwd(void);
 
 const char* wifi_mode_to_str(wifi_mode_t mode);
 wifi_mode_t str_to_wifi_mode(const char* str);

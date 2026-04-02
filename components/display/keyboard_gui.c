@@ -28,6 +28,7 @@
 #include "drv_loop.h"
 #include "key_definitions.h"
 #include "action_code.h"
+#include "keycode.h"
 #include "keyboard_gui.h"
 #include "lcd_hardware_internal.h"
 #include "menu_state_machine.h"
@@ -170,7 +171,7 @@ static void keyboard_gui_handle_single_keycode(uint8_t mods, uint8_t keycode) {
     if (input_event != INPUT_EVENT_KEYCODE) {
         keyboard_gui_post_input_event_isr(input_event, 0);
     } else {
-        char printable = scancode_to_printable_char(mods & (MOD_LSFT | MOD_RSFT), keycode);
+        char printable = scancode_to_printable_char(mods & MOD_MASK_SHIFT, keycode);
         if (printable != '\0') {
             keyboard_gui_post_input_event_isr(INPUT_EVENT_KEYCODE, printable);
         }

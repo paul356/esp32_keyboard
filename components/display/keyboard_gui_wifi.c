@@ -32,6 +32,9 @@
 
 #define TAG "gui_wifi"
 
+#define WIFI_SSID_BUF_SIZE    64
+#define WIFI_PASSWD_BUF_SIZE  64
+
 // WiFi settings GUI focus states
 typedef enum {
     WIDGET_FOCUS_WIFI_MODE = 0,   // Mode selector focus
@@ -62,8 +65,8 @@ typedef struct {
     widget_focus_e current_focus; // Current focus state (mode, SSID, or password)
     int cursor_pos_ssid;            // Cursor position in SSID field
     int cursor_pos_password;        // Cursor position in password field
-    char ssid_buffer[64];           // SSID input buffer
-    char password_buffer[64];       // Password input buffer
+    char ssid_buffer[WIFI_SSID_BUF_SIZE];      // SSID input buffer
+    char password_buffer[WIFI_PASSWD_BUF_SIZE]; // Password input buffer
     int selected_mode;              // 0=STA, 1=AP
 } wifi_settings_gui_t;
 
@@ -415,12 +418,11 @@ static void update_cursor_display(wifi_settings_gui_t *gui)
     }
 
     if (gui->current_focus == WIDGET_FOCUS_WIFI_PASSWD) {
-        // Password field - show cursor (but content is hidden)
-        char display_text[128]; // Increased buffer size to prevent truncation warnings
+        // Password field - show cursor with asterisks
+        char display_text[128];
         int pos = gui->cursor_pos_password;
         int len = strlen(gui->password_buffer);
 
-        // Create asterisk representation with cursor
         char asterisks[64];
         for (int i = 0; i < len; i++) {
             asterisks[i] = '*';
@@ -438,7 +440,7 @@ static void update_cursor_display(wifi_settings_gui_t *gui)
         }
         lv_textarea_set_text(gui->password_textfield, display_text);
     } else {
-        // Just show asterisks without cursor
+        // Show asterisks without cursor
         char asterisks[64];
         int len = strlen(gui->password_buffer);
         for (int i = 0; i < len; i++) {
@@ -533,7 +535,7 @@ static bool wifi_settings_handle_input_key(void *user_ctx, input_event_e input_e
                 if (gui->current_focus == WIDGET_FOCUS_WIFI_SSID) {
                     // Insert character in SSID field
                     int len = strlen(gui->ssid_buffer);
-                    if (len < 63) { // Leave room for null terminator
+                    if (len < WIFI_SSID_BUF_SIZE - 1) {
                         memmove(&gui->ssid_buffer[gui->cursor_pos_ssid + 1],
                                &gui->ssid_buffer[gui->cursor_pos_ssid],
                                len - gui->cursor_pos_ssid + 1);
@@ -544,7 +546,7 @@ static bool wifi_settings_handle_input_key(void *user_ctx, input_event_e input_e
                 } else if (gui->current_focus == WIDGET_FOCUS_WIFI_PASSWD) {
                     // Insert character in password field
                     int len = strlen(gui->password_buffer);
-                    if (len < 63) { // Leave room for null terminator
+                    if (len < WIFI_PASSWD_BUF_SIZE - 1) {
                         memmove(&gui->password_buffer[gui->cursor_pos_password + 1],
                                &gui->password_buffer[gui->cursor_pos_password],
                                len - gui->cursor_pos_password + 1);
@@ -604,9 +606,16 @@ static esp_err_t prepare_wifi_settings_gui(struct menu_item *self)
         gui->cursor_pos_ssid = 0;
     }
 
-    // Clear password field (for security, don't load existing password)
-    strcpy(gui->password_buffer, "");
-    gui->cursor_pos_password = 0;
+    // Load current password
+    const char* current_passwd = get_wifi_passwd();
+    if (current_passwd && strlen(current_passwd) > 0) {
+        strncpy(gui->password_buffer, current_passwd, sizeof(gui->password_buffer) - 1);
+        gui->password_buffer[sizeof(gui->password_buffer) - 1] = '\0';
+        gui->cursor_pos_password = strlen(gui->password_buffer);
+    } else {
+        strcpy(gui->password_buffer, "");
+        gui->cursor_pos_password = 0;
+    }
 
     // Update display
     update_cursor_display(gui);
@@ -723,9 +732,9 @@ esp_err_t keyboard_gui_wifi_settings_action(void *user_ctx)
     wifi_settings_gui_t *gui = (wifi_settings_gui_t *)user_ctx;
 
     // Confirm - save settings
-    ESP_LOGI(TAG, "WiFi settings confirmed: Mode=%s, SSID='%s', Password='%s'",
+    ESP_LOGI(TAG, "WiFi settings confirmed: Mode=%s, SSID='%s'",
              wifi_mode_to_str(selector_index_to_wifi_mode(gui->selected_mode)),
-             gui->ssid_buffer, gui->password_buffer);
+             gui->ssid_buffer);
 
     // Convert selected mode index to wifi_mode_t
     wifi_mode_t new_mode = selector_index_to_wifi_mode(gui->selected_mode);

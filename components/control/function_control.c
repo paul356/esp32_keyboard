@@ -484,6 +484,11 @@ const char* get_wifi_ssid(void)
     return function_state.wifi.ssid;
 }
 
+const char* get_wifi_passwd(void)
+{
+    return function_state.wifi.passwd;
+}
+
 const char* wifi_mode_to_str(wifi_mode_t mode)
 {
     switch (mode) {
