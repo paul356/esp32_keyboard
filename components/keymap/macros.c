@@ -46,6 +46,7 @@ static const expression_mapping_t special_key_mappings[] = {
     {"\\t", SS_TAP(X_TAB)},
     {"\\)", ")"},
     {"\\e", SS_TAP(X_ESCAPE)},
+    {"\\n", SS_TAP(X_ENTER)},
     {NULL, NULL}
 };
 
