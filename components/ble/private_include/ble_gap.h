@@ -31,6 +31,7 @@ extern "C" {
 esp_err_t ble_gap_set_sec_params(void);
 void ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t *param);
 esp_err_t ble_gap_adv_to_any(const char* adv_name, bool slow);
+esp_err_t ble_gap_update_conn_params_for_addr(esp_bd_addr_t bda, bool fast);
 esp_err_t ble_clear_all_bonds(void);
 
 

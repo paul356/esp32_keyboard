@@ -29,6 +29,15 @@ static const char *ble_addr_type_names[] = {"PUBLIC", "RANDOM", "RPA_PUBLIC", "R
 static ble_passkey_callback passkey_callback = NULL;
 static void *passkey_callback_arg = NULL;
 
+static esp_ble_adv_params_t hidd_adv_params = {
+    .adv_int_min        = 0x50,
+    .adv_int_max        = 0xA0,
+    .adv_type           = ADV_TYPE_IND,
+    .own_addr_type      = BLE_ADDR_TYPE_PUBLIC,
+    .channel_map        = ADV_CHNL_ALL,
+    .adv_filter_policy  = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
+};
+
 void ble_gap_set_passkey_callback(ble_passkey_callback callback, void* arg)
 {
     passkey_callback = callback;
@@ -109,6 +118,7 @@ void ble_gap_event_handler(esp_gap_ble_cb_event_t event, esp_ble_gap_cb_param_t 
      * */
     case ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT:
         ESP_LOGV(TAG, "BLE GAP ADV_DATA_SET_COMPLETE");
+        esp_ble_gap_start_advertising(&hidd_adv_params);
         break;
 
     case ESP_GAP_BLE_ADV_START_COMPLETE_EVT:
@@ -240,8 +250,8 @@ static esp_err_t ble_gap_config_adv_data(const char* adv_name)
         .set_scan_rsp = false,
         .include_name = true,
         .include_txpower = true,
-        .min_interval = 0x0006, //slave connection min interval, Time = min_interval * 1.25 msec
-        .max_interval = 0x0010, //slave connection max interval, Time = max_interval * 1.25 msec
+        .min_interval = 0x0010, //slave connection min interval, Time = min_interval * 1.25 msec = 20ms
+        .max_interval = 0x0020, //slave connection max interval, Time = max_interval * 1.25 msec = 40ms
         .appearance = ESP_HID_APPEARANCE_KEYBOARD,
         .manufacturer_len = 0,
         .p_manufacturer_data =  NULL,
@@ -268,28 +278,39 @@ static esp_err_t ble_gap_config_adv_data(const char* adv_name)
 
 esp_err_t ble_gap_adv_to_any(const char* adv_name, bool slow)
 {
-    esp_err_t ret = ble_gap_config_adv_data(adv_name);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to configure GAP advertising data: %s", esp_err_to_name(ret));
-        return ret;
-    }
-
-    static esp_ble_adv_params_t hidd_adv_params = {
-        .adv_int_min        = 0x50,
-        .adv_int_max        = 0xA0,
-        .adv_type           = ADV_TYPE_IND,
-        .own_addr_type      = BLE_ADDR_TYPE_PUBLIC,
-        .channel_map        = ADV_CHNL_ALL,
-        .adv_filter_policy  = ADV_FILTER_ALLOW_SCAN_ANY_CON_ANY,
-    };
-
     if (slow) {
         hidd_adv_params.adv_int_min = 0x320; // 500ms
         hidd_adv_params.adv_int_max = 0x640; // 1s
+    } else {
+        hidd_adv_params.adv_int_min = 0x50;  // 50ms
+        hidd_adv_params.adv_int_max = 0xA0;  // 100ms
     }
 
+    // esp_ble_gap_config_adv_data() is asynchronous; esp_ble_gap_start_advertising()
+    // is called in ESP_GAP_BLE_ADV_DATA_SET_COMPLETE_EVT after the data is committed.
+    esp_err_t ret = ble_gap_config_adv_data(adv_name);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to configure GAP advertising data: %s", esp_err_to_name(ret));
+    }
+    return ret;
+}
 
-    return esp_ble_gap_start_advertising(&hidd_adv_params);
+esp_err_t ble_gap_update_conn_params_for_addr(esp_bd_addr_t bda, bool fast)
+{
+    esp_ble_conn_update_params_t params = {
+        .latency  = 0,
+    };
+    if (fast) {
+        params.min_int = 0x10;   // 20ms
+        params.max_int = 0x20;   // 40ms
+        params.timeout = 0xC8;   // 2000ms supervision timeout
+    } else {
+        params.min_int = 0x50;   // 100ms
+        params.max_int = 0xA0;   // 200ms
+        params.timeout = 0x1F4;  // 5000ms supervision timeout
+    }
+    memcpy(params.bda, bda, ESP_BD_ADDR_LEN);
+    return esp_ble_gap_update_conn_params(&params);
 }
 
 esp_err_t ble_clear_all_bonds(void)

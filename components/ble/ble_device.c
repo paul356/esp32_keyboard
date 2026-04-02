@@ -124,16 +124,47 @@ bool is_ble_ready()
     return ble_ready;
 }
 
+esp_err_t ble_set_adv_speed(bool slow)
+{
+    if (!ble_ready) {
+        return ESP_ERR_INVALID_STATE;
+    }
+    const char *ble_name = get_ble_name();
+    return ble_gap_adv_to_any(ble_name, slow);
+}
+
+esp_err_t ble_update_conn_params(bool fast)
+{
+    if (!ble_ready || hid_dev == NULL) {
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    esp_hidd_conn_info_t connections[4];
+    size_t count = 0;
+    esp_err_t ret = esp_hidd_dev_get_connections(hid_dev, connections, 4, &count);
+    if (ret != ESP_OK || count == 0) {
+        return ret;
+    }
+
+    for (size_t i = 0; i < count; i++) {
+        ret = ble_gap_update_conn_params_for_addr(connections[i].remote_bda, fast);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to update conn params for connection %zu: %s", i, esp_err_to_name(ret));
+        }
+    }
+    return ESP_OK;
+}
+
 /**
  * @brief Intermediary GATTS event handler
  * Routes events between ESP-IDF HID and our custom layout service
  */
 void top_gatts_event_handler(esp_gatts_cb_event_t event, esp_gatt_if_t gatts_if, esp_ble_gatts_cb_param_t *param)
 {
-    if (event == ESP_GATTS_CONNECT_EVT) {
-        // Restart advertising to allow reconnection
+    if (event == ESP_GATTS_CONNECT_EVT && gatts_if == layout_service_get_gatts_if()) {
+        // Restart advertising to allow additional connections (only once per physical connection)
         const char *ble_name = get_ble_name();
-        esp_err_t ret = ble_gap_adv_to_any(ble_name, true);
+        esp_err_t ret = ble_gap_adv_to_any(ble_name, false);
         if (ret != ESP_OK)
         {
             ESP_LOGE(TAG, "Failed to start advertising for bonded devices: %s", esp_err_to_name(ret));

@@ -26,7 +26,7 @@ typedef struct {
 static const led_power_profile_t usb_profiles[] = {
     [IDLE_STATE_ACTIVE]     = { .brightness = 100, .rmt_enabled = true  },
     [IDLE_STATE_SHORT]      = { .brightness = 100, .rmt_enabled = true  },
-    [IDLE_STATE_LONG]       = { .brightness = 60, .rmt_enabled = true  },
+    [IDLE_STATE_LONG]       = { .brightness = 0,   .rmt_enabled = false },
 };
 
 // Power profiles for battery-powered mode (aggressive power saving)

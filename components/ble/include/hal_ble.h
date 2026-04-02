@@ -83,4 +83,26 @@ bool is_ble_ready(void);
  */
 struct esp_hidd_dev_s* ble_get_hid_dev(void);
 
+/** @brief Set BLE advertising speed
+ *
+ * Reconfigures and restarts BLE advertising with either fast or slow interval.
+ * Fast: 50-100ms (for initial connection/discovery)
+ * Slow: 500-1000ms (for idle power saving while still discoverable)
+ *
+ * @param slow true for slow advertising (power saving), false for fast
+ * @return ESP_OK on success, ESP_ERR_INVALID_STATE if BLE not initialized
+ */
+esp_err_t ble_set_adv_speed(bool slow);
+
+/** @brief Update BLE connection parameters for all active connections
+ *
+ * Requests connection interval update for every connected device.
+ * Fast: 20-40ms (active typing)
+ * Slow: 100-200ms (idle, saves power while staying connected)
+ *
+ * @param fast true for fast parameters (active use), false for slow (idle)
+ * @return ESP_OK on success, ESP_ERR_INVALID_STATE if BLE not initialized
+ */
+esp_err_t ble_update_conn_params(bool fast);
+
 #endif /* _HAL_BLE_H_ */

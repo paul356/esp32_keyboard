@@ -12,37 +12,39 @@
 #include "function_control.h"
 #include "esp_log.h"
 #include "miscs.h"
+#include <stdbool.h>
 
 #define TAG "ble_pwr"
 
 // BLE power profile configuration
 typedef struct {
     bool ble_enabled;       // Whether BLE should be enabled
+    bool adv_slow;          // Use slow advertising interval (power saving, still discoverable)
+    bool conn_params_fast;  // Use fast connection parameters (active use vs idle)
 } ble_power_profile_t;
 
 // Power profiles for USB-powered mode (no power saving)
 static const ble_power_profile_t usb_profiles[] = {
-    [IDLE_STATE_ACTIVE]     = { .ble_enabled = true  },
-    [IDLE_STATE_SHORT]      = { .ble_enabled = true  },
-    [IDLE_STATE_LONG]       = { .ble_enabled = true  },
+    [IDLE_STATE_ACTIVE] = { .ble_enabled = true,  .adv_slow = false, .conn_params_fast = true  },
+    [IDLE_STATE_SHORT]  = { .ble_enabled = true,  .adv_slow = false, .conn_params_fast = true  },
+    [IDLE_STATE_LONG]   = { .ble_enabled = true,  .adv_slow = false, .conn_params_fast = true  },
 };
 
 // Power profiles for battery-powered mode (aggressive power saving)
 static const ble_power_profile_t battery_profiles[] = {
-    [IDLE_STATE_ACTIVE]     = { .ble_enabled = true  },
-    [IDLE_STATE_SHORT]      = { .ble_enabled = true  },
-    [IDLE_STATE_LONG]       = { .ble_enabled = false },  // Disable BLE to save power
+    [IDLE_STATE_ACTIVE] = { .ble_enabled = true,  .adv_slow = false, .conn_params_fast = true  },
+    [IDLE_STATE_SHORT]  = { .ble_enabled = true,  .adv_slow = true,  .conn_params_fast = false },
+    [IDLE_STATE_LONG]   = { .ble_enabled = false, .adv_slow = true,  .conn_params_fast = false },
 };
 
 static void apply_ble_profile(const ble_power_profile_t *profile)
 {
     esp_err_t ret;
     bool ble_enabled = is_ble_enabled();
-    bool ble_ready = is_ble_ready();
+    bool ble_ready_now = is_ble_ready();
 
-    // In configuration BLE is on, but it could be turned off by power management.
-    if (profile->ble_enabled && ble_enabled && !ble_ready) {
-        // Need to enable BLE
+    if (profile->ble_enabled && ble_enabled && !ble_ready_now) {
+        // Need to enable BLE (waking from long idle)
         const char* ble_name = get_ble_name();
         ret = init_ble_device(ble_name);
         if (ret != ESP_OK) {
@@ -50,13 +52,24 @@ static void apply_ble_profile(const ble_power_profile_t *profile)
         } else {
             ESP_LOGI(TAG, "BLE enabled (power save mode ended)");
         }
-    } else if (!profile->ble_enabled && ble_ready) {
-        // Need to disable BLE
+    } else if (!profile->ble_enabled && ble_ready_now) {
+        // Need to disable BLE (entering long idle on battery)
         ret = deinit_ble_device();
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "Failed to disable BLE: %s", esp_err_to_name(ret));
         } else {
             ESP_LOGI(TAG, "BLE disabled (power save mode)");
+        }
+    } else if (profile->ble_enabled && ble_ready_now) {
+        // BLE is running - adjust advertising speed
+        ret = ble_set_adv_speed(profile->adv_slow);
+        if (ret != ESP_OK) {
+            ESP_LOGW(TAG, "Failed to set adv speed: %s", esp_err_to_name(ret));
+        }
+        // Adjust connection interval for all active connections
+        ret = ble_update_conn_params(profile->conn_params_fast);
+        if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+            ESP_LOGW(TAG, "Failed to update conn params: %s", esp_err_to_name(ret));
         }
     }
 }
