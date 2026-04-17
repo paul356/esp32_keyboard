@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2026 panhao356@gmail.com
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #include "led_drv.h"
 #include "esp_log.h"
 #include "esp_check.h"

@@ -1,7 +1,7 @@
 /*
  *  Unit tests for macro conversion functions in MK32 keyboard firmware.
  *
- *  Copyright (C) 2024 github.com/paul356
+ *  Copyright (C) 2024 panhao356@gmail.com
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by

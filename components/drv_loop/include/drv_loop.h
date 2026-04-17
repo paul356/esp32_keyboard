@@ -1,4 +1,7 @@
 /*
+ * Copyright (C) 2026 panhao356@gmail.com
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
  * drv_loop.h - Generic event system for MK32 keyboard
  *
  * This component provides a generic event system that components can use

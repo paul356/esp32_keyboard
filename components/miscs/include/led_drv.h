@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2026 panhao356@gmail.com
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ */
+
 #ifndef LED_DRV_H
 #define LED_DRV_H
 

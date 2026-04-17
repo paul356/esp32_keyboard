@@ -2,7 +2,7 @@
  *  This program is a keyboard firmware for ESP family boards inspired by
  *  MK32 and qmk_firmware.
  *
- *  Copyright (C) 2025 github.com/paul356
+ *  Copyright (C) 2025 panhao356@gmail.com
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by

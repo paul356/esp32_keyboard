@@ -4,7 +4,8 @@
  * This module integrates BLE power controls with the idle detection system
  * to optimize power consumption based on user activity.
  *
- * Copyright 2025
+ * Copyright (C) 2025 panhao356@gmail.com
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #include "idle_detection.h"

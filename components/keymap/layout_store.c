@@ -15,7 +15,7 @@
  * MA 02110-1301, USA.
  *
  * Original work: Copyright 2018 Gal Zaidenstein.
- * Modified by github.com/paul356 under GPL-2.0-or-later
+ * Modified by panhao356@gmail.com under GPL-2.0-or-later
  */
 
 #include <stdio.h>

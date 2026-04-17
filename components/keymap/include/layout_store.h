@@ -1,5 +1,8 @@
 /*
- * nvs_funcs.h
+ * Copyright (C) 2026 panhao356@gmail.com
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
+ * layout_store.h
  *
  *  Created on: 13 Sep 2018
  *      Author: gal

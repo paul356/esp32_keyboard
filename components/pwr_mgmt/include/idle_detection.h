@@ -4,7 +4,8 @@
  * This module provides a centralized mechanism for detecting user inactivity
  * to enable power-saving features across all components.
  *
- * Copyright 2025
+ * Copyright (C) 2025 panhao356@gmail.com
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #ifndef IDLE_DETECTION_H

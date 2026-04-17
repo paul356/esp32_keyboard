@@ -2,7 +2,7 @@
  *  This program is a keyboard firmware for ESP family boards inspired by
  *  MK32 and qmk_firmware.
  *
- *  Copyright (C) 2024 github.com/paul356
+ *  Copyright (C) 2024 panhao356@gmail.com
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -108,7 +108,7 @@ static about_gui_t* create_about_gui(void)
     lv_obj_set_style_text_color(gui->author_label, lv_color_hex(0x808080), 0); // Gray color
     lv_obj_set_style_text_font(gui->author_label, &lv_font_montserrat_10, 0);
     lv_obj_set_style_text_align(gui->author_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(gui->author_label, "Copyright (C) 2024 github.com/paul356");
+    lv_label_set_text(gui->author_label, "Copyright (C) 2024 panhao356@gmail.com");
 
     ESP_LOGI(TAG, "About GUI created successfully");
     return gui;

@@ -1,4 +1,7 @@
 /*
+ * Copyright (C) 2026 panhao356@gmail.com
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
  * drv_loop.c - Generic event system implementation for MK32 keyboard
  * Pure event system without any domain-specific logic
  */

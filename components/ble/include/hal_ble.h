@@ -15,7 +15,7 @@
  * MA 02110-1301, USA.
  *
  * Original Work: Copyright 2019 Benjamin Aigner <beni@asterics-foundation.org>
- * Modified by: github.com/paul356
+ * Modified by: panhao356@gmail.com
  */
 
 /** @file

@@ -3,7 +3,8 @@
  *
  * This module integrates display power controls with the idle detection system.
  *
- * Copyright 2025
+ * Copyright (C) 2025 panhao356@gmail.com
+ * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
 #ifndef DISPLAY_POWER_MGMT_H

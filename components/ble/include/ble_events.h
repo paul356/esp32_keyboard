@@ -1,4 +1,7 @@
 /*
+ * Copyright (C) 2026 panhao356@gmail.com
+ * SPDX-License-Identifier: GPL-3.0-or-later
+ *
  * ble_events.h - BLE component specific events
  *
  * This header defines events specific to the BLE component
