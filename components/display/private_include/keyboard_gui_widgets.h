@@ -300,6 +300,40 @@ bool keyboard_gui_wifi_settings_handle_input(void *user_ctx, input_event_e input
 esp_err_t keyboard_gui_wifi_settings_action(void *user_ctx);
 
 /**
+ * @brief Prepare Snake game GUI function for menu items
+ * Creates and shows Snake game screen; disables menu auto-timeout
+ * @param self Menu item for the Snake game
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_prepare_snake(struct menu_item *self);
+
+/**
+ * @brief Post Snake game GUI function for menu items
+ * Cleanup function for Snake game screen; restores menu auto-timeout
+ * @param self Menu item for the Snake game
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_post_snake(struct menu_item *self);
+
+/**
+ * @brief Input handler for Snake game menu item
+ * Handles arrow keys (steer snake) and ENTER (start/restart)
+ * @param user_ctx Snake GUI context
+ * @param input_event Input event type
+ * @param key_code Character code (unused)
+ * @return bool true if event was handled, false otherwise
+ */
+bool keyboard_gui_snake_handle_input(void *user_ctx, input_event_e input_event, char key_code);
+
+/**
+ * @brief Snake game user action (start / restart)
+ * Called when the user presses ENTER on the Snake menu item
+ * @param user_ctx Snake GUI context
+ * @return esp_err_t ESP_OK on success
+ */
+esp_err_t keyboard_gui_snake_action(void *user_ctx);
+
+/**
  * @brief Prepare About GUI function for menu items
  * Creates and shows About screen with keyboard information displayed in the center
  * @param self Menu item that displays About information

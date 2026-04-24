@@ -462,12 +462,18 @@ static void menu_setup_tree(void)
     // Create About menu item (to be added to main menu)
     struct menu_item *about = menu_item_create("About", &info_icon, keyboard_gui_prepare_about, keyboard_gui_post_about, NULL, NULL);
 
+    // Create Games menu and Snake submenu
+    struct menu_item *games_menu = menu_item_create("Games", &games_icon, keyboard_gui_prepare_nonleaf_item, keyboard_gui_post_nonleaf_item, NULL, NULL);
+    struct menu_item *snake_game = menu_item_create("Snake", &snake_icon, keyboard_gui_prepare_snake, keyboard_gui_post_snake, keyboard_gui_snake_handle_input, keyboard_gui_snake_action);
+    menu_item_add_child(games_menu, snake_game);
+
     // Add main menu children
     menu_item_add_child(s_menu_context.root_menu, keyboard_mode_menu);
     menu_item_add_child(s_menu_context.root_menu, bluetooth_menu);
     menu_item_add_child(s_menu_context.root_menu, wifi_menu);
     menu_item_add_child(s_menu_context.root_menu, led_menu);
     //menu_item_add_child(s_menu_context.root_menu, advanced_menu);
+    menu_item_add_child(s_menu_context.root_menu, games_menu);
     menu_item_add_child(s_menu_context.root_menu, about);
 
     // Create keyboard mode submenu items
