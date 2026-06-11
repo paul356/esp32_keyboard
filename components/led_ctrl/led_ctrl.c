@@ -9,6 +9,7 @@
 #include "esp_random.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "keycode.h"
 #include <string.h>
 #include <math.h>
 
@@ -29,6 +30,7 @@ typedef enum {
 } led_ctrl_event_id_t;
 
 typedef struct {
+    uint16_t keycode;
     uint8_t row;
     uint8_t col;
     bool pressed;  // True if key is pressed, false if released
@@ -55,6 +57,23 @@ static const char *TAG = "led_ctrl";
 // Event base definition
 ESP_EVENT_DEFINE_BASE(LED_CTRL_EVENTS);
 
+// Per-pattern default parameters (used when caller passes 0)
+static const struct {
+    uint32_t param1;
+    uint32_t param2;
+} s_pattern_defaults[LED_PATTERN_MAX] = {
+    [LED_PATTERN_OFF]         = {0,    0},
+    [LED_PATTERN_RAINBOW]     = {50,   0},   // speed
+    [LED_PATTERN_RAINDROP]    = {5,    0},   // spawn rate (1/N)
+    [LED_PATTERN_RIPPLE]      = {10,   30},  // speed, max_age (frames)
+    [LED_PATTERN_FIRE]        = {180,  40},  // intensity, spark_chance
+    [LED_PATTERN_BREATHING]   = {3000, 0},   // period_ms
+    [LED_PATTERN_WAVE]        = {50,   0},   // speed
+    [LED_PATTERN_HIT_KEY]     = {2000, 0},   // hold_time_ms
+    [LED_PATTERN_SNAKE]       = {0,    0},   // no params
+    [LED_PATTERN_TEXT_SCROLL] = {40,   0},   // scroll_speed
+};
+
 // Current pattern configuration
 static led_pattern_config_t s_current_pattern = {
     .pattern = LED_PATTERN_OFF,
@@ -67,15 +86,16 @@ static led_pattern_config_t s_current_pattern = {
 
 // Periodic timer for time-based patterns (breathing, wave, ripple decay)
 static esp_timer_handle_t s_led_timer = NULL;
-#define LED_TIMER_PERIOD_US  33000  // ~30 fps
+#define LED_TIMER_PERIOD_US  200000  // 5 fps
 
 // Ripple effect state
 #define MAX_RIPPLES 5
 typedef struct {
     int8_t led_index;   // Center LED of the ripple, -1 if inactive
     uint8_t age;        // Frames since creation
+    uint16_t hue;       // HSV hue for this ripple's color
 } ripple_t;
-static ripple_t s_ripples[MAX_RIPPLES] = {{-1, 0}};
+static ripple_t s_ripples[MAX_RIPPLES] = {{-1, 0, 0}};
 
 // ============================================================
 //  Snake state
@@ -83,7 +103,8 @@ static ripple_t s_ripples[MAX_RIPPLES] = {{-1, 0}};
 #define SNAKE_MAX_LEN 30
 static int8_t s_snake_body[SNAKE_MAX_LEN];  // LED indices of snake body, head at [0]
 static uint8_t s_snake_len = 4;
-static int8_t s_snake_dir = 1;              // +1 forward, -1 backward along strip
+static int8_t s_snake_dr = 0;              // grid row delta (-1/0/1)
+static int8_t s_snake_dc = 1;              // grid col delta (-1/0/1)
 static int8_t s_snake_food = -1;            // Food LED index
 
 // ============================================================
@@ -184,7 +205,7 @@ static void draw_fire_pattern(uint32_t frame);
 static void ripple_clear_all(void);
 static void raindrop_clear_all(void);
 static void snake_init(void);
-static void snake_handle_key(uint8_t row, uint8_t col);
+static void snake_handle_key(uint16_t keycode);
 
 /**
  * @brief Map matrix (row, col) to LED index using zigzag layout.
@@ -211,17 +232,6 @@ static int8_t key_to_led(uint8_t row, uint8_t col) {
     }
 
     return (idx < LED_DRV_NUM_LEDS) ? (int8_t)idx : -1;
-}
-
-/**
- * @brief Choose an effect color; defaults to blue if primary_color is black.
- */
-static led_drv_color_t get_effect_color(void) {
-    led_drv_color_t c = s_current_pattern.primary_color;
-    if (c.red == 0 && c.green == 0 && c.blue == 0) {
-        return LED_COLOR_BLUE;
-    }
-    return c;
 }
 
 // ============================================================
@@ -264,6 +274,37 @@ static int8_t led_move(int8_t led, int dr, int dc) {
 }
 
 // ============================================================
+//  Physical key geometry (centi-units, ×100 of keycap "u" width)
+//  Row total = 15.0u = 1500 centi-units for all 5 rows
+// ============================================================
+
+/** Key center x-position for each (row, col) in centi-units.
+ *  Precomputed from key-width.txt — standard 60% layout. */
+static const uint16_t key_center_x[5][14] = {
+    {  50,  150,  250,  350,  450,  550,  650,  750,  850,  950, 1050, 1150, 1250, 1400},
+    {  75,  200,  300,  400,  500,  600,  700,  800,  900, 1000, 1100, 1200, 1300, 1425},
+    {  88,  225,  325,  425,  525,  625,  725,  825,  925, 1025, 1125, 1225, 1387},
+    { 112,  275,  375,  475,  575,  675,  775,  875,  975, 1075, 1175, 1362},
+    {  62,  188,  312,  688, 1062, 1188, 1312, 1438},
+};
+
+/** Find column in a given row whose center x is closest to target_x. */
+static int8_t find_nearest_col(uint8_t row, uint16_t target_x) {
+    uint8_t n = row_key_counts[row];
+    int8_t best_c = 0;
+    uint16_t best_diff = 1500;
+    for (uint8_t c = 0; c < n; c++) {
+        uint16_t cx = key_center_x[row][c];
+        uint16_t diff = (cx > target_x) ? (cx - target_x) : (target_x - cx);
+        if (diff < best_diff) {
+            best_diff = diff;
+            best_c = (int8_t)c;
+        }
+    }
+    return best_c;
+}
+
+// ============================================================
 //  Color helpers
 // ============================================================
 
@@ -286,7 +327,7 @@ static led_drv_color_t hsv_to_rgb(uint16_t h, uint8_t s, uint8_t v) {
 }
 
 // ============================================================
-//  RAINBOW — HSV sweep across the strip
+//  RAINBOW — HSV sweep by physical x-position, cycling over time
 // ============================================================
 static void draw_rainbow_pattern(uint32_t frame) {
     uint32_t speed = s_current_pattern.param1;
@@ -294,12 +335,15 @@ static void draw_rainbow_pattern(uint32_t frame) {
 
     uint8_t sat = 255;
     uint8_t val = s_current_pattern.brightness;
-    uint16_t hue_per_led = 360 * 3 / LED_DRV_NUM_LEDS; // 3 full cycles across strip
-    uint16_t base = (uint16_t)((frame * speed / 30) % 360);
+    // 3 hue cycles across 1500 centi-units, shift each frame by speed
+    uint16_t shift = (uint16_t)((frame * speed) % 360);
 
     led_drv_clear();
     for (int i = 0; i < LED_DRV_NUM_LEDS; i++) {
-        uint16_t hue = (base + (uint16_t)i * hue_per_led) % 360;
+        uint8_t r, c;
+        if (!led_to_row_col((int8_t)i, &r, &c)) continue;
+        uint16_t cx = key_center_x[r][c];
+        uint16_t hue = (shift + (uint16_t)((uint32_t)cx * 360 * 3 / 1500)) % 360;
         led_drv_set_led(i, hsv_to_rgb(hue, sat, val));
     }
     if (s_rmt_enabled) led_drv_update();
@@ -381,24 +425,51 @@ static void snake_spawn_food(void) {
 }
 
 static void snake_init(void) {
-    s_snake_len = 4;
-    // Start at LED 20 (middle of row 1)
+    s_snake_len = 3;
+    // Start at LED 20 (middle of row 1), heading right in grid
     for (uint8_t i = 0; i < s_snake_len; i++) {
         s_snake_body[i] = 20 - (int8_t)i;
     }
-    s_snake_dir = 1;
+    s_snake_dr = 0;
+    s_snake_dc = 1;
     s_snake_food = -1;
     snake_spawn_food();
 }
 
 static void draw_snake_pattern(uint32_t frame) {
-    (void)frame;
-
     if (s_snake_len == 0) { snake_init(); return; }
 
-    // Move head
+    // Move every frame (5 steps/sec at 5fps)
     int8_t head = s_snake_body[0];
-    int8_t new_head = (head + s_snake_dir + LED_DRV_NUM_LEDS) % LED_DRV_NUM_LEDS;
+    uint8_t hr, hc;
+    if (!led_to_row_col(head, &hr, &hc)) { snake_init(); goto draw; }
+
+    int nr = (int)hr + s_snake_dr;
+    int nc = (int)hc + s_snake_dc;
+
+    // Wrap row (5 rows total)
+    if (nr < 0) nr = 4;
+    else if (nr >= 5) nr = 0;
+
+    // Column handling — use physical x-alignment for vertical moves
+    {
+        int ncols = (int)row_key_counts[nr];
+        if (s_snake_dc != 0) {
+            // Horizontal wrap
+            if (nc < 0) nc = ncols - 1;
+            else if (nc >= ncols) nc = 0;
+        } else if (s_snake_dr != 0) {
+            // Vertical: snap to nearest column by physical x-position
+            uint16_t cx = key_center_x[hr][hc];
+            nc = (int)find_nearest_col((uint8_t)nr, cx);
+        } else {
+            // Clamp
+            if (nc < 0) nc = 0;
+            else if (nc >= ncols) nc = ncols - 1;
+        }
+    }
+
+    int8_t new_head = key_to_led((uint8_t)nr, (uint8_t)nc);
 
     // Check self-collision
     bool dead = false;
@@ -407,11 +478,8 @@ static void draw_snake_pattern(uint32_t frame) {
     }
 
     if (dead) {
-        // Flash red briefly then restart
-        led_drv_clear();
-        if (s_rmt_enabled) led_drv_update();
         snake_init();
-        return;
+        goto draw;
     }
 
     // Shift body
@@ -429,45 +497,47 @@ static void draw_snake_pattern(uint32_t frame) {
         snake_spawn_food();
     }
 
-    // Draw
+draw:
+    // Draw — head=RED, body=GREEN, tail=BLUE
     led_drv_clear();
-    led_drv_color_t body_color = apply_brightness(LED_COLOR_GREEN, s_current_pattern.brightness);
     for (uint8_t i = 0; i < s_snake_len; i++) {
-        uint8_t b = (uint8_t)(((float)(s_snake_len - 1 - i) / (float)SNAKE_MAX_LEN) * 0.5f + 0.5f);
-        led_drv_set_led((uint16_t)s_snake_body[i], apply_brightness(body_color,
-            (uint8_t)((uint16_t)b * s_current_pattern.brightness / 255)));
+        led_drv_color_t seg_color;
+        if (i == 0) {
+            seg_color = LED_COLOR_RED;
+        } else if (i == 1) {
+            seg_color = LED_COLOR_GREEN;
+        } else {
+            seg_color = LED_COLOR_BLUE;
+        }
+        led_drv_set_led((uint16_t)s_snake_body[i],
+            apply_brightness(seg_color, s_current_pattern.brightness));
     }
     if (s_snake_food >= 0) {
+        // Blinking food: visible every other draw frame
         led_drv_set_led((uint16_t)s_snake_food,
             apply_brightness(LED_COLOR_RED, s_current_pattern.brightness));
     }
     if (s_rmt_enabled) led_drv_update();
 }
 
-static void snake_handle_key(uint8_t row, uint8_t col) {
+static void snake_handle_key(uint16_t keycode) {
     if (s_snake_len == 0) return;
-    int8_t head = s_snake_body[0];
-    uint8_t hr, hc;
-    if (!led_to_row_col(head, &hr, &hc)) return;
 
-    int8_t new_head = -1;
-    // Determine grid direction from key position relative to head
-    // Up: smaller row index, Down: larger row index
-    // Left/Right: within same row, compare columns
-    if (row < hr) {
-        new_head = led_move(head, -1, 0);
-    } else if (row > hr) {
-        new_head = led_move(head, 1, 0);
-    } else if (col < hc) {
-        if (hr & 1) new_head = led_move(head, 0, -1); // odd row: left → col-1
-        else       new_head = led_move(head, 0, 1);   // even row zigzag
-    } else if (col > hc) {
-        if (hr & 1) new_head = led_move(head, 0, 1);  // odd row: right → col+1
-        else       new_head = led_move(head, 0, -1);  // even row zigzag
+    int8_t dr = 0, dc = 0;
+
+    switch (keycode) {
+        case KC_UP:    dr = -1; dc =  0; break;
+        case KC_DOWN:  dr =  1; dc =  0; break;
+        case KC_LEFT:  dr =  0; dc = -1; break;
+        case KC_RIGHT: dr =  0; dc =  1; break;
+        default:       return;  // Not a direction key, ignore
     }
 
-    if (new_head < 0 || new_head == s_snake_body[1]) return; // reject same direction
-    s_snake_dir = new_head - head;
+    // Reject 180° turn (would reverse into body)
+    if (dr == -s_snake_dr && dc == -s_snake_dc) return;
+
+    s_snake_dr = dr;
+    s_snake_dc = dc;
 }
 
 // ============================================================
@@ -483,7 +553,6 @@ static const font_glyph_t* font_get_glyph(char ch) {
 static void draw_text_scroll_pattern(uint32_t frame) {
     uint32_t speed = s_current_pattern.param1;
     if (speed == 0) speed = 1;  // pixels per frame scroll speed
-    led_drv_color_t color = get_effect_color();
     uint8_t bri = s_current_pattern.brightness;
 
     // Move scroll offset (negative = moving leftward)
@@ -515,6 +584,9 @@ static void draw_text_scroll_pattern(uint32_t frame) {
                     int col = x + (int)cx;
                     if (col < 0 || col >= 14) continue;
                     if (row_data & (1 << (4 - cx))) {
+                        // Rainbow color based on column + frame (adjusted for 5fps)
+                        uint16_t hue = (uint16_t)(((uint32_t)col * 5000 + frame * 1200) % 65536);
+                        led_drv_color_t color = hsv_to_rgb(hue, 255, 255);
                         set_led_xy(cy, (uint8_t)col, apply_brightness(color, bri));
                     }
                 }
@@ -604,14 +676,16 @@ static void draw_breathing_pattern(uint32_t frame) {
     uint32_t period_ms = s_current_pattern.param1;
     if (period_ms == 0) period_ms = 3000;
 
-    // 30 fps → 33 ms/frame
-    uint32_t period_frames = period_ms * 30 / 1000;
+    // 5 fps → 200 ms/frame
+    uint32_t period_frames = period_ms * 5 / 1000;
     if (period_frames == 0) period_frames = 1;
 
     float phase = (float)(frame % period_frames) / (float)period_frames * 2.0f * (float)M_PI;
     float brightness_f = (sinf(phase) + 1.0f) / 2.0f;   // 0.0 … 1.0
 
-    led_drv_color_t color = get_effect_color();
+    // Slowly cycle hue: full rotation over ~20 seconds (100 frames at 5fps)
+    uint16_t hue = (uint16_t)((frame % 100) * 65536 / 100);
+    led_drv_color_t color = hsv_to_rgb(hue, 255, 255);
     led_drv_color_t dimmed = apply_brightness(color, (uint8_t)(brightness_f * (float)s_current_pattern.brightness));
 
     led_drv_clear();
@@ -629,11 +703,10 @@ static void draw_wave_pattern(uint32_t frame) {
     uint32_t speed = s_current_pattern.param1;
     if (speed == 0) speed = 50;
 
-    led_drv_color_t color = get_effect_color();
     int wave_width = 10;
 
-    // Move the wave center each frame
-    uint32_t pos = (frame * speed / 30) % LED_DRV_NUM_LEDS;
+    // Move the wave center each frame (5fps)
+    uint32_t pos = (frame * speed / 5) % LED_DRV_NUM_LEDS;
 
     led_drv_clear();
     for (int i = 0; i < wave_width; i++) {
@@ -641,6 +714,9 @@ static void draw_wave_pattern(uint32_t frame) {
         float dist = fabsf((float)(i - wave_width / 2)) / (float)(wave_width / 2);
         float brightness_f = (1.0f - dist);
         if (brightness_f < 0.0f) brightness_f = 0.0f;
+        // Rainbow gradient along the wave
+        uint16_t hue = (uint16_t)((uint32_t)idx * 65536 / LED_DRV_NUM_LEDS);
+        led_drv_color_t color = hsv_to_rgb(hue, 255, 255);
         led_drv_color_t dimmed = apply_brightness(color,
             (uint8_t)(brightness_f * (float)s_current_pattern.brightness));
         led_drv_set_led(idx, dimmed);
@@ -662,8 +738,6 @@ static void draw_ripple_pattern(uint32_t frame) {
     uint32_t max_age = s_current_pattern.param2;
     if (max_age == 0) max_age = 30;      // ripple lifetime in frames
 
-    led_drv_color_t color = get_effect_color();
-
     led_drv_clear();
 
     for (int r = 0; r < MAX_RIPPLES; r++) {
@@ -679,6 +753,7 @@ static void draw_ripple_pattern(uint32_t frame) {
         int radius = (int)(s_ripples[r].age * speed);
         int thickness = 2;
         float fade = 1.0f - (float)s_ripples[r].age / (float)max_age;
+        led_drv_color_t ripple_color = hsv_to_rgb(s_ripples[r].hue, 255, 255);
 
         for (int i = 0; i < LED_DRV_NUM_LEDS; i++) {
             int dist = abs(i - center);
@@ -687,7 +762,7 @@ static void draw_ripple_pattern(uint32_t frame) {
 
             if (dist >= radius && dist < radius + thickness) {
                 uint8_t b = (uint8_t)(fade * (float)s_current_pattern.brightness);
-                led_drv_color_t dimmed = apply_brightness(color, b);
+                led_drv_color_t dimmed = apply_brightness(ripple_color, b);
                 led_drv_set_led(i, dimmed);
             }
         }
@@ -713,6 +788,7 @@ static void ripple_add(int8_t led_index) {
     }
     s_ripples[oldest].led_index = led_index;
     s_ripples[oldest].age = 0;
+    s_ripples[oldest].hue = (uint16_t)(esp_random() % 65536);
 }
 
 /**
@@ -826,8 +902,15 @@ esp_err_t led_ctrl_set_pattern(led_pattern_type_e pattern_type, uint32_t param1,
     }
 
     s_current_pattern.pattern = pattern_type;
-    s_current_pattern.param1 = param1;
-    s_current_pattern.param2 = param2;
+
+    // Use per-pattern defaults when caller passes 0
+    if (pattern_type < LED_PATTERN_MAX) {
+        s_current_pattern.param1 = (param1 != 0) ? param1 : s_pattern_defaults[pattern_type].param1;
+        s_current_pattern.param2 = (param2 != 0) ? param2 : s_pattern_defaults[pattern_type].param2;
+    } else {
+        s_current_pattern.param1 = param1;
+        s_current_pattern.param2 = param2;
+    }
 
     ESP_LOGI(TAG, "LED pattern set to %d with param1=%lu, param2=%lu", pattern_type, param1, param2);
     return ESP_OK;
@@ -850,7 +933,7 @@ esp_err_t led_ctrl_get_pattern(led_pattern_type_e *pattern_type, uint32_t *param
     return ESP_OK;
 }
 
-esp_err_t led_ctrl_keystroke(uint8_t row, uint8_t col, bool pressed) {
+esp_err_t led_ctrl_keystroke(uint16_t keycode, uint8_t row, uint8_t col, bool pressed) {
     if (!s_initialized) {
         return ESP_ERR_INVALID_STATE;
     }
@@ -866,10 +949,11 @@ esp_err_t led_ctrl_keystroke(uint8_t row, uint8_t col, bool pressed) {
         return ESP_OK;
     }
 
-    ESP_LOGD(TAG, "Keystroke: pos=(%d,%d), pressed=%d", row, col, pressed);
+    ESP_LOGD(TAG, "Keystroke: keycode=0x%04X, pos=(%d,%d), pressed=%d", keycode, row, col, pressed);
 
     // Fill event structure and post to drv_loop
     led_ctrl_keystroke_t keystroke = {
+        .keycode = keycode,
         .row = row,
         .col = col,
         .pressed = pressed,
@@ -898,12 +982,16 @@ static void draw_hit_key_pattern(uint32_t index)
         prev = LED_DRV_NUM_LEDS - 1;
     }
 
+    // Rotating hue per keypress: each press shifts to a new color
+    uint16_t hue = (uint16_t)((index * 7919) % 65536);  // prime multiplier for good distribution
+    led_drv_color_t color = hsv_to_rgb(hue, 255, 255);
+
     // Apply brightness to colors
-    led_drv_color_t blue_brightness = apply_brightness(LED_COLOR_BLUE, s_current_pattern.brightness);
+    led_drv_color_t key_color = apply_brightness(color, s_current_pattern.brightness);
 
     // Update LEDs with brightness-adjusted colors
     led_drv_set_led(prev, LED_COLOR_BLACK);
-    led_drv_set_led(index, blue_brightness); // Set the LED at index 'count' to blue
+    led_drv_set_led(index, key_color);
 
     // Only update LED strip if RMT hardware is enabled
     if (s_rmt_enabled) {
@@ -981,8 +1069,8 @@ static void clear_all_leds(void)
 }
 
 static uint32_t s_count = 0;
-static void handle_keystroke_event(uint8_t row, uint8_t col, bool pressed) {
-    ESP_LOGD(TAG, "Keystroke event: row=%d, col=%d, pressed=%d", row, col, pressed);
+static void handle_keystroke_event(uint16_t keycode, uint8_t row, uint8_t col, bool pressed) {
+    ESP_LOGD(TAG, "Keystroke event: keycode=0x%04X, row=%d, col=%d, pressed=%d", keycode, row, col, pressed);
 
     switch (s_current_pattern.pattern) {
         case LED_PATTERN_HIT_KEY:
@@ -995,7 +1083,7 @@ static void handle_keystroke_event(uint8_t row, uint8_t col, bool pressed) {
             break;
         }
         case LED_PATTERN_SNAKE:
-            snake_handle_key(row, col);
+            if (pressed) snake_handle_key(keycode);
             break;
         default:
             break;
@@ -1092,7 +1180,7 @@ static void led_ctrl_event_handler(void *event_handler_arg, esp_event_base_t eve
                         keystroke->row, keystroke->col, keystroke->pressed);
 
                 // Handle keystroke-based patterns if needed
-                handle_keystroke_event(keystroke->row, keystroke->col, keystroke->pressed);
+                handle_keystroke_event(keystroke->keycode, keystroke->row, keystroke->col, keystroke->pressed);
             }
             break;
         }

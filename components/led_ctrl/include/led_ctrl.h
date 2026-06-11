@@ -74,13 +74,13 @@ esp_err_t led_ctrl_get_pattern(led_pattern_type_e *pattern_type, uint32_t *param
  * This function should be called whenever a key is pressed or released.
  * It will trigger appropriate LED effects based on the current pattern.
  *
- * @param scancode Key scancode
+ * @param keycode USB HID keycode of the key
  * @param row Key position row
  * @param col Key position column
  * @param pressed True if pressed, false if released
  * @return ESP_OK on success, error code otherwise
  */
-esp_err_t led_ctrl_keystroke(uint8_t row, uint8_t col, bool pressed);
+esp_err_t led_ctrl_keystroke(uint16_t keycode, uint8_t row, uint8_t col, bool pressed);
 
 /**
  * @brief Set global LED brightness

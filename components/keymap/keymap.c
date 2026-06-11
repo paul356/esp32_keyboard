@@ -86,7 +86,7 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
         return false;  // Prevent further processing of this keycode
     }
 
-    led_ctrl_keystroke(record->event.key.row, record->event.key.col, record->event.pressed);
+    led_ctrl_keystroke(keycode, record->event.key.row, record->event.key.col, record->event.pressed);
 
     return true;
 }
