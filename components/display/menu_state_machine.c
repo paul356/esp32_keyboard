@@ -142,11 +142,34 @@ bool menu_state_process_event(input_event_e event, unsigned char ch)
         event_consumed = true;
         break;
 
+    case INPUT_EVENT_RIGHT_ARROW:
+    case INPUT_EVENT_LEFT_ARROW:
+        if (s_menu_context.current_menu->handle_input_key)
+        {
+            // Leaf items handle left/right for their own internal navigation
+            s_menu_context.current_menu->handle_input_key(s_menu_context.current_menu->user_ctx, event, ch);
+        }
+        else if (s_menu_context.current_menu->parent)
+        {
+            // Navigate between sibling menus (with wrap-around)
+            struct menu_item *sibling = (event == INPUT_EVENT_RIGHT_ARROW)
+                ? menu_get_next_sibling(s_menu_context.current_menu)
+                : menu_get_prev_sibling(s_menu_context.current_menu);
+            if (!sibling) {
+                sibling = (event == INPUT_EVENT_RIGHT_ARROW)
+                    ? menu_get_first_child(s_menu_context.current_menu->parent)
+                    : menu_get_last_child(s_menu_context.current_menu->parent);
+            }
+            if (sibling) {
+                menu_navigate_to(sibling);
+            }
+        }
+        event_consumed = true;
+        break;
+
     case INPUT_EVENT_KEYCODE:
     case INPUT_EVENT_BACKSPACE:
     case INPUT_EVENT_TAB:
-    case INPUT_EVENT_RIGHT_ARROW:
-    case INPUT_EVENT_LEFT_ARROW:
     case INPUT_EVENT_DOWN_ARROW:
     case INPUT_EVENT_UP_ARROW:
         if (s_menu_context.current_menu->handle_input_key)
