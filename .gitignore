@@ -2,9 +2,12 @@ build/
 .vscode/
 cmake-*
 .idea/
+__pycache__/
+managed_components/
 sdkconfig.old
 node_modules
 *~
 *#
 .#*
 cscope.*
+dependencies.lock

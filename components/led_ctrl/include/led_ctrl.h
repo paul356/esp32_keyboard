@@ -20,7 +20,15 @@ extern "C" {
  */
 typedef enum {
     LED_PATTERN_OFF,                // All LEDs off
-    LED_PATTERN_HIT_KEY,            // Solid color
+    LED_PATTERN_HIT_KEY,            // Blue dot follows keystrokes
+    LED_PATTERN_BREATHING,          // Breathing effect (every 4th LED, sine brightness)
+    LED_PATTERN_WAVE,               // Traveling wave across LED strip
+    LED_PATTERN_RIPPLE,             // Expanding ripple from keypress
+    LED_PATTERN_RAINBOW,            // HSV rainbow sweep across strip
+    LED_PATTERN_RAINDROP,           // Matrix rain drops falling down
+    LED_PATTERN_SNAKE,              // Snake game with arrow-key control
+    LED_PATTERN_TEXT_SCROLL,        // Scrolling text on 5-row display
+    LED_PATTERN_FIRE,               // Fire simulation with rising flames
     LED_PATTERN_MAX
 } led_pattern_type_e;
 

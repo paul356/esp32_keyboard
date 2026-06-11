@@ -51,6 +51,12 @@ typedef struct {
 #define LED_COLOR_RED         LED_COLOR_RGB(255, 0, 0)
 #define LED_COLOR_GREEN       LED_COLOR_RGB(0, 255, 0)
 #define LED_COLOR_BLUE        LED_COLOR_RGB(0, 0, 255)
+#define LED_COLOR_CYAN        LED_COLOR_RGB(0, 255, 255)
+#define LED_COLOR_MAGENTA     LED_COLOR_RGB(255, 0, 255)
+#define LED_COLOR_YELLOW      LED_COLOR_RGB(255, 255, 0)
+#define LED_COLOR_ORANGE      LED_COLOR_RGB(255, 165, 0)
+#define LED_COLOR_PURPLE      LED_COLOR_RGB(128, 0, 128)
+#define LED_COLOR_PINK        LED_COLOR_RGB(255, 105, 180)
 
 /**
  * @brief Initialize the LED strip driver
