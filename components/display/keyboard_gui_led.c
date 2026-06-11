@@ -733,8 +733,8 @@ esp_err_t keyboard_gui_led_pattern_settings_action(void *user_ctx)
     }
     ESP_LOGI(TAG, "LED pattern applied successfully");
 
-    // Persist the pattern to NVS so it survives reboot/upgrade
-    ret = update_led_pattern((led_pattern_type_e)gui->selected_pattern);
+    // Persist the pattern and params to NVS so they survive reboot/upgrade
+    ret = update_led_pattern((led_pattern_type_e)gui->selected_pattern, param1_val, param2_val);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to persist LED pattern: %s", esp_err_to_name(ret));
     }
