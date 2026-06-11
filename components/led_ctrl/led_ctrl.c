@@ -65,7 +65,7 @@ static const struct {
     [LED_PATTERN_OFF]         = {0,    0},
     [LED_PATTERN_RAINBOW]     = {50,   0},   // speed
     [LED_PATTERN_RAINDROP]    = {5,    0},   // spawn rate (1/N)
-    [LED_PATTERN_RIPPLE]      = {2,    20},  // speed, max_age (frames)
+    [LED_PATTERN_RIPPLE]      = {1,    30},  // speed, max_age (frames)
     [LED_PATTERN_FIRE]        = {180,  40},  // intensity, spark_chance
     [LED_PATTERN_BREATHING]   = {3000, 0},   // period_ms
     [LED_PATTERN_WAVE]        = {50,   0},   // speed
