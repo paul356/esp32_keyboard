@@ -272,7 +272,7 @@ void set_default_led_enabled(control_state_t* state)
 
 void set_default_led_pattern(control_state_t* state)
 {
-    state->led.pattern = LED_PATTERN_HIT_KEY;
+    state->led.pattern = LED_PATTERN_RAINBOW;
 }
 
 void set_default_report_target_target(control_state_t* state)

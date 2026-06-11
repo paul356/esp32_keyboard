@@ -20,7 +20,14 @@ extern "C" {
  */
 typedef enum {
     LED_PATTERN_OFF,                // All LEDs off
-    LED_PATTERN_HIT_KEY,            // Solid color
+    LED_PATTERN_BREATHING,          // Breathing effect (every 4th LED, sine brightness)
+    LED_PATTERN_WAVE,               // Traveling wave across LED strip
+    LED_PATTERN_RIPPLE,             // Expanding ripple from keypress
+    LED_PATTERN_RAINBOW,            // HSV rainbow sweep across strip
+    LED_PATTERN_RAINDROP,           // Matrix rain drops falling down
+    LED_PATTERN_SNAKE,              // Snake game with arrow-key control
+    LED_PATTERN_TEXT_SCROLL,        // Scrolling text on 5-row display
+    LED_PATTERN_FIRE,               // Fire simulation with rising flames
     LED_PATTERN_MAX
 } led_pattern_type_e;
 
@@ -66,13 +73,13 @@ esp_err_t led_ctrl_get_pattern(led_pattern_type_e *pattern_type, uint32_t *param
  * This function should be called whenever a key is pressed or released.
  * It will trigger appropriate LED effects based on the current pattern.
  *
- * @param scancode Key scancode
+ * @param keycode USB HID keycode of the key
  * @param row Key position row
  * @param col Key position column
  * @param pressed True if pressed, false if released
  * @return ESP_OK on success, error code otherwise
  */
-esp_err_t led_ctrl_keystroke(uint8_t row, uint8_t col, bool pressed);
+esp_err_t led_ctrl_keystroke(uint16_t keycode, uint8_t row, uint8_t col, bool pressed);
 
 /**
  * @brief Set global LED brightness

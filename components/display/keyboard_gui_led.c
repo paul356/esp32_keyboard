@@ -50,7 +50,14 @@ typedef enum {
 // LED pattern definitions with human-readable names - mapped to led_pattern_type_e
 static const char* led_pattern_names[] = {
     "Off",           // LED_PATTERN_OFF
-    "Hit Key"        // LED_PATTERN_HIT_KEY
+    "Breathing",     // LED_PATTERN_BREATHING
+    "Wave",          // LED_PATTERN_WAVE
+    "Ripple",        // LED_PATTERN_RIPPLE
+    "Rainbow",       // LED_PATTERN_RAINBOW
+    "Raindrop",      // LED_PATTERN_RAINDROP
+    "Snake",         // LED_PATTERN_SNAKE
+    "Text Scroll",   // LED_PATTERN_TEXT_SCROLL
+    "Fire"           // LED_PATTERN_FIRE
 };
 
 #define LED_PATTERN_COUNT (LED_PATTERN_MAX)
@@ -723,8 +730,13 @@ esp_err_t keyboard_gui_led_pattern_settings_action(void *user_ctx)
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to set LED pattern: %s", esp_err_to_name(ret));
         return ret;
-    } else {
-        ESP_LOGI(TAG, "LED pattern applied successfully");
+    }
+    ESP_LOGI(TAG, "LED pattern applied successfully");
+
+    // Persist the pattern to NVS so it survives reboot/upgrade
+    ret = update_led_pattern((led_pattern_type_e)gui->selected_pattern);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to persist LED pattern: %s", esp_err_to_name(ret));
     }
 
     return ESP_OK;
