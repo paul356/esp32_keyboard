@@ -21,6 +21,10 @@ extern const lv_image_dsc_t led_icon;
 extern const lv_image_dsc_t advanced_icon;
 extern const lv_image_dsc_t info_icon;
 
+// Games menu icon
+extern const lv_image_dsc_t games_icon;
+extern const lv_image_dsc_t snake_icon;
+
 // New submenu icons
 extern const lv_image_dsc_t switch_icon;
 extern const lv_image_dsc_t bluetooth_pc_pair;
