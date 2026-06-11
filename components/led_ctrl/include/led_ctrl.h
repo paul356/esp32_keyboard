@@ -20,7 +20,6 @@ extern "C" {
  */
 typedef enum {
     LED_PATTERN_OFF,                // All LEDs off
-    LED_PATTERN_HIT_KEY,            // Blue dot follows keystrokes
     LED_PATTERN_BREATHING,          // Breathing effect (every 4th LED, sine brightness)
     LED_PATTERN_WAVE,               // Traveling wave across LED strip
     LED_PATTERN_RIPPLE,             // Expanding ripple from keypress

@@ -69,7 +69,6 @@ static const struct {
     [LED_PATTERN_FIRE]        = {180,  40},  // intensity, spark_chance
     [LED_PATTERN_BREATHING]   = {3000, 0},   // period_ms
     [LED_PATTERN_WAVE]        = {50,   0},   // speed
-    [LED_PATTERN_HIT_KEY]     = {2000, 0},   // hold_time_ms
     [LED_PATTERN_SNAKE]       = {0,    0},   // no params
     [LED_PATTERN_TEXT_SCROLL] = {40,   0},   // scroll_speed
 };
@@ -189,11 +188,9 @@ static const font_glyph_t s_font[] = {
 // Forward declarations
 static void led_ctrl_event_handler(void *event_handler_arg, esp_event_base_t event_base,
                                    int32_t event_id, void *event_data);
-static void update_led_pattern(uint32_t frame);
 static void refresh_led_pattern(void);
 static led_drv_color_t apply_brightness(led_drv_color_t color, uint8_t brightness);
 static void clear_all_leds(void);
-static void draw_hit_key_pattern(uint32_t index);
 static void draw_breathing_pattern(uint32_t frame);
 static void draw_wave_pattern(uint32_t frame);
 static void draw_ripple_pattern(uint32_t frame);
@@ -974,50 +971,12 @@ static led_drv_color_t apply_brightness(led_drv_color_t color, uint8_t brightnes
     return result;
 }
 
-static void draw_hit_key_pattern(uint32_t index)
-{
-    uint32_t prev = index - 1;
-    // Example: Increment a counter for demonstration purposes
-    if (prev >= LED_DRV_NUM_LEDS) {
-        prev = LED_DRV_NUM_LEDS - 1;
-    }
-
-    // Rotating hue per keypress: each press shifts to a new color
-    uint16_t hue = (uint16_t)((index * 7919) % 65536);  // prime multiplier for good distribution
-    led_drv_color_t color = hsv_to_rgb(hue, 255, 255);
-
-    // Apply brightness to colors
-    led_drv_color_t key_color = apply_brightness(color, s_current_pattern.brightness);
-
-    // Update LEDs with brightness-adjusted colors
-    led_drv_set_led(prev, LED_COLOR_BLACK);
-    led_drv_set_led(index, key_color);
-
-    // Only update LED strip if RMT hardware is enabled
-    if (s_rmt_enabled) {
-        led_drv_update(); // Update the LED strip with the new colors
-    } else {
-        ESP_LOGD(TAG, "Skipping LED update - RMT disabled");
-    }
-}
-
 /**
- * @brief Update LED pattern based on keystroke
- * This function updates the LED pattern based on the current pattern configuration
+ * Frame counter for time-based animation patterns.
  */
 static uint32_t current_frame;
-static void update_led_pattern(uint32_t frame) {
-    ESP_LOGD(TAG, "Updating LED pattern: frame=%lu", frame);
-
-    current_frame = frame;
-    uint32_t index = frame % LED_DRV_NUM_LEDS;
-    draw_hit_key_pattern(index);
-
-    ESP_LOGD(TAG, "Keystroke count: %lu", frame);
-}
 
 /**
- * @brief Refresh the current LED pattern
  * Called from the periodic timer via LED_CTRL_EVENT_UPDATE_LEDS.
  */
 static void refresh_led_pattern(void) {
@@ -1048,9 +1007,6 @@ static void refresh_led_pattern(void) {
         case LED_PATTERN_FIRE:
             draw_fire_pattern(current_frame);
             break;
-        case LED_PATTERN_HIT_KEY:
-            // HIT_KEY is event-driven; timer refresh does nothing
-            break;
         case LED_PATTERN_OFF:
         default:
             // OFF: do nothing
@@ -1068,15 +1024,10 @@ static void clear_all_leds(void)
     }
 }
 
-static uint32_t s_count = 0;
 static void handle_keystroke_event(uint16_t keycode, uint8_t row, uint8_t col, bool pressed) {
     ESP_LOGD(TAG, "Keystroke event: keycode=0x%04X, row=%d, col=%d, pressed=%d", keycode, row, col, pressed);
 
     switch (s_current_pattern.pattern) {
-        case LED_PATTERN_HIT_KEY:
-            update_led_pattern(s_count);
-            ++s_count;
-            break;
         case LED_PATTERN_RIPPLE: {
             int8_t led_idx = key_to_led(row, col);
             ripple_add(led_idx);

@@ -50,7 +50,6 @@ typedef enum {
 // LED pattern definitions with human-readable names - mapped to led_pattern_type_e
 static const char* led_pattern_names[] = {
     "Off",           // LED_PATTERN_OFF
-    "Hit Key",       // LED_PATTERN_HIT_KEY
     "Breathing",     // LED_PATTERN_BREATHING
     "Wave",          // LED_PATTERN_WAVE
     "Ripple",        // LED_PATTERN_RIPPLE
