@@ -142,11 +142,31 @@ bool menu_state_process_event(input_event_e event, unsigned char ch)
         event_consumed = true;
         break;
 
+    case INPUT_EVENT_RIGHT_ARROW:
+    case INPUT_EVENT_LEFT_ARROW:
+        if (s_menu_context.menu_active)
+        {
+            if (s_menu_context.current_menu->handle_input_key)
+            {
+                // Leaf items handle left/right for their own internal navigation
+                s_menu_context.current_menu->handle_input_key(s_menu_context.current_menu->user_ctx, event, ch);
+            }
+            else
+            {
+                // Switch focus between sibling menus (with wrap-around), same as encoder CW/CCW
+                if (event == INPUT_EVENT_RIGHT_ARROW) {
+                    menu_focus_next_child(s_menu_context.current_menu);
+                } else {
+                    menu_focus_prev_child(s_menu_context.current_menu);
+                }
+            }
+        }
+        event_consumed = true;
+        break;
+
     case INPUT_EVENT_KEYCODE:
     case INPUT_EVENT_BACKSPACE:
     case INPUT_EVENT_TAB:
-    case INPUT_EVENT_RIGHT_ARROW:
-    case INPUT_EVENT_LEFT_ARROW:
     case INPUT_EVENT_DOWN_ARROW:
     case INPUT_EVENT_UP_ARROW:
         if (s_menu_context.current_menu->handle_input_key)
