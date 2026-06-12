@@ -83,6 +83,8 @@ typedef struct _control_state_t {
     struct {
         bool enabled;
         led_pattern_type_e pattern;
+        uint32_t param1;
+        uint32_t param2;
     } led;
     struct {
         target_conn_e target;
@@ -115,6 +117,8 @@ static void set_default_ble_name(control_state_t* config);
 static void set_default_usb_enabled(control_state_t* config);
 static void set_default_led_enabled(control_state_t* config);
 static void set_default_led_pattern(control_state_t* config);
+static void set_default_led_param1(control_state_t* config);
+static void set_default_led_param2(control_state_t* config);
 static void set_default_report_target_target(control_state_t* config);
 static void set_default_report_target_ble_irk(control_state_t* config);
 
@@ -130,6 +134,8 @@ CONFIG_VALUE_GETTER_SETTER(ble, name)
 CONFIG_VALUE_GETTER_SETTER(usb, enabled)
 CONFIG_VALUE_GETTER_SETTER(led, enabled)
 CONFIG_VALUE_GETTER_SETTER(led, pattern)
+CONFIG_VALUE_GETTER_SETTER(led, param1)
+CONFIG_VALUE_GETTER_SETTER(led, param2)
 CONFIG_VALUE_GETTER_SETTER(report_target, target)
 CONFIG_VALUE_GETTER_SETTER(report_target, ble_irk)
 
@@ -151,7 +157,9 @@ static config_item_t usb_config[] = {
 
 static config_item_t led_config[] = {
     {"enabled", &load_led_enabled,  &save_led_enabled, set_default_led_enabled},
-    {"pattern", &load_led_pattern,  &save_led_pattern, set_default_led_pattern}
+    {"pattern", &load_led_pattern,  &save_led_pattern, set_default_led_pattern},
+    {"param1",  &load_led_param1,   &save_led_param1,  set_default_led_param1},
+    {"param2",  &load_led_param2,   &save_led_param2,  set_default_led_param2}
 };
 
 static config_item_t report_target_config[] = {
@@ -275,6 +283,16 @@ void set_default_led_pattern(control_state_t* state)
     state->led.pattern = LED_PATTERN_RAINBOW;
 }
 
+void set_default_led_param1(control_state_t* state)
+{
+    state->led.param1 = 0;  // 0 means use pattern default
+}
+
+void set_default_led_param2(control_state_t* state)
+{
+    state->led.param2 = 0;  // 0 means use pattern default
+}
+
 void set_default_report_target_target(control_state_t* state)
 {
     state->report_target.target = TARGET_USB;
@@ -358,7 +376,9 @@ esp_err_t restore_saved_state(void)
     log_memory_usage("After init_ble_device");
 
     if (function_state.led.enabled) {
-        ret = led_ctrl_set_pattern(function_state.led.pattern, 0, 0);
+        ret = led_ctrl_set_pattern(function_state.led.pattern,
+                                   function_state.led.param1,
+                                   function_state.led.param2);
     } else {
         ret = led_ctrl_set_pattern(LED_PATTERN_OFF, 0, 0);
     }
@@ -623,7 +643,7 @@ esp_err_t update_led_switch(bool flag)
     return update_persisted_config(LED);
 }
 
-esp_err_t update_led_pattern(led_pattern_type_e pattern)
+esp_err_t update_led_pattern(led_pattern_type_e pattern, uint32_t param1, uint32_t param2)
 {
     if (pattern < LED_PATTERN_OFF || pattern >= LED_PATTERN_MAX) {
         ESP_LOGE(TAG, "Invalid LED pattern: %d", pattern);
@@ -638,7 +658,9 @@ esp_err_t update_led_pattern(led_pattern_type_e pattern)
     }
 
     function_state.led.pattern = pattern;
-    led_ctrl_set_pattern(pattern, 0, 0);
+    function_state.led.param1 = param1;
+    function_state.led.param2 = param2;
+    led_ctrl_set_pattern(pattern, param1, param2);
 
     return update_persisted_config(LED);
 }
