@@ -149,20 +149,19 @@ bool menu_state_process_event(input_event_e event, unsigned char ch)
             // Leaf items handle left/right for their own internal navigation
             s_menu_context.current_menu->handle_input_key(s_menu_context.current_menu->user_ctx, event, ch);
         }
-        else if (s_menu_context.current_menu->parent)
+        else if (s_menu_context.menu_active && s_menu_context.current_menu->parent)
         {
-            // Navigate between sibling menus (with wrap-around)
-            struct menu_item *sibling = (event == INPUT_EVENT_RIGHT_ARROW)
-                ? menu_get_next_sibling(s_menu_context.current_menu)
-                : menu_get_prev_sibling(s_menu_context.current_menu);
-            if (!sibling) {
-                sibling = (event == INPUT_EVENT_RIGHT_ARROW)
-                    ? menu_get_first_child(s_menu_context.current_menu->parent)
-                    : menu_get_last_child(s_menu_context.current_menu->parent);
+            // Switch focus between sibling menus (with wrap-around), same as encoder CW/CCW
+            if (event == INPUT_EVENT_RIGHT_ARROW) {
+                menu_focus_next_child(s_menu_context.current_menu->parent);
+            } else {
+                menu_focus_prev_child(s_menu_context.current_menu->parent);
             }
-            if (sibling) {
-                menu_navigate_to(sibling);
-            }
+        }
+        else if (!s_menu_context.menu_active)
+        {
+            // If not active, return to root
+            menu_navigate_to(s_menu_context.root_menu);
         }
         event_consumed = true;
         break;
